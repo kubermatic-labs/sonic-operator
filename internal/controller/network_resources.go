@@ -36,6 +36,16 @@ func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 		return &api.SwitchDHCPRelay{}, &api.SwitchDHCPRelayList{}, nil
 	case "FRRMigration":
 		return &api.SwitchFRRMigration{}, &api.SwitchFRRMigrationList{}, nil
+	case "ACLPolicy":
+		return &api.SwitchACLPolicy{}, &api.SwitchACLPolicyList{}, nil
+	case "ACLBinding":
+		return &api.SwitchACLBinding{}, &api.SwitchACLBindingList{}, nil
+	case "QoSMap":
+		return &api.SwitchQoSMap{}, &api.SwitchQoSMapList{}, nil
+	case "Scheduler":
+		return &api.SwitchScheduler{}, &api.SwitchSchedulerList{}, nil
+	case "QoSBinding":
+		return &api.SwitchQoSBinding{}, &api.SwitchQoSBindingList{}, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported network kind %q", kind)
 	}
@@ -58,6 +68,16 @@ func networkFields(obj client.Object) (any, *api.NetworkResourceStatus, *api.Net
 	case *api.SwitchDHCPRelay:
 		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchFRRMigration:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchACLPolicy:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchACLBinding:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchQoSMap:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchScheduler:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchQoSBinding:
 		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	default:
 		panic("networkFields called with a non-network object")
@@ -124,6 +144,12 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 	}
 	target := ""
 	switch s := spec.(type) {
+	case *api.SwitchACLPolicySpec, *api.SwitchACLBindingSpec, *api.SwitchQoSMapSpec, *api.SwitchSchedulerSpec, *api.SwitchQoSBindingSpec:
+		var err error
+		target, err = trafficDesired(spec)
+		if err != nil {
+			return nil, "", err
+		}
 	case *api.SwitchFRRMigrationSpec:
 		if s.Mode != "Unified" && s.Mode != "Traditional" {
 			return nil, "", fmt.Errorf("FRR migration mode must be Traditional or Unified")

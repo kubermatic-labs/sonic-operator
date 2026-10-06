@@ -7,7 +7,11 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,12 +21,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/yaml"
 )
 
 func TestNetworkSchema(t *testing.T) {
 	env := &envtest.Environment{BinaryAssetsDirectory: getFirstFoundEnvTestBinaryDir(), ErrorIfCRDPathMissing: true}
+	// Generate into test-local storage: concurrent workers own the shared outputs.
+	crdDir := t.TempDir()
+	gen := exec.Command(filepath.Join("..", "..", "bin", "controller-gen"), "crd", "paths=../../api/v1alpha1", "output:crd:artifacts:config="+crdDir)
+	if output, err := gen.CombinedOutput(); err != nil {
+		t.Fatalf("generate test-local schemas: %v\n%s", err, output)
+	}
 	for _, resource := range networkTestSpecs {
-		env.CRDDirectoryPaths = append(env.CRDDirectoryPaths, filepath.Join("..", "..", "config", "crd", "bases", "sonic.networking.metal.ironcore.dev_switch"+strings.ToLower(resource.kind)+"s.yaml"))
+		plural := strings.ToLower(resource.kind) + "s"
+		if resource.kind == "ACLPolicy" {
+			plural = "aclpolicies"
+		}
+		env.CRDDirectoryPaths = append(env.CRDDirectoryPaths, filepath.Join(crdDir, "sonic.networking.metal.ironcore.dev_switch"+plural+".yaml"))
 	}
 	cfg, err := env.Start()
 	if err != nil {
@@ -71,7 +86,7 @@ func TestNetworkSchema(t *testing.T) {
 			if resource.kind == "PortChannel" && (got["minLinks"] != int64(1) || got["mtu"] != int64(9100) || got["lacpMode"] != "active" || got["adminState"] != "Up" || got["fastRate"] != false) {
 				t.Fatalf("incorrect LAG defaults: %+v", got)
 			}
-			if resource.kind != "VRF" && resource.kind != "PortChannel" && resource.kind != "FRRMigration" && got["vrf"] != "default" {
+			if !isTrafficKind(resource.kind) && resource.kind != "VRF" && resource.kind != "PortChannel" && resource.kind != "FRRMigration" && got["vrf"] != "default" {
 				t.Fatalf("missing default VRF: %+v", got)
 			}
 			if resource.kind == "StaticRoute" {
@@ -191,6 +206,10 @@ func TestNetworkSchema(t *testing.T) {
 						key, value = "address", "192.0.2.3"
 					case "DHCPRelay":
 						key, value = "vlanID", int64(11)
+					case "ACLBinding":
+						key, value = "policy", "other"
+					case "QoSBinding":
+						key, value = "interfaceName", "Ethernet4"
 					}
 					_ = unstructured.SetNestedField(changed.Object, value, "spec", key)
 				}
@@ -247,6 +266,15 @@ func TestNetworkSchema(t *testing.T) {
 					}
 				}
 				_ = unstructured.SetNestedField(bad.Object, value, "spec", key)
+				if isTrafficKind(resource.kind) && (invalid == "value" || invalid == "duplicate") {
+					// Normalize numbers and slices into unstructured-compatible values.
+					raw, _ := json.Marshal(trafficInvalidFields(resource.kind, invalid == "duplicate"))
+					var fields map[string]any
+					_ = json.Unmarshal(raw, &fields)
+					for key, value := range fields {
+						_ = unstructured.SetNestedField(bad.Object, value, "spec", key)
+					}
+				}
 				if err := c.Create(t.Context(), bad); !apierrors.IsInvalid(err) {
 					t.Fatalf("%s accepted: %v", invalid, err)
 				}
@@ -263,4 +291,70 @@ func TestNetworkSchema(t *testing.T) {
 			}
 		})
 	}
+	for i, tc := range trafficValidationCases {
+		t.Run("traffic/"+tc.name, func(t *testing.T) {
+			// Use the Kubernetes JSON decoder to retain exact int64 values.
+			obj := &unstructured.Unstructured{}
+			raw := fmt.Sprintf(`{"apiVersion":%q,"kind":%q,"metadata":{"name":"contract-%d"},"spec":%s}`, api.GroupVersion.String(), "Switch"+tc.kind, i, tc.spec)
+			if err := obj.UnmarshalJSON([]byte(raw)); err != nil {
+				t.Fatal(err)
+			}
+			_ = unstructured.SetNestedField(obj.Object, "leaf", "spec", "switchRef", "name")
+			err := c.Create(t.Context(), obj)
+			if tc.valid {
+				if err != nil {
+					t.Fatalf("valid contract rejected: %v", err)
+				}
+				if tc.kind == "Scheduler" {
+					meter, _, _ := unstructured.NestedString(obj.Object, "spec", "meterType")
+					if meter == "" {
+						t.Fatal("missing Bytes default")
+					}
+				}
+			} else if !apierrors.IsInvalid(err) {
+				t.Fatalf("invalid contract accepted: %v", err)
+			}
+		})
+	}
+	t.Run("QoS map type immutable", func(t *testing.T) {
+		obj := &api.SwitchQoSMap{}
+		if err := c.Get(t.Context(), client.ObjectKey{Name: "defaults"}, obj); err != nil {
+			t.Fatal(err)
+		}
+		obj.Spec.Type = "TCToQueue"
+		if err := c.Update(t.Context(), obj); !apierrors.IsInvalid(err) {
+			t.Fatalf("type update accepted: %v", err)
+		}
+	})
+	t.Run("traffic documentation samples", func(t *testing.T) {
+		doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "usage", "traffic-policy.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		blocks := regexp.MustCompile("(?s)```yaml\\n(.*?)```").FindAllSubmatch(doc, -1)
+		count := 0
+		for _, block := range blocks {
+			for _, sample := range strings.Split(string(block[1]), "\n---\n") {
+				data, err := yaml.YAMLToJSON([]byte(sample))
+				if err != nil {
+					t.Fatal(err)
+				}
+				obj := &unstructured.Unstructured{}
+				if err := obj.UnmarshalJSON(data); err != nil {
+					t.Fatal(err)
+				}
+				if err := c.Create(t.Context(), obj); err != nil {
+					t.Fatal(err)
+				}
+				policy, _, _ := unstructured.NestedString(obj.Object, "spec", "managementPolicy")
+				if policy != "Observe" {
+					t.Fatal("sample permits writes")
+				}
+				count++
+			}
+		}
+		if count != 6 {
+			t.Fatalf("validated %d samples, want 6", count)
+		}
+	})
 }

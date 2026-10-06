@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"strings"
 	"testing"
 
 	switchAgent "github.com/ironcore-dev/sonic-operator/internal/agent/interface"
@@ -14,6 +15,40 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func TestGroupedNetworkEnvelope(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding"} {
+		t.Run(kind, func(t *testing.T) {
+			for _, tc := range []struct {
+				name, kind string
+				valid      bool
+			}{
+				{"canonical", kind, true},
+				{"lowercase", strings.ToLower(kind), false},
+				{"space", kind + " ", false},
+				{"null", kind + "\x00", false},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					for _, write := range []bool{false, true} {
+						err := agent.ValidateNetworkRequest(&agent.NetworkRequest{Kind: tc.kind, OwnerID: "uid", Spec: json.RawMessage(`{}`)}, write)
+						if (err == nil) != tc.valid {
+							t.Fatalf("write=%v err=%v", write, err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestTrafficPolicyFlagDefaultsDisabled(t *testing.T) {
+	t.Parallel()
+	f := flag.Lookup("allow-traffic-policy")
+	if f == nil || f.DefValue != "false" {
+		t.Fatalf("traffic policy must have an independent, default-disabled flag: %v", f)
+	}
+}
 
 func TestFRRMigrationEnvelope(t *testing.T) {
 	t.Parallel()

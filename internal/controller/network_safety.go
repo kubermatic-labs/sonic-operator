@@ -24,7 +24,7 @@ import (
 
 func (r *NetworkReconciler) networkWritesDisabled(common *api.NetworkResourceSpec) bool {
 	return r.ObserveOnly || !r.AllowNetworkConfig || common.ManagementPolicy != api.NetworkManagementPolicyManage ||
-		(r.Kind == "FRRMigration" && !r.AllowFRRMigration)
+		(r.Kind == "FRRMigration" && !r.AllowFRRMigration) || (isTrafficKind(r.Kind) && !r.AllowTrafficPolicy)
 }
 
 // Check the fresh Get result, never the previously published Kubernetes status.
@@ -102,6 +102,7 @@ func (r *NetworkReconciler) checkNetworkClaims(ctx context.Context, obj client.O
 			aliases[other.Name] = true
 		}
 	}
+
 	_, list, _ := networkObjects(r.Kind)
 	if err := r.APIReader.List(ctx, list); err != nil {
 		return err
@@ -124,6 +125,7 @@ func (r *NetworkReconciler) checkNetworkClaims(ctx context.Context, obj client.O
 		if otherTarget == target {
 			return fmt.Errorf("%s %q also claims target %q on this switch", r.Kind, other.GetName(), target)
 		}
+
 		return nil
 	})
 }

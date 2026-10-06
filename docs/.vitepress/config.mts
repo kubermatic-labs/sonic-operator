@@ -83,6 +83,7 @@ export default withMermaid({
           { text: 'LAG and Layer 3', link: '/usage/lag-l3-mappings' },
           { text: 'BGP and DHCP relay', link: '/usage/bgp-relay' },
           { text: 'FRR mode migration', link: '/usage/frr-migration' },
+          { text: 'ACL and QoS', link: '/usage/traffic-policy' },
         ]
       },
       {

@@ -15,6 +15,11 @@ resources:
 - bases/sonic.networking.metal.ironcore.dev_switchbgppeers.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchdhcprelays.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchfrrmigrations.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchaclpolicies.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchaclbindings.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchqosmaps.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchschedulers.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchqosbindings.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

@@ -31,6 +31,11 @@ var networkTestSpecs = []struct{ kind, spec string }{
 	{"BGPPeer", `{"address":"192.0.2.2","remoteASN":65002,"addressFamilies":["ipv4Unicast"]}`},
 	{"DHCPRelay", `{"vlanID":10,"ipv4Servers":["192.0.2.10"],"ipv6Servers":["2001:db8::10"]}`},
 	{"FRRMigration", `{"mode":"Unified","approvedDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`},
+	{"ACLPolicy", `{"name":"edge","family":"IPv4","defaultAction":"Drop","rules":[{"name":"web","priority":100,"action":"Permit","protocol":6,"destinationPort":443}]}`},
+	{"ACLBinding", `{"policy":"edge","interfaces":["Ethernet0","PortChannel10"]}`},
+	{"QoSMap", `{"name":"dscp","type":"DSCPToTC","entries":[{"from":0,"to":0},{"from":46,"to":5}]}`},
+	{"Scheduler", `{"name":"weighted","algorithm":"DWRR","weight":10}`},
+	{"QoSBinding", `{"interfaceName":"Ethernet0","dscpToTC":"dscp","queues":[{"index":0,"scheduler":"weighted"}]}`},
 }
 
 type networkTestAgent struct {
@@ -92,6 +97,7 @@ func networkFixture(t *testing.T, kind, spec string) (client.Object, *api.Switch
 		return a, nil
 	}}
 	r.AllowFRRMigration = kind == "FRRMigration"
+	r.AllowTrafficPolicy = isTrafficKind(kind)
 	return obj, sw, a, c, r
 }
 
@@ -290,6 +296,9 @@ func TestNetworkInvalidSpecNeverWrites(t *testing.T) {
 				case "policy":
 					fields["managementPolicy"] = "manage"
 				case "value":
+					if isTrafficKind(resource.kind) {
+						fields = trafficInvalidFields(resource.kind, false)
+					}
 					switch resource.kind {
 					case "PortChannel":
 						fields["lacpMode"] = "static"
@@ -309,6 +318,9 @@ func TestNetworkInvalidSpecNeverWrites(t *testing.T) {
 						fields["mode"] = "split"
 					}
 				case "duplicate":
+					if isTrafficKind(resource.kind) {
+						fields = trafficInvalidFields(resource.kind, true)
+					}
 					switch resource.kind {
 					case "PortChannel":
 						fields["members"] = []string{"Ethernet0", "Ethernet0"}

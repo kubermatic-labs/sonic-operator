@@ -12,7 +12,7 @@ import (
 // NetworkResourceSpecApplyConfiguration represents a declarative configuration of the NetworkResourceSpec type for use
 // with apply.
 //
-// NetworkResourceSpec is shared by the eight network resources.
+// NetworkResourceSpec is shared by the allowlisted network resources.
 type NetworkResourceSpecApplyConfiguration struct {
 	SwitchRef        *NetworkSwitchReferenceApplyConfiguration `json:"switchRef,omitempty"`
 	ManagementPolicy *apiv1alpha1.NetworkManagementPolicy      `json:"managementPolicy,omitempty"`

@@ -25,7 +25,7 @@ type NetworkSwitchReference struct {
 	Name string `json:"name"`
 }
 
-// NetworkResourceSpec is shared by the eight network resources.
+// NetworkResourceSpec is shared by the allowlisted network resources.
 type NetworkResourceSpec struct {
 	// +required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="switchRef is immutable"
@@ -85,7 +85,11 @@ func init() {
 			&SwitchPortChannel{}, &SwitchPortChannelList{}, &SwitchVRF{}, &SwitchVRFList{},
 			&SwitchL3Interface{}, &SwitchL3InterfaceList{}, &SwitchStaticRoute{}, &SwitchStaticRouteList{},
 			&SwitchBGP{}, &SwitchBGPList{}, &SwitchBGPPeer{}, &SwitchBGPPeerList{}, &SwitchDHCPRelay{}, &SwitchDHCPRelayList{},
-			&SwitchFRRMigration{}, &SwitchFRRMigrationList{})
+			&SwitchFRRMigration{}, &SwitchFRRMigrationList{},
+			&SwitchACLPolicy{}, &SwitchACLPolicyList{}, &SwitchACLBinding{}, &SwitchACLBindingList{},
+			&SwitchQoSMap{}, &SwitchQoSMapList{}, &SwitchScheduler{}, &SwitchSchedulerList{},
+			&SwitchQoSBinding{}, &SwitchQoSBindingList{},
+		)
 		return nil
 	})
 }
