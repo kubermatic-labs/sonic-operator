@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"reflect"
 	"time"
 
@@ -44,6 +45,26 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	if err != nil {
 		return fmt.Errorf("invalid recorded request: %w", err)
 	}
+	if r.Kind == "EVPNPeer" || r.Kind == "EVPN" {
+		// Preserve the originally resolved mapping snapshot. Recovery must not
+		// silently replace it with today's dependency state or drop it by
+		// unmarshalling the internal payload into the public API type.
+		var recorded map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(raw), &recorded); err != nil {
+			return err
+		}
+		if mappings, ok := recorded["mappings"]; ok {
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(request.Spec, &fields); err != nil {
+				return err
+			}
+			fields["mappings"] = mappings
+			request.Spec, err = json.Marshal(fields)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	// Only immutable selectors must agree. Mutable fields may be invalid or new.
 	currentSpec, _, _ := networkFields(obj)
 	currentRaw, err := json.Marshal(currentSpec)
@@ -61,7 +82,17 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	// saved mode and approval before considering a transition in either direction.
 	for _, field := range []string{"switchRef", "name", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "domainID", "peerSwitchRef", "tunnel"} {
 		current, previous := currentFields[field], savedFields[field]
-
+		if field == "address" && r.Kind == "EVPNPeer" {
+			canonical := func(value any) any {
+				if s, ok := value.(string); ok {
+					if ip, err := netip.ParseAddr(s); err == nil {
+						return ip.String()
+					}
+				}
+				return value
+			}
+			current, previous = canonical(current), canonical(previous)
+		}
 		if field == "vrf" {
 			if current == nil || current == "" {
 				current = "default"
@@ -72,6 +103,17 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 		}
 		if !reflect.DeepEqual(current, previous) {
 			return fmt.Errorf("recorded network target selector %s changed; retaining finalizer", field)
+		}
+	}
+	if r.Kind == "EVPNPeer" {
+		role := func(v any) any {
+			if v == nil || v == "" {
+				return "Leaf"
+			}
+			return v
+		}
+		if role(currentFields["role"]) != role(savedFields["role"]) {
+			return fmt.Errorf("EVPN peer role changed during recovery")
 		}
 	}
 	sw := &api.Switch{}

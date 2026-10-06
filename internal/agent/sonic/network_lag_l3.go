@@ -511,6 +511,15 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 		return nil, fmt.Errorf("1..256 addresses required; removal is outside additive scope")
 	}
 	table := lagL3InterfaceTable(spec.Name)
+	if table == "VLAN_INTERFACE" {
+		// Enforce the L2-only invariant in both creation orders. This runs on
+		// pending-request replanning too, before either pre/post-state recovery.
+		for key, fields := range db {
+			if strings.HasPrefix(key, "VXLAN_TUNNEL_MAP|") && fields["vlan"] == spec.Name {
+				return nil, fmt.Errorf("SVI conflicts with existing L2 VXLAN VLAN mapping; gateway/IRB is unsupported")
+			}
+		}
+	}
 	key := table + "|" + spec.Name
 	old := db[key]
 	oldVRF := old["vrf_name"]

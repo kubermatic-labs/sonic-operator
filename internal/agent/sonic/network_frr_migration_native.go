@@ -34,6 +34,7 @@ const (
 	frrMigrationRestart
 	frrMigrationContainer
 	frrMigrationSeparatedCandidate
+	frrMigrationAddresses
 )
 
 // Fixed commands only. No spec field, approval, hostname or DB content is ever
@@ -57,6 +58,8 @@ func runFRRMigration(ctx context.Context, command frrMigrationCommand) ([]byte, 
 		argv = []string{"ip", "-j", "-4", "route", "show", "table", "all"}
 	case frrMigrationKernel6:
 		argv = []string{"ip", "-j", "-6", "route", "show", "table", "all"}
+	case frrMigrationAddresses:
+		argv = []string{"ip", "-j", "address", "show"}
 	case frrMigrationService:
 		argv = []string{"systemctl", "show", "bgp.service", "-p", "ActiveState", "-p", "SubState", "-p", "Result", "-p", "InvocationID"}
 	case frrMigrationCandidate:
@@ -384,6 +387,7 @@ func inspectFRRMigration(ctx context.Context, db vlanChangeDB, modes ...string) 
 		}
 	}
 	var routes []string
+	var hostEvidence frrMigrationHostEvidence
 	for _, command := range []frrMigrationCommand{frrMigrationRoutes4, frrMigrationRoutes6, frrMigrationKernel4, frrMigrationKernel6} {
 		stage = map[frrMigrationCommand]frrMigrationDiagnostic{frrMigrationRoutes4: "FRRIPv4RoutesUnsupported", frrMigrationRoutes6: "FRRIPv6RoutesUnsupported", frrMigrationKernel4: "KernelIPv4RoutesUnsupported", frrMigrationKernel6: "KernelIPv6RoutesUnsupported"}[command]
 		data, err := runFRRMigration(ctx, command)
@@ -392,9 +396,33 @@ func inspectFRRMigration(ctx context.Context, db vlanChangeDB, modes ...string) 
 		}
 		semantic, err := frrMigrationValidateRoutes(data, command == frrMigrationKernel4 || command == frrMigrationKernel6, db)
 		if err != nil {
+			if hostEvidence == nil {
+				addresses, probeErr := runFRRMigration(ctx, frrMigrationAddresses)
+				if probeErr != nil {
+					return evidence, fmt.Errorf("host address corroboration unavailable")
+				}
+				hostEvidence, probeErr = frrMigrationHostAddresses(addresses, db)
+				if probeErr != nil {
+					return evidence, probeErr
+				}
+			}
+			semantic, err = frrMigrationValidateRoutes(data, command == frrMigrationKernel4 || command == frrMigrationKernel6, db, hostEvidence)
+		}
+		if err != nil {
 			return evidence, err
 		}
 		routes = append(routes, semantic)
+	}
+	if hostEvidence != nil {
+		addresses, err := runFRRMigration(ctx, frrMigrationAddresses)
+		if err != nil {
+			return evidence, err
+		}
+		after, err := frrMigrationHostAddresses(addresses, db)
+		if err != nil || after.semantic() != hostEvidence.semantic() {
+			return evidence, fmt.Errorf("host addresses changed during routing verification")
+		}
+		routes = append(routes, hostEvidence.semantic())
 	}
 	data, _ := json.Marshal(routes)
 	evidence.RoutesHash = vlanChangeHash(data)
@@ -550,8 +578,11 @@ func frrMigrationRouteAllowed(dst, dev, protocol, kind, gateway string, db vlanC
 	return false
 }
 
-func frrMigrationValidateRoutes(data []byte, kernel bool, db vlanChangeDB) (string, error) {
+func frrMigrationValidateRoutes(data []byte, kernel bool, db vlanChangeDB, host ...frrMigrationHostEvidence) (string, error) {
 	fail := func() (string, error) { return "", fmt.Errorf("unsupported effective routing state") }
+	allowed := func(dst, dev, protocol, kind, gateway string) bool {
+		return frrMigrationRouteAllowed(dst, dev, protocol, kind, gateway, db, kernel) || len(host) == 1 && host[0].routeAllowed(dst, dev, protocol, kind, gateway, kernel)
+	}
 	var semantic []string
 	if kernel {
 		var rows []struct {
@@ -572,7 +603,7 @@ func frrMigrationValidateRoutes(data []byte, kernel bool, db vlanChangeDB) (stri
 			if table != "" && table != `"default"` && table != `"local"` && table != `"main"` && table != "253" && table != "254" && table != "255" {
 				return fail()
 			}
-			if len(r.Nexthops) > 0 || len(r.Encap) > 0 || !frrMigrationRouteAllowed(r.Dst, r.Dev, r.Protocol, r.Type, r.Gateway, db, true) {
+			if len(r.Nexthops) > 0 || len(r.Encap) > 0 || !allowed(r.Dst, r.Dev, r.Protocol, r.Type, r.Gateway) {
 				return fail()
 			}
 			semantic = append(semantic, strings.Join([]string{r.Dst, r.Dev, r.Protocol, r.Type, r.Gateway, table}, "|"))
@@ -602,10 +633,14 @@ func frrMigrationValidateRoutes(data []byte, kernel bool, db vlanChangeDB) (stri
 						return fail()
 					}
 					for _, hop := range r.Nexthops {
-						if !frrMigrationRouteAllowed(prefix, hop.InterfaceName, r.Protocol, "", hop.IP, db, false) {
+						if !allowed(prefix, hop.InterfaceName, r.Protocol, "", hop.IP) {
 							return fail()
 						}
-						semantic = append(semantic, prefix+"|"+r.Protocol+"|"+hop.InterfaceName)
+						value := prefix + "|" + r.Protocol + "|" + hop.InterfaceName
+						if hop.IP != "" {
+							value += "|" + hop.IP
+						}
+						semantic = append(semantic, value)
 					}
 				}
 			}

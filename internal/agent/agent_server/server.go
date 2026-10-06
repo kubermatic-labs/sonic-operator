@@ -40,6 +40,7 @@ var (
 	allowNetworkConfig      = flag.Bool("allow-network-config", false, "Allow network configuration when read-only is disabled")
 	allowFRRMigration       = flag.Bool("allow-frr-migration", false, "Allow FRR migration when network configuration is enabled and read-only is disabled")
 	allowTrafficPolicy      = flag.Bool("allow-traffic-policy", false, "Allow ACL and QoS configuration when network configuration is enabled and read-only is disabled")
+	allowRedundancy         = flag.Bool("allow-redundancy", false, "Allow MLAG and EVPN/VXLAN configuration when network configuration is enabled and read-only is disabled")
 	networkJournalDir       = flag.String("network-journal-dir", "", "Private persistent absolute network journal directory; required for network writes and all cooperating writers after first use")
 )
 
@@ -355,6 +356,11 @@ func newGRPCServerWithFRRMigration(certFile, keyFile, clientCAFile string, readO
 
 // Traffic policy requires an independent opt-in for both Ensure and Recover.
 func newGRPCServerWithTrafficPolicy(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic bool) (*grpc.Server, error) {
+	return newGRPCServerWithRedundancy(certFile, keyFile, clientCAFile, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic, false)
+}
+
+// Redundancy requires an independent opt-in for both Ensure and Recover.
+func newGRPCServerWithRedundancy(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic, allowRedundancy bool) (*grpc.Server, error) {
 	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
 	if err != nil {
 		return nil, err
@@ -380,6 +386,10 @@ func newGRPCServerWithTrafficPolicy(certFile, keyFile, clientCAFile string, read
 				return nil, grpcstatus.Error(codes.PermissionDenied, "FRR migration requires --allow-frr-migration=true")
 			}
 			switch r.GetKind() {
+			case "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer", "EVPN":
+				if !allowRedundancy {
+					return nil, grpcstatus.Error(codes.PermissionDenied, "redundancy requires --allow-redundancy=true")
+				}
 			case "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
 				if !allowTraffic {
 					return nil, grpcstatus.Error(codes.PermissionDenied, "traffic policy requires --allow-traffic-policy=true")
@@ -414,7 +424,7 @@ func StartServer() {
 	flag.Parse()
 
 	// Validate security configuration before opening a listener or contacting the backend.
-	s, err := newGRPCServerWithTrafficPolicy(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration, *allowTrafficPolicy)
+	s, err := newGRPCServerWithRedundancy(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration, *allowTrafficPolicy, *allowRedundancy)
 	if err != nil {
 		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}

@@ -57,6 +57,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchDHCPRelayApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchDHCPRelaySpec"):
 		return &apiv1alpha1.SwitchDHCPRelaySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchEVPN"):
+		return &apiv1alpha1.SwitchEVPNApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchEVPNPeer"):
+		return &apiv1alpha1.SwitchEVPNPeerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchEVPNPeerSpec"):
+		return &apiv1alpha1.SwitchEVPNPeerSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchEVPNSpec"):
+		return &apiv1alpha1.SwitchEVPNSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchFRRMigration"):
 		return &apiv1alpha1.SwitchFRRMigrationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchFRRMigrationSpec"):
@@ -71,6 +79,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchL3InterfaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchL3InterfaceSpec"):
 		return &apiv1alpha1.SwitchL3InterfaceSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchMLAG"):
+		return &apiv1alpha1.SwitchMLAGApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchMLAGSpec"):
+		return &apiv1alpha1.SwitchMLAGSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakout"):
 		return &apiv1alpha1.SwitchPortBreakoutApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakoutChild"):
@@ -113,10 +125,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchVLANSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANStatus"):
 		return &apiv1alpha1.SwitchVLANStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANVNI"):
+		return &apiv1alpha1.SwitchVLANVNIApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANVNISpec"):
+		return &apiv1alpha1.SwitchVLANVNISpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVRF"):
 		return &apiv1alpha1.SwitchVRFApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVRFSpec"):
 		return &apiv1alpha1.SwitchVRFSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVXLANTunnel"):
+		return &apiv1alpha1.SwitchVXLANTunnelApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVXLANTunnelSpec"):
+		return &apiv1alpha1.SwitchVXLANTunnelSpecApplyConfiguration{}
 
 	}
 	return nil

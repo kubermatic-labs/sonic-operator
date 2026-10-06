@@ -18,9 +18,12 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 - [SwitchBGPPeer](#switchbgppeer)
 - [SwitchCredentials](#switchcredentials)
 - [SwitchDHCPRelay](#switchdhcprelay)
+- [SwitchEVPN](#switchevpn)
+- [SwitchEVPNPeer](#switchevpnpeer)
 - [SwitchFRRMigration](#switchfrrmigration)
 - [SwitchInterface](#switchinterface)
 - [SwitchL3Interface](#switchl3interface)
+- [SwitchMLAG](#switchmlag)
 - [SwitchPortBreakout](#switchportbreakout)
 - [SwitchPortChannel](#switchportchannel)
 - [SwitchQoSBinding](#switchqosbinding)
@@ -28,7 +31,9 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 - [SwitchScheduler](#switchscheduler)
 - [SwitchStaticRoute](#switchstaticroute)
 - [SwitchVLAN](#switchvlan)
+- [SwitchVLANVNI](#switchvlanvni)
 - [SwitchVRF](#switchvrf)
+- [SwitchVXLANTunnel](#switchvxlantunnel)
 
 
 
@@ -80,6 +85,8 @@ _Underlying type:_ _string_
 
 _Appears in:_
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
+- [SwitchEVPNSpec](#switchevpnspec)
 - [SwitchInterfaceSpec](#switchinterfacespec)
 - [SwitchInterfaceStatus](#switchinterfacestatus)
 - [SwitchPortBreakoutChild](#switchportbreakoutchild)
@@ -172,6 +179,21 @@ _Appears in:_
 | `type` _[HostPathType](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#hostpathtype-v1-core)_ | Type describes the expected host-path type, following the Kubernetes Pod<br />hostPath API. Generated ZTP does not create missing paths. |  |  |
 
 
+#### MLAGPortChannel
+
+_Underlying type:_ _string_
+
+
+
+_Validation:_
+- MaxLength: 32
+- Pattern: `^PortChannel(0|[1-9][0-9]{0,3})$`
+
+_Appears in:_
+- [SwitchMLAGSpec](#switchmlagspec)
+
+
+
 #### Management
 
 
@@ -220,6 +242,7 @@ _Validation:_
 _Appears in:_
 - [StaticRouteNextHop](#staticroutenexthop)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 
 
 
@@ -253,14 +276,19 @@ _Appears in:_
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
+- [SwitchEVPNSpec](#switchevpnspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
+- [SwitchMLAGSpec](#switchmlagspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
+- [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
 
 | Field | Description |
 | --- | --- |
@@ -298,14 +326,19 @@ _Appears in:_
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
+- [SwitchEVPNSpec](#switchevpnspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
+- [SwitchMLAGSpec](#switchmlagspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
+- [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -327,14 +360,19 @@ _Appears in:_
 - [SwitchBGP](#switchbgp)
 - [SwitchBGPPeer](#switchbgppeer)
 - [SwitchDHCPRelay](#switchdhcprelay)
+- [SwitchEVPN](#switchevpn)
+- [SwitchEVPNPeer](#switchevpnpeer)
 - [SwitchFRRMigration](#switchfrrmigration)
 - [SwitchL3Interface](#switchl3interface)
+- [SwitchMLAG](#switchmlag)
 - [SwitchPortChannel](#switchportchannel)
 - [SwitchQoSBinding](#switchqosbinding)
 - [SwitchQoSMap](#switchqosmap)
 - [SwitchScheduler](#switchscheduler)
 - [SwitchStaticRoute](#switchstaticroute)
+- [SwitchVLANVNI](#switchvlanvni)
 - [SwitchVRF](#switchvrf)
+- [SwitchVXLANTunnel](#switchvxlantunnel)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -362,14 +400,19 @@ _Appears in:_
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
+- [SwitchEVPNSpec](#switchevpnspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
+- [SwitchMLAGSpec](#switchmlagspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
+- [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -390,6 +433,7 @@ _Appears in:_
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 
@@ -515,6 +559,55 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `index` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 0 <br /> |
 | `scheduler` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+
+
+#### RedundancyIPv4
+
+_Underlying type:_ _string_
+
+
+
+_Validation:_
+- MaxLength: 15
+
+_Appears in:_
+- [SwitchMLAGSpec](#switchmlagspec)
+- [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
+
+
+
+#### RedundancyName
+
+_Underlying type:_ _string_
+
+RedundancyName is a native SONiC identifier, never a table key or command.
+
+_Validation:_
+- MaxLength: 32
+- MinLength: 1
+- Pattern: `^[A-Za-z][A-Za-z0-9_-]*$`
+
+_Appears in:_
+- [SwitchEVPNSpec](#switchevpnspec)
+- [SwitchVLANVNISpec](#switchvlanvnispec)
+- [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
+
+
+
+#### RouteIdentifier
+
+_Underlying type:_ _string_
+
+RouteIdentifier accepts the two-octet ASN, four-octet ASN, and IPv4 forms.
+
+_Validation:_
+- MaxLength: 21
+- Pattern: `^((0|[1-9][0-9]{0,9})|([0-9]{1,3}\.){3}[0-9]{1,3}):(0|[1-9][0-9]{0,9})$`
+
+_Appears in:_
+- [SwitchEVPNPeerSpec](#switchevpnpeerspec)
+- [SwitchVLANVNISpec](#switchvlanvnispec)
+
 
 
 #### StaticRouteNextHop
@@ -776,6 +869,90 @@ _Appears in:_
 | `ipv6Servers` _string array_ |  |  | MaxItems: 16 <br />items:MaxLength: 45 <br /> |
 
 
+#### SwitchEVPN
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchEVPN` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchEVPNSpec](#switchevpnspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchEVPNPeer
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchEVPNPeer` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchEVPNPeerSpec](#switchevpnpeerspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchEVPNPeerSpec
+
+
+
+SwitchEVPNPeerSpec owns the EVPN AF of an existing shared BGP neighbor.
+
+
+
+_Appears in:_
+- [SwitchEVPNPeer](#switchevpnpeer)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `role` _string_ | Role distinguishes local VTEP participation from spine transit. | Leaf | Enum: [Leaf Transit] <br /> |
+| `importRouteTargets` _[RouteIdentifier](#routeidentifier) array_ | Transit peers use explicit RT sets without local mapping references. |  | MaxItems: 64 <br />MaxLength: 21 <br />Pattern: `^((0\|[1-9][0-9]\{0,9\})\|([0-9]\{1,3\}\.)\{3\}[0-9]\{1,3\}):(0\|[1-9][0-9]\{0,9\})$` <br /> |
+| `exportRouteTargets` _[RouteIdentifier](#routeidentifier) array_ |  |  | MaxItems: 64 <br />MaxLength: 21 <br />Pattern: `^((0\|[1-9][0-9]\{0,9\})\|([0-9]\{1,3\}\.)\{3\}[0-9]\{1,3\}):(0\|[1-9][0-9]\{0,9\})$` <br /> |
+| `vrf` _[NetworkVRFName](#networkvrfname)_ |  | default | Enum: [default] <br />MaxLength: 15 <br />Pattern: `^(default\|Vrf[A-Za-z0-9_-]\{1,12\})$` <br /> |
+| `address` _[NetworkIP](#networkip)_ |  |  | MaxLength: 45 <br /> |
+| `remoteASN` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 1 <br /> |
+| `localAddress` _[NetworkIP](#networkip)_ |  |  | MaxLength: 45 <br /> |
+| `adminState` _[AdminState](#adminstate)_ | AdminState controls the EVPN address family, not shared neighbor fields. | Down | Enum: [Up Down] <br /> |
+| `mappingRefs` _[NetworkSwitchReference](#networkswitchreference) array_ | MappingRefs selects the local VLAN/VNI policies permitted on this peer.<br />Existing Down-only peers may omit this field; activation requires it. |  | MaxItems: 64 <br /> |
+
+
+#### SwitchEVPNSpec
+
+
+
+SwitchEVPNSpec owns global L2 advertisement on one switch.
+
+
+
+_Appears in:_
+- [SwitchEVPN](#switchevpn)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `tunnel` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
+| `mappingRefs` _[NetworkSwitchReference](#networkswitchreference) array_ |  |  | MaxItems: 64 <br /> |
+| `adminState` _[AdminState](#adminstate)_ |  | Down | Enum: [Up Down] <br /> |
+
+
 #### SwitchFRRMigration
 
 
@@ -931,6 +1108,50 @@ _Appears in:_
 | `name` _string_ |  |  | MaxLength: 32 <br />Pattern: `^(Ethernet(0\|[1-9][0-9]*)\|PortChannel(0\|[1-9][0-9]\{0,3\})\|Vlan[1-9][0-9]\{0,3\})$` <br /> |
 | `vrf` _[NetworkVRFName](#networkvrfname)_ |  | default | MaxLength: 15 <br />Pattern: `^(default\|Vrf[A-Za-z0-9_-]\{1,12\})$` <br /> |
 | `addresses` _[NetworkInterfaceAddress](#networkinterfaceaddress) array_ | Addresses retain host bits; removals are not supported. |  | MaxItems: 64 <br />MaxLength: 49 <br />MinItems: 1 <br /> |
+
+
+#### SwitchMLAG
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchMLAG` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchMLAGSpec](#switchmlagspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchMLAGSpec
+
+
+
+SwitchMLAGSpec coordinates staged, reciprocal configurations on two switches.
+
+
+
+_Appears in:_
+- [SwitchMLAG](#switchmlag)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `domainID` _integer_ |  |  | Maximum: 4095 <br />Minimum: 1 <br /> |
+| `peerSwitchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `localAddress` _[RedundancyIPv4](#redundancyipv4)_ |  |  | MaxLength: 15 <br /> |
+| `peerAddress` _[RedundancyIPv4](#redundancyipv4)_ |  |  | MaxLength: 15 <br /> |
+| `peerLink` _[MLAGPortChannel](#mlagportchannel)_ |  |  | MaxLength: 32 <br />Pattern: `^PortChannel(0\|[1-9][0-9]\{0,3\})$` <br /> |
+| `members` _[MLAGPortChannel](#mlagportchannel) array_ |  |  | MaxItems: 256 <br />MaxLength: 32 <br />MinItems: 1 <br />Pattern: `^PortChannel(0\|[1-9][0-9]\{0,3\})$` <br /> |
+| `keepaliveInterval` _integer_ | KeepaliveInterval is in seconds. | 1 | Maximum: 60 <br />Minimum: 1 <br /> |
+| `sessionTimeout` _integer_ | SessionTimeout is in seconds. | 30 | Maximum: 3600 <br />Minimum: 2 <br /> |
 
 
 #### SwitchPortBreakout
@@ -1423,6 +1644,48 @@ _Appears in:_
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Ready and Synced are true only after confirming the requested configuration. |  |  |
 
 
+#### SwitchVLANVNI
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchVLANVNI` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchVLANVNISpec](#switchvlanvnispec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchVLANVNISpec
+
+
+
+SwitchVLANVNISpec maps an existing VLAN to an L2VNI with explicit import/export policy.
+
+
+
+_Appears in:_
+- [SwitchVLANVNI](#switchvlanvni)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `tunnel` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
+| `vlanID` _integer_ |  |  | Maximum: 4094 <br />Minimum: 1 <br /> |
+| `vni` _integer_ |  |  | Maximum: 1.6777215e+07 <br />Minimum: 1 <br /> |
+| `routeDistinguisher` _[RouteIdentifier](#routeidentifier)_ |  |  | MaxLength: 21 <br />Pattern: `^((0\|[1-9][0-9]\{0,9\})\|([0-9]\{1,3\}\.)\{3\}[0-9]\{1,3\}):(0\|[1-9][0-9]\{0,9\})$` <br /> |
+| `importRouteTargets` _[RouteIdentifier](#routeidentifier) array_ |  |  | MaxItems: 64 <br />MaxLength: 21 <br />MinItems: 1 <br />Pattern: `^((0\|[1-9][0-9]\{0,9\})\|([0-9]\{1,3\}\.)\{3\}[0-9]\{1,3\}):(0\|[1-9][0-9]\{0,9\})$` <br /> |
+| `exportRouteTargets` _[RouteIdentifier](#routeidentifier) array_ |  |  | MaxItems: 64 <br />MaxLength: 21 <br />MinItems: 1 <br />Pattern: `^((0\|[1-9][0-9]\{0,9\})\|([0-9]\{1,3\}\.)\{3\}[0-9]\{1,3\}):(0\|[1-9][0-9]\{0,9\})$` <br /> |
+
+
 #### SwitchVRF
 
 
@@ -1458,6 +1721,45 @@ _Appears in:_
 | `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
 | `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
 | `name` _string_ |  |  | MaxLength: 15 <br />Pattern: `^Vrf[A-Za-z0-9_-]\{1,12\}$` <br /> |
+
+
+#### SwitchVXLANTunnel
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchVXLANTunnel` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchVXLANTunnelSpec](#switchvxlantunnelspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchVXLANTunnelSpec
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchVXLANTunnel](#switchvxlantunnel)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
+| `sourceAddress` _[RedundancyIPv4](#redundancyipv4)_ |  |  | MaxLength: 15 <br /> |
+| `evpnNVO` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
 
 
 #### TrafficPolicyName

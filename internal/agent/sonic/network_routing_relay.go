@@ -202,6 +202,9 @@ func routingUnified(db vlanChangeDB) error {
 // Reject unmanaged origination/import policy rather than erasing it or claiming
 // that an empty prefixes list suppresses settings owned by somebody else.
 func routingNoImplicitAdvertisements(db vlanChangeDB, vrf string, prefixes []string) error {
+	if _, _, err := evpnIsolatedConfig(db); err != nil {
+		return err
+	}
 	wanted := map[string]bool{}
 	for _, p := range prefixes {
 		af := "ipv4_unicast"
@@ -211,7 +214,7 @@ func routingNoImplicitAdvertisements(db vlanChangeDB, vrf string, prefixes []str
 		wanted["BGP_GLOBALS_AF_NETWORK|"+vrf+"|"+af+"|"+p] = true
 	}
 	for key, fields := range db {
-		for _, table := range []string{"ROUTE_REDISTRIBUTE", "BGP_GLOBALS_AF_AGGREGATE_ADDR", "BGP_GLOBALS_EVPN_VNI"} {
+		for _, table := range []string{"ROUTE_REDISTRIBUTE", "BGP_GLOBALS_AF_AGGREGATE_ADDR"} {
 			if strings.HasPrefix(key, table+"|"+vrf+"|") {
 				return fmt.Errorf("existing %s conflicts with explicit-only advertisements", table)
 			}
@@ -220,6 +223,9 @@ func routingNoImplicitAdvertisements(db vlanChangeDB, vrf string, prefixes []str
 			return fmt.Errorf("existing network conflicts with explicit prefixes; removal is not supported")
 		}
 		if strings.HasPrefix(key, "BGP_GLOBALS_AF|"+vrf+"|") {
+			if key == evpnGlobalKey && evpnGlobalConfigValid(fields) {
+				continue
+			}
 			for field, value := range fields {
 				if (strings.HasPrefix(field, "redistribute") || strings.HasPrefix(field, "import") || strings.HasPrefix(field, "export") || strings.HasPrefix(field, "advertise") || strings.HasPrefix(field, "default-originate")) && value != "false" && value != "" {
 					return fmt.Errorf("existing address-family import/export policy is unsupported")
@@ -296,7 +302,7 @@ func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 			return routingShutdownPreflight(ctx, runRoutingRead, s.VRF, s.LocalASN, "")
 		}
 	}
-	return plan, nil
+	return evpnGuardUnicastPlan(plan, db), nil
 }
 
 func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
@@ -389,6 +395,16 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 	if err := routingNoImplicitAdvertisements(db, s.VRF, prefixes); err != nil {
 		return nil, err
 	}
+	if present, _, err := evpnIsolatedConfig(db); err != nil {
+		return nil, err
+	} else if present && s.AdminState == "Up" {
+		if _, err := evpnConfiguredPeerPolicy(db, s.Address); err != nil {
+			return nil, err
+		}
+		if db["BGP_NEIGHBOR_AF|default|"+s.Address+"|"+evpnAF]["admin_status"] != "up" {
+			return nil, fmt.Errorf("EVPN AF must be staged Up before parent activation")
+		}
+	}
 	policy := routingExportPolicy(s.VRF, prefixes)
 	for key, fields := range policy {
 		for f, v := range fields {
@@ -418,6 +434,11 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 	}
 	for existingKey := range db {
 		if strings.HasPrefix(existingKey, "BGP_NEIGHBOR_AF|"+s.VRF+"|"+s.Address+"|") && !strings.HasSuffix(existingKey, "|ipv4_unicast") && !strings.HasSuffix(existingKey, "|ipv6_unicast") {
+			// The complete exact disabled EVPN contract was validated above.
+			// Do not claim this other resource's AF field in desired/ownership.
+			if s.VRF == "default" && strings.HasSuffix(existingKey, "|"+evpnAF) {
+				continue
+			}
 			return nil, fmt.Errorf("existing peer has unsupported address families")
 		}
 	}
@@ -494,7 +515,21 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 			}
 		}
 	}
-	return plan, nil
+	guarded := evpnGuardUnicastPlan(plan, db)
+	if s.AdminState == "Up" && db["BGP_NEIGHBOR_AF|default|"+s.Address+"|"+evpnAF] != nil {
+		before := guarded.Preflight
+		guarded.Preflight = func(ctx context.Context, m *SonicAgent) error {
+			current, _, err := m.vlanChangeSnapshot(ctx)
+			if err != nil {
+				return err
+			}
+			if err := evpnParentActivation(ctx, m, current, s.Address); err != nil {
+				return err
+			}
+			return before(ctx, m)
+		}
+	}
+	return guarded, nil
 }
 
 func planNetworkDHCPRelay(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {

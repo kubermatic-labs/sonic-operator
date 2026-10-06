@@ -24,7 +24,7 @@ import (
 
 func (r *NetworkReconciler) networkWritesDisabled(common *api.NetworkResourceSpec) bool {
 	return r.ObserveOnly || !r.AllowNetworkConfig || common.ManagementPolicy != api.NetworkManagementPolicyManage ||
-		(r.Kind == "FRRMigration" && !r.AllowFRRMigration) || (isTrafficKind(r.Kind) && !r.AllowTrafficPolicy)
+		(r.Kind == "FRRMigration" && !r.AllowFRRMigration) || (isTrafficKind(r.Kind) && !r.AllowTrafficPolicy) || (isRedundancyKind(r.Kind) && !r.AllowRedundancy)
 }
 
 // Check the fresh Get result, never the previously published Kubernetes status.
@@ -102,7 +102,9 @@ func (r *NetworkReconciler) checkNetworkClaims(ctx context.Context, obj client.O
 			aliases[other.Name] = true
 		}
 	}
-
+	if err := r.checkEVPNNeighborClaims(ctx, obj, aliases); err != nil {
+		return err
+	}
 	_, list, _ := networkObjects(r.Kind)
 	if err := r.APIReader.List(ctx, list); err != nil {
 		return err
@@ -125,7 +127,9 @@ func (r *NetworkReconciler) checkNetworkClaims(ctx context.Context, obj client.O
 		if otherTarget == target {
 			return fmt.Errorf("%s %q also claims target %q on this switch", r.Kind, other.GetName(), target)
 		}
-
+		if mapping, ok := obj.(*api.SwitchVLANVNI); ok && vlanVNIOverlap(mapping, other.(*api.SwitchVLANVNI)) {
+			return fmt.Errorf("VLANVNI %q overlaps VLAN, VNI, RD or route-target isolation", other.GetName())
+		}
 		return nil
 	})
 }

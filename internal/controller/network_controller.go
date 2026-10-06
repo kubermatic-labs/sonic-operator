@@ -46,6 +46,7 @@ type NetworkReconciler struct {
 	AllowNetworkConfig bool
 	AllowFRRMigration  bool
 	AllowTrafficPolicy bool
+	AllowRedundancy    bool
 	NewAgentClient     func(context.Context, client.Reader, *corev1.LocalObjectReference, string) (agentclient.SwitchAgentClient, error)
 }
 
@@ -59,6 +60,9 @@ type NetworkReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags;switchvxlantunnels;switchvlanvnis;switchevpnpeers,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags/status;switchvxlantunnels/status;switchvlanvnis/status;switchevpnpeers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags/finalizers;switchvxlantunnels/finalizers;switchvlanvnis/finalizers;switchevpnpeers/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchevpns,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchevpns/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchevpns/finalizers,verbs=update;patch
 
 func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
@@ -151,6 +155,11 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		reason = "ConflictingClaim"
 		return result, err
 	}
+	dependenciesFresh, err := r.resolveEVPNRequest(ctx, obj, sw, desired)
+	if err != nil {
+		reason = "DependencyNotReady"
+		return result, err
+	}
 	factory := r.NewAgentClient
 	if factory == nil {
 		factory = switchutil.NewAgentClientFromSwitchRef
@@ -186,7 +195,19 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if message == "" {
 		message = "Configuration, runtime and persistence are reported independently"
 	}
-
+	var peerFresh func() error
+	if mlag, ok := obj.(*api.SwitchMLAG); ok {
+		peerFresh, err = r.checkMLAGPeer(ctx, mlag, sw, current, !r.networkWritesDisabled(common))
+		if err != nil {
+			reason, message = "PeerNotReady", err.Error()
+			// Observe keeps local evidence and reports missing/asymmetric peers.
+			if r.networkWritesDisabled(common) {
+				status.RuntimeVerified = false
+				return result, nil
+			}
+			return result, err
+		}
+	}
 	if r.networkWritesDisabled(common) {
 		reason = "WritesDisabled"
 		return result, nil
@@ -196,7 +217,13 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if current.Exists && current.ConfigurationVerified && current.PersistenceVerified {
 		return result, nil
 	}
-
+	if evpn, ok := obj.(*api.SwitchEVPNPeer); ok {
+		peerFresh, err = r.checkEVPNStaged(ctx, evpn, sw, nc)
+		if err != nil {
+			reason = "SharedNeighborNotReady"
+			return result, err
+		}
+	}
 	if migration, ok := obj.(*api.SwitchFRRMigration); ok {
 		if err := approveNetworkFRRMigration(migration, sw, current); err != nil {
 			reason = "ApprovalRequired"
@@ -233,7 +260,16 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 	// Once Ensure starts, the pre-write snapshot no longer proves current state.
-
+	if err := dependenciesFresh(); err != nil {
+		reason = "DependencyChanged"
+		return result, err
+	}
+	if peerFresh != nil {
+		if err := peerFresh(); err != nil {
+			reason = "PeerChanged"
+			return result, err
+		}
+	}
 	observed = false
 	status.Exists, status.ConfigurationVerified, status.RuntimeVerified, status.PersistenceVerified = false, false, false, false
 	status.Observed.Raw = nil
@@ -295,7 +331,8 @@ func (r *NetworkReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			_ = meta.EachListItem(list, func(item runtime.Object) error {
 				obj := item.(client.Object)
 				_, _, common := networkFields(obj)
-				if common.SwitchRef.Name == sw.GetName() {
+				mlag, isMLAG := obj.(*api.SwitchMLAG)
+				if common.SwitchRef.Name == sw.GetName() || (isMLAG && mlag.Spec.PeerSwitchRef.Name == sw.GetName()) {
 					requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(obj)})
 				}
 				return nil
