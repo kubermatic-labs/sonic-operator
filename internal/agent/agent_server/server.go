@@ -32,7 +32,7 @@ var (
 	port                    = flag.Int("port", 50051, "The server port")
 	redisAddr               = flag.String("redis-addr", "127.0.0.1:6379", "The Redis address")
 	bindAddress             = flag.String("bind-address", "127.0.0.1", "The server bind address")
-	readOnly                = flag.Bool("read-only", true, "Only allow explicitly approved read RPCs")
+	readOnly                = flag.Bool("read-only", true, "Serve only read RPCs and reject all writes, streaming and unknown RPCs. Set to false to enable the write features selected by the --allow-* flags")
 	tlsCertFile             = flag.String("tls-cert-file", "", "Required PEM server certificate file")
 	tlsKeyFile              = flag.String("tls-key-file", "", "Required PEM server private key file")
 	tlsClientCAFile         = flag.String("tls-client-ca-file", "", "Required PEM CA bundle trusted to issue client certificates")
@@ -393,7 +393,7 @@ func newGRPCServerWithTLSProof(certFile, keyFile, clientCAFile string, readOnly,
 	}))
 	if readOnly {
 		opts = append(opts, grpc.ChainUnaryInterceptor(readOnlyInterceptor),
-			// No streaming RPCs are approved, including reflection and unknown methods.
+			// Streaming RPCs, including reflection, and unknown methods are rejected.
 			grpc.StreamInterceptor(func(any, grpc.ServerStream, *grpc.StreamServerInfo, grpc.StreamHandler) error {
 				return grpcstatus.Error(codes.PermissionDenied, "agent is read-only: streaming RPCs are not allowed")
 			}),
