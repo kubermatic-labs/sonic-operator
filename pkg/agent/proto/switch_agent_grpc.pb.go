@@ -33,6 +33,11 @@ const (
 	SwitchAgentService_GetVLANAuthority_FullMethodName        = "/switchagent.v1.SwitchAgentService/GetVLANAuthority"
 	SwitchAgentService_ReconcileVLANAuthority_FullMethodName  = "/switchagent.v1.SwitchAgentService/ReconcileVLANAuthority"
 	SwitchAgentService_ReleaseVLANAuthority_FullMethodName    = "/switchagent.v1.SwitchAgentService/ReleaseVLANAuthority"
+	SwitchAgentService_GetPortBreakout_FullMethodName         = "/switchagent.v1.SwitchAgentService/GetPortBreakout"
+	SwitchAgentService_ReconcilePortBreakout_FullMethodName   = "/switchagent.v1.SwitchAgentService/ReconcilePortBreakout"
+	SwitchAgentService_GetNetworkResource_FullMethodName      = "/switchagent.v1.SwitchAgentService/GetNetworkResource"
+	SwitchAgentService_EnsureNetworkResource_FullMethodName   = "/switchagent.v1.SwitchAgentService/EnsureNetworkResource"
+	SwitchAgentService_RecoverNetworkResource_FullMethodName  = "/switchagent.v1.SwitchAgentService/RecoverNetworkResource"
 )
 
 // SwitchAgentServiceClient is the client API for SwitchAgentService service.
@@ -55,6 +60,11 @@ type SwitchAgentServiceClient interface {
 	GetVLANAuthority(ctx context.Context, in *GetVLANAuthorityRequest, opts ...grpc.CallOption) (*VLANAuthorityResponse, error)
 	ReconcileVLANAuthority(ctx context.Context, in *VLANAuthorityRequest, opts ...grpc.CallOption) (*VLANAuthorityResponse, error)
 	ReleaseVLANAuthority(ctx context.Context, in *ReleaseVLANAuthorityRequest, opts ...grpc.CallOption) (*ReleaseVLANAuthorityResponse, error)
+	GetPortBreakout(ctx context.Context, in *GetPortBreakoutRequest, opts ...grpc.CallOption) (*PortBreakoutResponse, error)
+	ReconcilePortBreakout(ctx context.Context, in *PortBreakoutRequest, opts ...grpc.CallOption) (*PortBreakoutResponse, error)
+	GetNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error)
+	EnsureNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error)
+	RecoverNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error)
 }
 
 type switchAgentServiceClient struct {
@@ -195,6 +205,56 @@ func (c *switchAgentServiceClient) ReleaseVLANAuthority(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *switchAgentServiceClient) GetPortBreakout(ctx context.Context, in *GetPortBreakoutRequest, opts ...grpc.CallOption) (*PortBreakoutResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortBreakoutResponse)
+	err := c.cc.Invoke(ctx, SwitchAgentService_GetPortBreakout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *switchAgentServiceClient) ReconcilePortBreakout(ctx context.Context, in *PortBreakoutRequest, opts ...grpc.CallOption) (*PortBreakoutResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortBreakoutResponse)
+	err := c.cc.Invoke(ctx, SwitchAgentService_ReconcilePortBreakout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *switchAgentServiceClient) GetNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NetworkResponse)
+	err := c.cc.Invoke(ctx, SwitchAgentService_GetNetworkResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *switchAgentServiceClient) EnsureNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NetworkResponse)
+	err := c.cc.Invoke(ctx, SwitchAgentService_EnsureNetworkResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *switchAgentServiceClient) RecoverNetworkResource(ctx context.Context, in *NetworkRequest, opts ...grpc.CallOption) (*NetworkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NetworkResponse)
+	err := c.cc.Invoke(ctx, SwitchAgentService_RecoverNetworkResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SwitchAgentServiceServer is the server API for SwitchAgentService service.
 // All implementations must embed UnimplementedSwitchAgentServiceServer
 // for forward compatibility.
@@ -215,6 +275,11 @@ type SwitchAgentServiceServer interface {
 	GetVLANAuthority(context.Context, *GetVLANAuthorityRequest) (*VLANAuthorityResponse, error)
 	ReconcileVLANAuthority(context.Context, *VLANAuthorityRequest) (*VLANAuthorityResponse, error)
 	ReleaseVLANAuthority(context.Context, *ReleaseVLANAuthorityRequest) (*ReleaseVLANAuthorityResponse, error)
+	GetPortBreakout(context.Context, *GetPortBreakoutRequest) (*PortBreakoutResponse, error)
+	ReconcilePortBreakout(context.Context, *PortBreakoutRequest) (*PortBreakoutResponse, error)
+	GetNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error)
+	EnsureNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error)
+	RecoverNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error)
 	mustEmbedUnimplementedSwitchAgentServiceServer()
 }
 
@@ -263,6 +328,21 @@ func (UnimplementedSwitchAgentServiceServer) ReconcileVLANAuthority(context.Cont
 }
 func (UnimplementedSwitchAgentServiceServer) ReleaseVLANAuthority(context.Context, *ReleaseVLANAuthorityRequest) (*ReleaseVLANAuthorityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReleaseVLANAuthority not implemented")
+}
+func (UnimplementedSwitchAgentServiceServer) GetPortBreakout(context.Context, *GetPortBreakoutRequest) (*PortBreakoutResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPortBreakout not implemented")
+}
+func (UnimplementedSwitchAgentServiceServer) ReconcilePortBreakout(context.Context, *PortBreakoutRequest) (*PortBreakoutResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReconcilePortBreakout not implemented")
+}
+func (UnimplementedSwitchAgentServiceServer) GetNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNetworkResource not implemented")
+}
+func (UnimplementedSwitchAgentServiceServer) EnsureNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureNetworkResource not implemented")
+}
+func (UnimplementedSwitchAgentServiceServer) RecoverNetworkResource(context.Context, *NetworkRequest) (*NetworkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecoverNetworkResource not implemented")
 }
 func (UnimplementedSwitchAgentServiceServer) mustEmbedUnimplementedSwitchAgentServiceServer() {}
 func (UnimplementedSwitchAgentServiceServer) testEmbeddedByValue()                            {}
@@ -519,6 +599,96 @@ func _SwitchAgentService_ReleaseVLANAuthority_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SwitchAgentService_GetPortBreakout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPortBreakoutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SwitchAgentServiceServer).GetPortBreakout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SwitchAgentService_GetPortBreakout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SwitchAgentServiceServer).GetPortBreakout(ctx, req.(*GetPortBreakoutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SwitchAgentService_ReconcilePortBreakout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PortBreakoutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SwitchAgentServiceServer).ReconcilePortBreakout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SwitchAgentService_ReconcilePortBreakout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SwitchAgentServiceServer).ReconcilePortBreakout(ctx, req.(*PortBreakoutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SwitchAgentService_GetNetworkResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NetworkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SwitchAgentServiceServer).GetNetworkResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SwitchAgentService_GetNetworkResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SwitchAgentServiceServer).GetNetworkResource(ctx, req.(*NetworkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SwitchAgentService_EnsureNetworkResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NetworkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SwitchAgentServiceServer).EnsureNetworkResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SwitchAgentService_EnsureNetworkResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SwitchAgentServiceServer).EnsureNetworkResource(ctx, req.(*NetworkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SwitchAgentService_RecoverNetworkResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NetworkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SwitchAgentServiceServer).RecoverNetworkResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SwitchAgentService_RecoverNetworkResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SwitchAgentServiceServer).RecoverNetworkResource(ctx, req.(*NetworkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SwitchAgentService_ServiceDesc is the grpc.ServiceDesc for SwitchAgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -577,6 +747,26 @@ var SwitchAgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReleaseVLANAuthority",
 			Handler:    _SwitchAgentService_ReleaseVLANAuthority_Handler,
+		},
+		{
+			MethodName: "GetPortBreakout",
+			Handler:    _SwitchAgentService_GetPortBreakout_Handler,
+		},
+		{
+			MethodName: "ReconcilePortBreakout",
+			Handler:    _SwitchAgentService_ReconcilePortBreakout_Handler,
+		},
+		{
+			MethodName: "GetNetworkResource",
+			Handler:    _SwitchAgentService_GetNetworkResource_Handler,
+		},
+		{
+			MethodName: "EnsureNetworkResource",
+			Handler:    _SwitchAgentService_EnsureNetworkResource_Handler,
+		},
+		{
+			MethodName: "RecoverNetworkResource",
+			Handler:    _SwitchAgentService_RecoverNetworkResource_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

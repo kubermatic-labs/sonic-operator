@@ -184,6 +184,30 @@ func TestSwitchVLANGates(t *testing.T) {
 	}
 }
 
+func TestSwitchVLANPortChannelAcceptance(t *testing.T) {
+	t.Parallel()
+	for _, policy := range []api.VLANManagementPolicy{api.VLANManagementPolicyObserve, api.VLANManagementPolicyManage} {
+		t.Run(string(policy), func(t *testing.T) {
+			v, a, scheme := vlanFixture(t)
+			v.Spec.ManagementPolicy = policy
+			v.Spec.Members[0].InterfaceName = "PortChannel10"
+			a.response.Members[0].InterfaceName = "PortChannel10"
+			c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(v).WithObjects(v).Build()
+			r := vlanReconciler(c, a)
+			if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(v)}); err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if policy == api.VLANManagementPolicyManage {
+				want = 1
+			}
+			if len(a.writes) != want || a.closes != 1 {
+				t.Fatalf("writes=%v closes=%d", a.writes, a.closes)
+			}
+		})
+	}
+}
+
 func TestSwitchVLANFailures(t *testing.T) {
 	t.Parallel()
 	failure := errors.New("agent unavailable")
@@ -211,7 +235,7 @@ func TestSwitchVLANFailures(t *testing.T) {
 		{name: "zero VLAN", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.VLANID = 0 }},
 		{name: "reserved VLAN", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.VLANID = 4095 }},
 		{name: "unknown policy", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.ManagementPolicy = "manage" }},
-		{name: "non Ethernet port", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.Members[0].InterfaceName = "PortChannel1" }},
+		{name: "noncanonical LAG port", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.Members[0].InterfaceName = "PortChannel01" }},
 		{name: "noncanonical port", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.Members[0].InterfaceName = "Ethernet00" }},
 		{name: "missing tagging mode", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.Members[0].TaggingMode = "" }},
 		{name: "invalid tagging mode", change: func(v *api.SwitchVLAN, _ *vlanTestAgent) { v.Spec.Members[0].TaggingMode = "TAGGED" }},

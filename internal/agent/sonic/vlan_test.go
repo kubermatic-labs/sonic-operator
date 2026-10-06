@@ -30,7 +30,7 @@ func TestVLANInvalidRequests(t *testing.T) {
 		{name: "negative", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet-1", TaggingMode: "tagged"}}}},
 		{name: "subinterface", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet0.1", TaggingMode: "tagged"}}}},
 		{name: "glob", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet*", TaggingMode: "tagged"}}}},
-		{name: "LAG", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "PortChannel1", TaggingMode: "tagged"}}}},
+		{name: "noncanonical LAG", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "PortChannel01", TaggingMode: "tagged"}}}},
 		{name: "empty mode", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet0"}}}},
 		{name: "uppercase mode", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet0", TaggingMode: "TAGGED"}}}},
 		{name: "duplicate", vlan: &agent.VLAN{ID: 100, Members: []agent.VLANMember{{InterfaceName: "Ethernet0", TaggingMode: "tagged"}, {InterfaceName: "Ethernet0", TaggingMode: "tagged"}}}},

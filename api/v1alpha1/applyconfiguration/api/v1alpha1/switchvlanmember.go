@@ -10,7 +10,7 @@ package v1alpha1
 //
 // SwitchVLANMember declares a Layer-2 membership.
 type SwitchVLANMemberApplyConfiguration struct {
-	// InterfaceName is the canonical SONiC Ethernet name, not an alias or handle.
+	// InterfaceName is the canonical SONiC Ethernet or PortChannel name, not an alias.
 	InterfaceName *string `json:"interfaceName,omitempty"`
 	// TaggingMode can replace an existing mode only under Authoritative policy.
 	TaggingMode *string `json:"taggingMode,omitempty"`

@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-var vlanEthernetName = regexp.MustCompile(`^Ethernet(0|[1-9][0-9]*)$`)
+var vlanEthernetName = regexp.MustCompile(`^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3}))$`)
 
 // SwitchVLANReconciler observes VLANs and optionally adds configuration.
 type SwitchVLANReconciler struct {

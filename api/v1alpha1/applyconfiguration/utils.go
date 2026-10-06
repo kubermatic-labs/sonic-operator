@@ -21,14 +21,60 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=sonic.networking.metal.ironcore.dev, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("Neighbor"):
 		return &apiv1alpha1.NeighborApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NetworkResourceSpec"):
+		return &apiv1alpha1.NetworkResourceSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NetworkResourceStatus"):
+		return &apiv1alpha1.NetworkResourceStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NetworkSwitchReference"):
+		return &apiv1alpha1.NetworkSwitchReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("StaticRouteNextHop"):
+		return &apiv1alpha1.StaticRouteNextHopApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGP"):
+		return &apiv1alpha1.SwitchBGPApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPPeer"):
+		return &apiv1alpha1.SwitchBGPPeerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPPeerSpec"):
+		return &apiv1alpha1.SwitchBGPPeerSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPSpec"):
+		return &apiv1alpha1.SwitchBGPSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchCredentials"):
 		return &apiv1alpha1.SwitchCredentialsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchDHCPRelay"):
+		return &apiv1alpha1.SwitchDHCPRelayApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchDHCPRelaySpec"):
+		return &apiv1alpha1.SwitchDHCPRelaySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchFRRMigration"):
+		return &apiv1alpha1.SwitchFRRMigrationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchFRRMigrationSpec"):
+		return &apiv1alpha1.SwitchFRRMigrationSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchInterface"):
 		return &apiv1alpha1.SwitchInterfaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchInterfaceSpec"):
 		return &apiv1alpha1.SwitchInterfaceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchInterfaceStatus"):
 		return &apiv1alpha1.SwitchInterfaceStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchL3Interface"):
+		return &apiv1alpha1.SwitchL3InterfaceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchL3InterfaceSpec"):
+		return &apiv1alpha1.SwitchL3InterfaceSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakout"):
+		return &apiv1alpha1.SwitchPortBreakoutApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakoutChild"):
+		return &apiv1alpha1.SwitchPortBreakoutChildApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakoutReference"):
+		return &apiv1alpha1.SwitchPortBreakoutReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakoutSpec"):
+		return &apiv1alpha1.SwitchPortBreakoutSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortBreakoutStatus"):
+		return &apiv1alpha1.SwitchPortBreakoutStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortChannel"):
+		return &apiv1alpha1.SwitchPortChannelApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortChannelSpec"):
+		return &apiv1alpha1.SwitchPortChannelSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchStaticRoute"):
+		return &apiv1alpha1.SwitchStaticRouteApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchStaticRouteSpec"):
+		return &apiv1alpha1.SwitchStaticRouteSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLAN"):
 		return &apiv1alpha1.SwitchVLANApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANMember"):
@@ -41,6 +87,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchVLANSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANStatus"):
 		return &apiv1alpha1.SwitchVLANStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVRF"):
+		return &apiv1alpha1.SwitchVRFApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVRFSpec"):
+		return &apiv1alpha1.SwitchVRFSpecApplyConfiguration{}
 
 	}
 	return nil

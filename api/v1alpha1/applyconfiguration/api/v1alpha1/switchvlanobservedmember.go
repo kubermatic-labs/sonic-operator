@@ -9,7 +9,7 @@ package v1alpha1
 // with apply.
 //
 // SwitchVLANObservedMember includes unmanaged members, which may use interface
-// names outside the Ethernet-only scope allowed in spec (for example a LAG).
+// names outside the Ethernet/PortChannel scope allowed in spec.
 type SwitchVLANObservedMemberApplyConfiguration struct {
 	InterfaceName *string `json:"interfaceName,omitempty"`
 	TaggingMode   *string `json:"taggingMode,omitempty"`

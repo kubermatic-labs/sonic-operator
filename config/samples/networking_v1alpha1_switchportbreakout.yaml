@@ -1,0 +1,12 @@
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchPortBreakout
+metadata:
+  name: leaf-ethernet0
+spec:
+  switchRef:
+    name: leaf
+  port: Ethernet0
+  # Must exactly match the platform's status.supportedModes.
+  mode: 4x25G
+  managementPolicy: Observe
+  childAdminState: Down

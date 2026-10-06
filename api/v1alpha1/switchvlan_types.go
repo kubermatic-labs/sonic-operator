@@ -46,9 +46,9 @@ type SwitchVLANReference struct {
 
 // SwitchVLANMember declares a Layer-2 membership.
 type SwitchVLANMember struct {
-	// InterfaceName is the canonical SONiC Ethernet name, not an alias or handle.
+	// InterfaceName is the canonical SONiC Ethernet or PortChannel name, not an alias.
 	// +required
-	// +kubebuilder:validation:Pattern=`^Ethernet(0|[1-9][0-9]*)$`
+	// +kubebuilder:validation:Pattern=`^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3}))$`
 	InterfaceName string `json:"interfaceName"`
 	// TaggingMode can replace an existing mode only under Authoritative policy.
 	// +required
@@ -96,7 +96,7 @@ type SwitchVLANSpec struct {
 }
 
 // SwitchVLANObservedMember includes unmanaged members, which may use interface
-// names outside the Ethernet-only scope allowed in spec (for example a LAG).
+// names outside the Ethernet/PortChannel scope allowed in spec.
 type SwitchVLANObservedMember struct {
 	InterfaceName string `json:"interfaceName"`
 	TaggingMode   string `json:"taggingMode"`

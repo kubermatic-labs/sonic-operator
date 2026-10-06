@@ -1,0 +1,10 @@
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchFRRMigration
+metadata:
+  name: switch-a-unified
+spec:
+  switchRef:
+    name: switch-a
+  managementPolicy: Observe
+  mode: Unified
+  # approvedDigest is intentionally omitted. Review status.observed before approval.

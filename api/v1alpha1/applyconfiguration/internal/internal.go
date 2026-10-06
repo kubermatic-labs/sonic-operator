@@ -28,6 +28,8 @@ var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BreakoutManagementPolicy
+  scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.Neighbor
   map:
     fields:
@@ -40,8 +42,166 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: systemName
       type:
         scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkInterfaceAddress
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkPrefix
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: configurationVerified
+      type:
+        scalar: boolean
+    - name: exists
+      type:
+        scalar: boolean
+    - name: observed
+      type:
+        namedType: __untyped_atomic_
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: persistenceVerified
+      type:
+        scalar: boolean
+    - name: runtimeVerified
+      type:
+        scalar: boolean
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+  scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.OperationState
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.StaticRouteNextHop
+  map:
+    fields:
+    - name: address
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP
+    - name: distance
+      type:
+        scalar: numeric
+      default: 1
+    - name: interfaceName
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGP
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGPSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGPPeer
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGPPeerSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGPPeerSpec
+  map:
+    fields:
+    - name: address
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP
+    - name: addressFamilies
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: adminState
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+      default: Down
+    - name: localAddress
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: maxPrefixes
+      type:
+        scalar: numeric
+      default: 1000
+    - name: remoteASN
+      type:
+        scalar: numeric
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: vrf
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+      default: default
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGPSpec
+  map:
+    fields:
+    - name: localASN
+      type:
+        scalar: numeric
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: prefixes
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkPrefix
+          elementRelationship: associative
+      default: []
+    - name: routerID
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: vrf
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+      default: default
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchCredentials
   map:
     fields:
@@ -70,6 +230,87 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: type
       type:
         namedType: io.k8s.api.core.v1.SecretType
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchDHCPRelay
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchDHCPRelaySpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchDHCPRelaySpec
+  map:
+    fields:
+    - name: ipv4Servers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: ipv6Servers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: vlanID
+      type:
+        scalar: numeric
+    - name: vrf
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+      default: default
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchFRRMigration
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchFRRMigrationSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchFRRMigrationSpec
+  map:
+    fields:
+    - name: approvedDigest
+      type:
+        scalar: string
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: mode
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchInterface
   map:
     fields:
@@ -134,6 +375,266 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchInterfaceState
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchL3Interface
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchL3InterfaceSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchL3InterfaceSpec
+  map:
+    fields:
+    - name: addresses
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkInterfaceAddress
+          elementRelationship: associative
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: name
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: vrf
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+      default: default
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakout
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutChild
+  map:
+    fields:
+    - name: adminState
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+    - name: lanes
+      type:
+        scalar: string
+    - name: mtu
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: speed
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutSpec
+  map:
+    fields:
+    - name: childAdminState
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+      default: Down
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BreakoutManagementPolicy
+      default: Observe
+    - name: mode
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutStatus
+  map:
+    fields:
+    - name: children
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutChild
+          elementRelationship: associative
+          keys:
+          - name
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: configurationVerified
+      type:
+        scalar: boolean
+    - name: message
+      type:
+        scalar: string
+    - name: mode
+      type:
+        scalar: string
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: pending
+      type:
+        scalar: boolean
+    - name: persistenceVerified
+      type:
+        scalar: boolean
+    - name: previousChildren
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakoutChild
+          elementRelationship: associative
+          keys:
+          - name
+    - name: runtimeVerified
+      type:
+        scalar: boolean
+    - name: supportedModes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: targetIdentity
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortChannel
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortChannelSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortChannelSpec
+  map:
+    fields:
+    - name: adminState
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+      default: Up
+    - name: fastRate
+      type:
+        scalar: boolean
+      default: false
+    - name: lacpMode
+      type:
+        scalar: string
+      default: active
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: members
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: minLinks
+      type:
+        scalar: numeric
+      default: 1
+    - name: mtu
+      type:
+        scalar: numeric
+      default: 9100
+    - name: name
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchStaticRoute
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchStaticRouteSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchStaticRouteSpec
+  map:
+    fields:
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: nextHops
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.StaticRouteNextHop
+          elementRelationship: associative
+          keys:
+          - address
+    - name: prefix
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkPrefix
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: vrf
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
+      default: default
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLAN
   map:
     fields:
@@ -248,6 +749,37 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: targetIdentity
       type:
         scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVRF
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVRFSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVRFSpec
+  map:
+    fields:
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: name
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANDeletionPolicy
   scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANManagementPolicy
@@ -412,6 +944,18 @@ var schemaYAML = typed.YAMLObject(`types:
     elementRelationship: atomic
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
   scalar: untyped
+- name: io.k8s.apimachinery.pkg.runtime.RawExtension
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.types.UID
   scalar: string
 - name: __untyped_atomic_

@@ -30,6 +30,56 @@ rules:
 - apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
+  - switchbgppeers
+  - switchbgps
+  - switchdhcprelays
+  - switchfrrmigrations
+  - switchl3interfaces
+  - switchportchannels
+  - switchstaticroutes
+  - switchvrfs
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchbgppeers/finalizers
+  - switchbgps/finalizers
+  - switchdhcprelays/finalizers
+  - switchfrrmigrations/finalizers
+  - switchl3interfaces/finalizers
+  - switchportchannels/finalizers
+  - switchstaticroutes/finalizers
+  - switchvrfs/finalizers
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchbgppeers/status
+  - switchbgps/status
+  - switchcredentials/status
+  - switchdhcprelays/status
+  - switches/status
+  - switchfrrmigrations/status
+  - switchinterfaces/status
+  - switchl3interfaces/status
+  - switchportbreakouts/status
+  - switchportchannels/status
+  - switchstaticroutes/status
+  - switchvlans/status
+  - switchvrfs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
   - switchcredentials/finalizers
   - switches/finalizers
   - switchinterfaces/finalizers
@@ -39,17 +89,7 @@ rules:
 - apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
-  - switchcredentials/status
-  - switches/status
-  - switchinterfaces/status
-  - switchvlans/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - sonic.networking.metal.ironcore.dev
-  resources:
+  - switchportbreakouts
   - switchvlans
   verbs:
   - get
