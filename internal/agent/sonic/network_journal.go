@@ -22,12 +22,13 @@ import (
 // Target fields only: unknown fields (including secrets on the same hash) stay
 // in memory. Full CONFIG_DB fingerprints bind pending recovery and persistence.
 type networkRecord struct {
-	Kind        string          `json:"kind"`
-	OwnerID     string          `json:"owner_id"`
-	Fields      vlanChangeDB    `json:"fields"`
-	Owned       vlanChangeDB    `json:"owned"`
-	Fingerprint string          `json:"fingerprint"`
-	Pending     *networkPending `json:"pending,omitempty"`
+	Kind        string             `json:"kind"`
+	OwnerID     string             `json:"owner_id"`
+	Fields      vlanChangeDB       `json:"fields"`
+	Owned       vlanChangeDB       `json:"owned"`
+	Fingerprint string             `json:"fingerprint"`
+	Pending     *networkPending    `json:"pending,omitempty"`
+	BufferProof *bufferNativeProof `json:"buffer_proof,omitempty"`
 	// Global EVPN's declared set authorizes mapping creation during local-only
 	// initialization. Omitted on legacy records, which cannot authorize it.
 	EVPNMappings []agent.EVPNMappingSnapshot `json:"evpn_mappings,omitempty"`
@@ -37,13 +38,15 @@ type networkRecord struct {
 }
 
 type networkPending struct {
-	Request    agent.NetworkRequest `json:"request"`
-	Activation string               `json:"activation,omitempty"`
-	Before     vlanChangeDB         `json:"before"`
-	After      vlanChangeDB         `json:"after"`
-	Owned      vlanChangeDB         `json:"owned"`
-	PreHash    string               `json:"pre_hash"`
-	PostHash   string               `json:"post_hash"`
+	Request       agent.NetworkRequest `json:"request"`
+	Activation    string               `json:"activation,omitempty"`
+	Before        vlanChangeDB         `json:"before"`
+	After         vlanChangeDB         `json:"after"`
+	Owned         vlanChangeDB         `json:"owned"`
+	PreHash       string               `json:"pre_hash"`
+	PostHash      string               `json:"post_hash"`
+	BufferProof   *bufferNativeProof   `json:"buffer_proof,omitempty"`
+	BufferReapply bool                 `json:"buffer_reapply,omitempty"`
 }
 
 type networkJournalState struct {
@@ -174,7 +177,35 @@ func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 		} else if r.Pending == nil || r.Fingerprint != "" {
 			return nil, fmt.Errorf("missing confirmed network state")
 		}
+		if r.BufferProof != nil {
+			if !reflect.DeepEqual(r.Fields, r.Owned) {
+				return nil, fmt.Errorf("qualified buffer record does not own all declared fields")
+			}
+			if !bufferProofKind(r.Kind, r.Fields) {
+				return nil, fmt.Errorf("native buffer proof on unsupported resource")
+			}
+			if err := r.BufferProof.validate(r.Fields); err != nil {
+				return nil, err
+			}
+		}
 		if p := r.Pending; p != nil {
+			if r.BufferProof != nil && (p.BufferProof == nil || p.BufferProof.Fingerprint != r.BufferProof.Fingerprint) {
+				return nil, fmt.Errorf("pending buffer operation changed its qualified native identity")
+			}
+			if p.BufferProof != nil {
+				if !reflect.DeepEqual(p.After, p.Owned) {
+					return nil, fmt.Errorf("qualified pending buffer does not own all declared fields")
+				}
+				if !bufferProofKind(r.Kind, p.After) {
+					return nil, fmt.Errorf("pending native buffer proof on unsupported resource")
+				}
+				if err := p.BufferProof.validate(p.After); err != nil {
+					return nil, err
+				}
+			}
+			if p.BufferReapply && p.BufferProof == nil {
+				return nil, fmt.Errorf("buffer reapply lacks native qualification")
+			}
 			pending++
 			id, err := networkIdentity(&p.Request)
 			if err != nil || id != identity || p.Request.Kind != r.Kind || p.Request.OwnerID != r.OwnerID || agent.ValidateNetworkRequest(&p.Request, true) != nil {

@@ -17,7 +17,7 @@ var trafficQoSName = regexp.MustCompile(`^[A-Za-z0-9][-A-Za-z0-9_]{0,31}$`)
 
 func isTrafficKind(kind string) bool {
 	switch kind {
-	case "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
+	case "BufferPool", "BufferProfile", "BufferPG", "BufferQueue", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
 		return true
 	default:
 		return false
@@ -75,12 +75,12 @@ func trafficDesired(spec any) (string, error) {
 		}
 		return string(s.Policy), nil
 	case *api.SwitchQoSMapSpec:
-		if !validQoSName(s.Name) || (s.Type != "DSCPToTC" && s.Type != "Dot1pToTC" && s.Type != "TCToQueue") || len(s.Entries) == 0 || len(s.Entries) > 256 {
+		if !validQoSName(s.Name) || (s.Type != "DSCPToTC" && s.Type != "Dot1pToTC" && s.Type != "TCToQueue" && s.Type != "TCToPriorityGroup") || len(s.Entries) == 0 || len(s.Entries) > 256 {
 			return "", fmt.Errorf("invalid QoS map name, type or entries")
 		}
 		seen := map[uint32]bool{}
 		for _, e := range s.Entries {
-			if seen[e.From] || (s.Type == "DSCPToTC" && e.From > 63) || (s.Type == "Dot1pToTC" && e.From > 7) {
+			if seen[e.From] || (s.Type == "DSCPToTC" && e.From > 63) || (s.Type == "Dot1pToTC" && e.From > 7) || (s.Type == "TCToPriorityGroup" && (e.From > 15 || e.To > 7)) {
 				return "", fmt.Errorf("invalid or duplicate QoS map input")
 			}
 			seen[e.From] = true
@@ -112,10 +112,10 @@ func trafficDesired(spec any) (string, error) {
 		}
 		return string(s.Name), nil
 	case *api.SwitchQoSBindingSpec:
-		if len(s.InterfaceName) > 32 || !networkEthernet.MatchString(s.InterfaceName) || len(s.Queues) > 256 || (s.DSCPToTC == "" && s.Dot1pToTC == "" && s.TCToQueue == "" && len(s.Queues) == 0) {
+		if len(s.InterfaceName) > 32 || !networkEthernet.MatchString(s.InterfaceName) || len(s.Queues) > 256 || (s.DSCPToTC == "" && s.Dot1pToTC == "" && s.TCToQueue == "" && s.TCToPriorityGroup == "" && len(s.Queues) == 0) {
 			return "", fmt.Errorf("QoS binding requires an Ethernet interface and at least one binding")
 		}
-		for _, name := range []api.QoSPolicyName{s.DSCPToTC, s.Dot1pToTC, s.TCToQueue} {
+		for _, name := range []api.QoSPolicyName{s.DSCPToTC, s.Dot1pToTC, s.TCToQueue, s.TCToPriorityGroup} {
 			if name != "" && !validQoSName(name) {
 				return "", fmt.Errorf("invalid QoS map reference")
 			}

@@ -99,6 +99,8 @@ The SONiC consumer does not provide a reliable acknowledgement that maps a profi
 Verified queue shaping and classification are therefore not available yet. No hardware packet or rate tests have been performed.
 :::
 
+`TCToPriorityGroup` maps and standalone `tcToPriorityGroup` bindings use the conditional ownership path described in [Buffers](./buffers.md). That path also needs native producer identity and lifecycle evidence that the tested SONiC builds do not provide, so it fails closed as well.
+
 ### Maps
 
 Profile names contain 1..32 letters, digits, underscores or hyphens and start with a letter or digit. Map `type` is one of:
@@ -108,6 +110,7 @@ Profile names contain 1..32 letters, digits, underscores or hyphens and start wi
 | `DSCPToTC` | DSCP `0..63` | Traffic class |
 | `Dot1pToTC` | Dot1p `0..7` | Traffic class |
 | `TCToQueue` | Traffic class | Queue index |
+| `TCToPriorityGroup` | Traffic class `0..15` | PG `0..7`, also checked against the native port topology |
 
 Each map has 1..256 entries with unique `from` values. Traffic class and queue values are uint32 in the API; agent preflight enforces the tighter native storage limits and the device's actual capabilities and queue maps. Passing schema validation does not mean the hardware supports a value.
 
@@ -128,7 +131,7 @@ Shaping rules:
 
 ### Bindings
 
-A QoS binding targets one physical `EthernetN` port. It must set at least one of `dscpToTC`, `dot1pToTC`, `tcToQueue`, or a non-empty `queues` list. Queue indices are unique (up to 256 entries) and each queue references a named scheduler. Referenced maps and schedulers must already exist and be verified as applied.
+A QoS binding targets one physical `EthernetN` port. It must set at least one of `dscpToTC`, `dot1pToTC`, `tcToQueue`, `tcToPriorityGroup`, or a non-empty `queues` list. Queue indices are unique (up to 256 entries) and each queue references a named scheduler. Referenced maps and schedulers must already exist and be verified as applied.
 
 ```yaml
 apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1

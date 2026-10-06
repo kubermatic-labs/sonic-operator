@@ -60,7 +60,7 @@ func (s *proxyServer) networkResource(ctx context.Context, request *pb.NetworkRe
 		return out, nil
 	}
 	// Keep independent verification evidence even when persistence failed.
-	out.Result = &pb.NetworkResult{Exists: result.Exists, ConfigurationVerified: result.ConfigurationVerified, RuntimeVerified: result.RuntimeVerified, PersistenceVerified: result.PersistenceVerified, ObservedJson: result.Observed, Message: result.Message}
+	out.Result = &pb.NetworkResult{Exists: result.Exists, ConfigurationVerified: result.ConfigurationVerified, RuntimeVerified: result.RuntimeVerified, PersistenceVerified: result.PersistenceVerified, ObservedJson: result.Observed, Message: result.Message, BufferRepairEligible: result.BufferRepairEligible}
 	return out, nil
 }
 

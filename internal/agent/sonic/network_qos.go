@@ -29,9 +29,10 @@ var qosPortPattern = regexp.MustCompile(`^Ethernet(0|[1-9][0-9]*)$`)
 type qosMapKind struct{ table, field, sai, from, to string }
 
 var qosMapKinds = map[string]qosMapKind{
-	"DSCPToTC":  {"DSCP_TO_TC_MAP", "dscp_to_tc_map", "DSCP_TO_TC", "dscp", "tc"},
-	"Dot1pToTC": {"DOT1P_TO_TC_MAP", "dot1p_to_tc_map", "DOT1P_TO_TC", "dot1p", "tc"},
-	"TCToQueue": {"TC_TO_QUEUE_MAP", "tc_to_queue_map", "TC_TO_QUEUE", "tc", "qidx"},
+	"TCToPriorityGroup": {"TC_TO_PRIORITY_GROUP_MAP", "tc_to_pg_map", "TC_TO_PRIORITY_GROUP", "tc", "pg"},
+	"DSCPToTC":          {"DSCP_TO_TC_MAP", "dscp_to_tc_map", "DSCP_TO_TC", "dscp", "tc"},
+	"Dot1pToTC":         {"DOT1P_TO_TC_MAP", "dot1p_to_tc_map", "DOT1P_TO_TC", "dot1p", "tc"},
+	"TCToQueue":         {"TC_TO_QUEUE_MAP", "tc_to_queue_map", "TC_TO_QUEUE", "tc", "qidx"},
 }
 
 type qosMapSpec struct {
@@ -55,11 +56,12 @@ type qosSchedulerSpec struct {
 
 type qosBindingSpec struct {
 	routingSpecMeta
-	InterfaceName string            `json:"interfaceName"`
-	DSCPToTC      string            `json:"dscpToTC"`
-	Dot1pToTC     string            `json:"dot1pToTC"`
-	TCToQueue     string            `json:"tcToQueue"`
-	Queues        []json.RawMessage `json:"queues"`
+	InterfaceName     string            `json:"interfaceName"`
+	DSCPToTC          string            `json:"dscpToTC"`
+	Dot1pToTC         string            `json:"dot1pToTC"`
+	TCToQueue         string            `json:"tcToQueue"`
+	TCToPriorityGroup string            `json:"tcToPriorityGroup"`
+	Queues            []json.RawMessage `json:"queues"`
 }
 
 func qosUint(v uint64) string { return strconv.FormatUint(v, 10) }
@@ -145,6 +147,9 @@ func planNetworkQoSMap(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, 
 	if err := qosValidateMap(kind.table, complete[kind.table+"|"+spec.Name]); err != nil {
 		return nil, err
 	}
+	if spec.Type == "TCToPriorityGroup" {
+		return bufferPlan("QoSMap|"+spec.Type+"|"+spec.Name, desired), nil
+	}
 	return qosProfilePlan("QoSMap|"+spec.Type+"|"+spec.Name, desired), nil
 }
 
@@ -166,6 +171,8 @@ func qosValidateMap(table string, fields map[string]string) error {
 		max = 7
 	case "TC_TO_QUEUE_MAP":
 		outputMax = 9
+	case "TC_TO_PRIORITY_GROUP_MAP":
+		outputMax = 7
 	default:
 		return fmt.Errorf("unsupported QoS map table")
 	}
@@ -269,7 +276,7 @@ func qosValidateScheduler(fields map[string]string) error {
 
 func planNetworkQoSBinding(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var spec qosBindingSpec
-	if err := routingDecode(r, "QoSBinding", &spec, "interfaceName dscpToTC dot1pToTC tcToQueue queues"); err != nil {
+	if err := routingDecode(r, "QoSBinding", &spec, "interfaceName dscpToTC dot1pToTC tcToQueue tcToPriorityGroup queues"); err != nil {
 		return nil, err
 	}
 	if err := qosMeta(spec.routingSpecMeta); err != nil {
@@ -289,7 +296,7 @@ func planNetworkQoSBinding(db vlanChangeDB, r *agent.NetworkRequest) (*networkPl
 		return nil, fmt.Errorf("VOQ binding is unsupported")
 	}
 	desired := vlanChangeDB{}
-	for typ, name := range map[string]string{"DSCPToTC": spec.DSCPToTC, "Dot1pToTC": spec.Dot1pToTC, "TCToQueue": spec.TCToQueue} {
+	for typ, name := range map[string]string{"DSCPToTC": spec.DSCPToTC, "Dot1pToTC": spec.Dot1pToTC, "TCToQueue": spec.TCToQueue, "TCToPriorityGroup": spec.TCToPriorityGroup} {
 		if name == "" {
 			continue
 		}
@@ -334,6 +341,9 @@ func planNetworkQoSBinding(db vlanChangeDB, r *agent.NetworkRequest) (*networkPl
 	}
 	if err := qosBindingSelectors(db, desired, port); err != nil {
 		return nil, err
+	}
+	if len(desired) == 1 && len(desired["PORT_QOS_MAP|"+port]) == 1 && desired["PORT_QOS_MAP|"+port]["tc_to_pg_map"] != "" {
+		return bufferPlan("QoSBinding|"+port, desired), nil
 	}
 	return qosBindingPlan(port, desired), nil
 }

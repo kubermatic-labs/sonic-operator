@@ -40,6 +40,10 @@ rules:
   - switchaclpolicies
   - switchbgppeers
   - switchbgps
+  - switchbufferpgs
+  - switchbufferpools
+  - switchbufferprofiles
+  - switchbufferqueues
   - switchdhcprelays
   - switchevpnpeers
   - switchevpns
@@ -68,6 +72,10 @@ rules:
   - switchaclpolicies/finalizers
   - switchbgppeers/finalizers
   - switchbgps/finalizers
+  - switchbufferpgs/finalizers
+  - switchbufferpools/finalizers
+  - switchbufferprofiles/finalizers
+  - switchbufferqueues/finalizers
   - switchdhcprelays/finalizers
   - switchevpnpeers/finalizers
   - switchevpns/finalizers
@@ -93,6 +101,10 @@ rules:
   - switchartifacts/status
   - switchbgppeers/status
   - switchbgps/status
+  - switchbufferpgs/status
+  - switchbufferpools/status
+  - switchbufferprofiles/status
+  - switchbufferqueues/status
   - switchcredentials/status
   - switchdhcprelays/status
   - switches/status

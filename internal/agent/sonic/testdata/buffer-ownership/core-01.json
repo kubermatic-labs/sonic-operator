@@ -1,0 +1,4 @@
+{
+  "BUFFER_PG": {"Ethernet11|7": {"profile": "PORT3_INGRESS_PROFILE"}},
+  "BUFFER_PROFILE": {"PORT3_INGRESS_PROFILE": {"dynamic_th": "3", "pool": "PORT3_INGRESS_POOL", "size": "0"}}
+}

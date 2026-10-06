@@ -1,0 +1,52 @@
+# Observation-only buffer declarations. Applying them does not configure a switch;
+# set managementPolicy: Manage only after the native qualification described in
+# docs/usage/buffers.md is available for your SONiC build.
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBufferPool
+metadata:
+  name: leaf-01-ingress-lossless-pool
+spec:
+  switchRef:
+    name: leaf-01
+  managementPolicy: Observe
+  name: ingress_lossless_pool
+  type: ingress
+  mode: dynamic
+  size: 10875072
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBufferProfile
+metadata:
+  name: leaf-01-ingress-lossy-profile
+spec:
+  switchRef:
+    name: leaf-01
+  managementPolicy: Observe
+  name: ingress_lossy_profile
+  pool: ingress_lossless_pool
+  size: 0
+  dynamicThreshold: 3
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBufferPG
+metadata:
+  name: leaf-01-ethernet8-pg0
+spec:
+  switchRef:
+    name: leaf-01
+  managementPolicy: Observe
+  interfaceName: Ethernet8
+  range: "0"
+  profile: ingress_lossy_profile
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBufferQueue
+metadata:
+  name: leaf-01-ethernet8-queue0-2
+spec:
+  switchRef:
+    name: leaf-01
+  managementPolicy: Observe
+  interfaceName: Ethernet8
+  range: "0-2"
+  profile: egress_lossy_profile

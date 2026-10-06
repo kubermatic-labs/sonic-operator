@@ -15,11 +15,13 @@ import (
 // SwitchQoSBindingSpec references existing, applied maps and schedulers on one data port.
 type SwitchQoSBindingSpecApplyConfiguration struct {
 	NetworkResourceSpecApplyConfiguration `json:",inline"`
-	InterfaceName                         *string                             `json:"interfaceName,omitempty"`
-	DSCPToTC                              *apiv1alpha1.QoSPolicyName          `json:"dscpToTC,omitempty"`
-	Dot1pToTC                             *apiv1alpha1.QoSPolicyName          `json:"dot1pToTC,omitempty"`
-	TCToQueue                             *apiv1alpha1.QoSPolicyName          `json:"tcToQueue,omitempty"`
-	Queues                                []QoSQueueBindingApplyConfiguration `json:"queues,omitempty"`
+	InterfaceName                         *string                    `json:"interfaceName,omitempty"`
+	DSCPToTC                              *apiv1alpha1.QoSPolicyName `json:"dscpToTC,omitempty"`
+	Dot1pToTC                             *apiv1alpha1.QoSPolicyName `json:"dot1pToTC,omitempty"`
+	TCToQueue                             *apiv1alpha1.QoSPolicyName `json:"tcToQueue,omitempty"`
+	// TCToPriorityGroup references TC_TO_PRIORITY_GROUP_MAP through PORT_QOS_MAP.tc_to_pg_map.
+	TCToPriorityGroup *apiv1alpha1.QoSPolicyName          `json:"tcToPriorityGroup,omitempty"`
+	Queues            []QoSQueueBindingApplyConfiguration `json:"queues,omitempty"`
 }
 
 // SwitchQoSBindingSpecApplyConfiguration constructs a declarative configuration of the SwitchQoSBindingSpec type for use with
@@ -73,6 +75,14 @@ func (b *SwitchQoSBindingSpecApplyConfiguration) WithDot1pToTC(value apiv1alpha1
 // If called multiple times, the TCToQueue field is set to the value of the last call.
 func (b *SwitchQoSBindingSpecApplyConfiguration) WithTCToQueue(value apiv1alpha1.QoSPolicyName) *SwitchQoSBindingSpecApplyConfiguration {
 	b.TCToQueue = &value
+	return b
+}
+
+// WithTCToPriorityGroup sets the TCToPriorityGroup field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TCToPriorityGroup field is set to the value of the last call.
+func (b *SwitchQoSBindingSpecApplyConfiguration) WithTCToPriorityGroup(value apiv1alpha1.QoSPolicyName) *SwitchQoSBindingSpecApplyConfiguration {
+	b.TCToPriorityGroup = &value
 	return b
 }
 

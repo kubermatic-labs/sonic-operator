@@ -18,7 +18,7 @@ import (
 
 func TestGroupedNetworkEnvelope(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer"} {
+	for _, kind := range []string{"BufferPool", "BufferProfile", "BufferPG", "BufferQueue", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer"} {
 		t.Run(kind, func(t *testing.T) {
 			for _, tc := range []struct {
 				name, kind string
@@ -149,5 +149,13 @@ func TestNetworkJournalStartupOnly(t *testing.T) {
 	}
 	if err := configureNetworkJournal(b, "/private/network", false, true); err != nil || b.calls != 1 {
 		t.Fatalf("configured disabled writer: %v calls=%d", err, b.calls)
+	}
+}
+
+func TestNetworkServerBufferRepairEligibility(t *testing.T) {
+	s := NewProxyServer(networkBackend{result: &agent.NetworkResult{Exists: true, ConfigurationVerified: true, PersistenceVerified: true, BufferRepairEligible: true}})
+	out, err := s.GetNetworkResource(t.Context(), &pb.NetworkRequest{Kind: "BufferProfile", OwnerId: "owner", SpecJson: []byte(`{"name":"A"}`)})
+	if err != nil || !out.GetResult().GetBufferRepairEligible() || out.GetResult().GetRuntimeVerified() || !out.GetResult().GetPersistenceVerified() {
+		t.Fatalf("lost repair/persistence contract: %+v %v", out, err)
 	}
 }

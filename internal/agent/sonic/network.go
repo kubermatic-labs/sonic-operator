@@ -24,8 +24,10 @@ import (
 )
 
 type networkPlan struct {
-	Identity string
-	Desired  vlanChangeDB
+	Identity             string
+	Desired              vlanChangeDB
+	BufferProof          *bufferNativeProof
+	BufferRepairEligible bool
 	// Runtime is read-only. false,nil means nonconvergence; errors propagate
 	// with partial configuration/persistence evidence. Activation recovery needs
 	// exact applied-runtime proof, not merely matching CONFIG_DB.
@@ -78,6 +80,9 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 		return "", fmt.Errorf("trailing spec JSON")
 	}
 	for _, key := range []string{"name", "vrf", "address", "prefix", "policy", "type", "interfaceName", "tunnel"} {
+		if key == "type" && r.Kind == "BufferPool" {
+			continue
+		}
 		if raw, ok := fields[key]; ok {
 			var value string
 			if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || json.Unmarshal(raw, &value) != nil {
@@ -102,6 +107,21 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 	case "Port":
 		if name := text("nativeName"); canonicalNumber(name, "Ethernet", 1<<32-1) {
 			return "Port|" + name, nil
+		}
+	case "BufferPool", "BufferProfile":
+		if networkQoSIdentifier.MatchString(name) {
+			return r.Kind + "|" + name, nil
+		}
+	case "BufferPG", "BufferQueue":
+		var selector string
+		if json.Unmarshal(fields["range"], &selector) == nil {
+			table := "BUFFER_PG"
+			if r.Kind == "BufferQueue" {
+				table = "BUFFER_QUEUE"
+			}
+			if networkBufferTarget(r.Kind, table, text("interfaceName")+"|"+selector) {
+				return r.Kind + "|" + text("interfaceName") + "|" + selector, nil
+			}
 		}
 	case "EVPN":
 		return "EVPN|default", nil
@@ -137,7 +157,7 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 			return r.Kind + "|" + policy, nil
 		}
 	case "QoSMap":
-		if typ := text("type"); networkQoSIdentifier.MatchString(name) && (typ == "DSCPToTC" || typ == "Dot1pToTC" || typ == "TCToQueue") {
+		if typ := text("type"); networkQoSIdentifier.MatchString(name) && (typ == "DSCPToTC" || typ == "Dot1pToTC" || typ == "TCToQueue" || typ == "TCToPriorityGroup") {
 			return r.Kind + "|" + typ + "|" + name, nil
 		}
 	case "QoSBinding":
@@ -185,6 +205,8 @@ func planNetworkResource(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan
 	switch r.Kind {
 	case "Port":
 		return planNetworkPort(db, r)
+	case "BufferPool", "BufferProfile", "BufferPG", "BufferQueue":
+		return planNetworkBuffer(db, r)
 	case "EVPN":
 		return planNetworkEVPN(db, r)
 	case "MLAG":
@@ -255,9 +277,14 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		// Policy and binding deliberately reserve disjoint fields on ACL_TABLE.
 		"ACLPolicy":  {"ACL_TABLE": "type stage policy_desc", "ACL_RULE": "PRIORITY PACKET_ACTION IP_TYPE SRC_IP DST_IP SRC_IPV6 DST_IPV6 IP_PROTOCOL NEXT_HEADER L4_SRC_PORT L4_DST_PORT"},
 		"ACLBinding": {"ACL_TABLE": "ports@"},
-		"QoSMap":     {"DSCP_TO_TC_MAP": "", "DOT1P_TO_TC_MAP": "", "TC_TO_QUEUE_MAP": ""},
+		"QoSMap":     {"DSCP_TO_TC_MAP": "", "DOT1P_TO_TC_MAP": "", "TC_TO_QUEUE_MAP": "", "TC_TO_PRIORITY_GROUP_MAP": ""},
 		"Scheduler":  {"SCHEDULER": "type weight meter_type cir pir cbs pbs"},
-		"QoSBinding": {"PORT_QOS_MAP": "dscp_to_tc_map dot1p_to_tc_map tc_to_queue_map", "QUEUE": "scheduler"},
+		"QoSBinding": {"PORT_QOS_MAP": "dscp_to_tc_map dot1p_to_tc_map tc_to_queue_map tc_to_pg_map", "QUEUE": "scheduler"},
+
+		"BufferPool":    {"BUFFER_POOL": "type mode size xoff"},
+		"BufferProfile": {"BUFFER_PROFILE": "pool size dynamic_th static_th xon xoff xon_offset"},
+		"BufferPG":      {"BUFFER_PG": "profile"},
+		"BufferQueue":   {"BUFFER_QUEUE": "profile"},
 	}[kind]
 	if allowed == nil || len(desired) == 0 {
 		return fmt.Errorf("empty or unsupported network plan")
@@ -288,6 +315,9 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		}
 		if !networkTrafficTarget(kind, table, name) {
 			return fmt.Errorf("invalid traffic policy target %s", key)
+		}
+		if !networkBufferTarget(kind, table, name) {
+			return fmt.Errorf("invalid buffer target %s", key)
 		}
 		if !networkRedundancyTarget(kind, table, name) {
 			return fmt.Errorf("invalid redundancy target %s", key)
@@ -425,6 +455,8 @@ func networkQoSMapField(table, field string) bool {
 		max = 7
 	case "TC_TO_QUEUE_MAP":
 		max = 255
+	case "TC_TO_PRIORITY_GROUP_MAP":
+		max = 15
 	default:
 		return false
 	}
@@ -611,12 +643,15 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		// Absence of pending work is a successful orphan/no-op, including no record.
 		return &agent.NetworkResult{Message: "no pending network operation; configuration orphaned unchanged"}, nil
 	}
-	p, err := planner(db, r)
+	p, err := planner(bufferPlanningDB(db, record), r)
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, err.Error())
 	}
 	if p == nil || p.Identity != identity || len(p.Identity) > 1024 {
 		return failure(fmt.Errorf("invalid network plan identity"))
+	}
+	if err := bufferAttachProof(p, record); err != nil {
+		return failure(err)
 	}
 	if err := validateNetworkFields(r.Kind, p.Desired); err != nil {
 		return failure(err)
@@ -629,7 +664,12 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 	}
 	fail := func(message string) (*agent.NetworkResult, *agent.Status) {
 		out, _ := m.observeNetwork(ctx, db, p, record)
-		out.PersistenceVerified = false
+		out.BufferRepairEligible = false
+		// A rejected qualified buffer preflight performed no mutation. Retain
+		// still-valid independent saved-state evidence for runtime-only failures.
+		if record == nil || record.BufferProof == nil || record.Pending != nil {
+			out.PersistenceVerified = false
+		}
 		out.Message = message
 		return out, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, message)
 	}
@@ -667,6 +707,7 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 			return fail(err.Error())
 		}
 	}
+	bufferRepair := record != nil && record.BufferProof != nil && p.BufferProof != nil && reflect.DeepEqual(record.Fields, p.Desired)
 	if record != nil {
 		for key, fields := range record.Owned {
 			owned[key] = maps.Clone(fields)
@@ -689,20 +730,21 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 			old, exists := db[key][field]
 			portRepair := r.Kind == "Port" && record != nil && record.Fields[key][field] == value
 			traditionalRepair := r.Kind == "BGP" && traditionalPlan(p) && record != nil && record.Fields[key][field] == value
-			if previous, ours := owned[key][field]; exists && ours && previous != old && !portRepair && !traditionalRepair {
+			if previous, ours := owned[key][field]; exists && ours && previous != old && !portRepair && !traditionalRepair && !(bufferRepair && previous == value) {
 				return fail("owned network field drifted; inspect before reconciliation")
 			}
 			if exists && old != value {
-				// Only qualified owned-field updates, approved mode changes, and
-				// repairs to recorded Port/Traditional BGP values may overwrite fields.
+				// Only qualified owned-field updates, approved mode changes,
+				// repairs to recorded Port/Traditional BGP values and
+				// native-qualified buffer restoration may overwrite fields.
 				previous, ours := owned[key][field]
 				peerAdmin := r.Kind == "BGPPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR|") && field == "admin_status" && (value == "up" || value == "down")
 				evpnAdmin := r.Kind == "EVPNPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR_AF|default|") && strings.HasSuffix(key, "|l2vpn_evpn") && field == "admin_status" && (old == "up" || old == "down") && (value == "up" || value == "down")
 				globalEVPNAdmin := r.Kind == "EVPN" && key == evpnGlobalKey && field == "advertise-all-vni" && (old == "true" || old == "false") && (value == "true" || value == "false")
 				relayServers := r.Kind == "DHCPRelay" && routingRelayMutableField(key, field)
 				modeUpdate := migrationUpdate && frrMigrationModeUpdate(key, field, old, value) && (record == nil || (ours && previous == old))
-				if !portRepair && !traditionalRepair && !modeUpdate && (!ours || previous != old || (!peerAdmin && !evpnAdmin && !globalEVPNAdmin && !relayServers)) {
-					return fail("conflicting network field; only qualified owned-field updates, approved mode changes or recorded Port/Traditional BGP repairs are allowed")
+				if !portRepair && !traditionalRepair && !modeUpdate && !(bufferRepair && ours && previous == value) && (!ours || previous != old || (!peerAdmin && !evpnAdmin && !globalEVPNAdmin && !relayServers)) {
+					return fail("conflicting network field; only qualified owned-field updates, approved mode changes, recorded Port/Traditional BGP repairs or qualified buffer restoration are allowed")
 				}
 			}
 			if !exists || (exists && old != value) {
@@ -713,7 +755,14 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 			}
 		}
 	}
-	if record != nil && reflect.DeepEqual(record.Fields, p.Desired) && networkSubset(db, p.Desired) && record.Fingerprint == vlanAuthorityHash(db) {
+	reapply := false
+	if bufferRepair {
+		// A lost applied attribute with unchanged CONFIG_DB needs an idempotent
+		// native SET of the exact adopted fields, not a false no-op success.
+		verified, _, err := p.Runtime(ctx, m)
+		reapply = err != nil || !verified
+	}
+	if !reapply && record != nil && (!bufferProofKind(r.Kind, p.Desired) || record.BufferProof != nil) && reflect.DeepEqual(record.Fields, p.Desired) && networkSubset(db, p.Desired) && record.Fingerprint == vlanAuthorityHash(db) {
 		if p.Persisted == nil {
 			return m.observeNetwork(ctx, db, p, record)
 		}
@@ -740,6 +789,11 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 			return fail("network preflight failed: " + err.Error())
 		}
 	}
+	if p.BufferProof != nil {
+		// Equal existing values become real UID-owned values after native proof,
+		// so future reconciliation may restore them through the ordinary CAS.
+		owned = networkTarget(p.Desired, p.Desired)
+	}
 	if record == nil {
 		record = &networkRecord{Kind: r.Kind, OwnerID: r.OwnerID}
 		if r.Kind == "Port" {
@@ -764,7 +818,7 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		}
 		activation = "Prepared"
 	}
-	record.Pending = &networkPending{Request: *r, Activation: activation, Before: before, After: p.Desired, Owned: owned, PreHash: vlanAuthorityHash(db), PostHash: vlanAuthorityHash(post)}
+	record.Pending = &networkPending{Request: *r, Activation: activation, Before: before, After: p.Desired, Owned: owned, PreHash: vlanAuthorityHash(db), PostHash: vlanAuthorityHash(post), BufferProof: p.BufferProof, BufferReapply: reapply}
 	if err := storeNetworkJournal(journal, state); err != nil {
 		return fail("pending network journal durability uncertain: " + err.Error())
 	}
@@ -780,12 +834,15 @@ func (m *SonicAgent) finishRecordedNetwork(ctx context.Context, j *vlanAuthority
 		planner = planNetworkResource
 	}
 	pending := r.Pending
-	original, e := planner(db, &pending.Request)
+	original, e := planner(bufferPlanningDB(db, r), &pending.Request)
 	if e != nil {
 		return fail(fmt.Errorf("pending request cannot be planned safely: %w", e))
 	}
 	if original == nil || original.Identity != identity || !reflect.DeepEqual(original.Desired, pending.After) {
 		return fail(fmt.Errorf("pending planner output changed; manual inspection required"))
+	}
+	if e = bufferAttachProof(original, r); e != nil {
+		return fail(e)
 	}
 	if e = validateNetworkActivationPreflight(r.Kind, original); e != nil {
 		return fail(e)
@@ -818,6 +875,7 @@ func (m *SonicAgent) observeNetwork(ctx context.Context, db vlanChangeDB, p *net
 			probeError = err
 		}
 		out.RuntimeVerified = verified && err == nil
+		out.BufferRepairEligible = err == nil && !verified && p.BufferRepairEligible && r != nil && r.Pending == nil && r.BufferProof != nil && reflect.DeepEqual(r.Fields, p.Desired) && networkSubset(r.Owned, p.Desired)
 		if len(observed) != 0 && json.Valid(observed) {
 			out.Observed = observed
 		} else if len(observed) != 0 {
@@ -829,6 +887,7 @@ func (m *SonicAgent) observeNetwork(ctx context.Context, db vlanChangeDB, p *net
 		}
 		latest, _, err := m.vlanChangeSnapshot(ctx)
 		if err != nil || vlanAuthorityHash(latest) != vlanAuthorityHash(db) {
+			out.BufferRepairEligible = false
 			out.ConfigurationVerified, out.RuntimeVerified, out.PersistenceVerified = false, false, false
 			out.Message = "configuration changed or could not be read after runtime observation; retry"
 			probeError = fmt.Errorf("%s", out.Message)
@@ -841,6 +900,7 @@ func (m *SonicAgent) observeNetwork(ctx context.Context, db vlanChangeDB, p *net
 		out.Message = "port layout differs from durable adoption; hardware qualification required"
 	}
 	if probeError != nil {
+		out.BufferRepairEligible = false
 		return out, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, "runtime observation failed: "+probeError.Error())
 	}
 	return out, nil
@@ -862,14 +922,21 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 	if hash != p.PostHash && (p.Activation == "Dispatched" || p.Activation == "Verified") {
 		return fail("configuration reverted after activation dispatch; manual inspection required")
 	}
-	if hash != p.PostHash {
+	if hash != p.PostHash || p.BufferReapply {
 		if plan.Preflight != nil {
 			if err := plan.Preflight(ctx, m); err != nil {
 				return fail("network preflight failed: " + err.Error())
 			}
 		}
 		m.configDirty = true
-		applied, err := m.casVLANChange(ctx, raw, p.Before, p.After)
+		from := p.Before
+		if p.BufferReapply {
+			// Force an HSET notification for every qualified owned field. The
+			// full raw snapshot remains the CAS precondition; durable Before is
+			// unchanged and recovery still accepts only exact pre/post hashes.
+			from = vlanChangeDB{}
+		}
+		applied, err := m.casVLANChange(ctx, raw, from, p.After)
 		if err != nil {
 			return fail("network CAS outcome uncertain; recover pending request")
 		}
@@ -886,6 +953,12 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 				return fail("CAS rejected; pending cleanup durability uncertain; retry")
 			}
 			return fail("CONFIG_DB changed before network CAS; rejected intent cleared; retry")
+		}
+		if p.BufferReapply {
+			p.BufferReapply = false
+			if err := storeNetworkJournal(j, state); err != nil {
+				return fail("buffer reapply durability uncertain; recover pending request")
+			}
 		}
 	}
 	var err error
@@ -975,6 +1048,7 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 		return fail("network configuration changed during save; persistence pending")
 	}
 	oldFields, oldOwned, oldHash := r.Fields, r.Owned, r.Fingerprint
+	oldBufferProof := r.BufferProof
 	oldMappings := r.EVPNMappings
 	if r.Kind == "EVPN" {
 		var spec evpnGlobalSpec
@@ -984,6 +1058,7 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 		r.EVPNMappings = spec.Mappings
 	}
 	r.Fields, r.Owned, r.Fingerprint, r.Pending = p.After, p.Owned, p.PostHash, nil
+	r.BufferProof = p.BufferProof
 	// SaveConfig persists the entire DB. Refresh proof for all matching records,
 	// otherwise independent controllers repeatedly save each other's stale proof.
 	for identity, other := range state.Records {
@@ -994,6 +1069,7 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 	}
 	if err := storeNetworkJournal(j, state); err != nil {
 		r.Fields, r.Owned, r.Fingerprint, r.Pending = oldFields, oldOwned, oldHash, p
+		r.BufferProof = oldBufferProof
 		r.EVPNMappings = oldMappings
 		return fail("network save acknowledged but completion durability uncertain; retry")
 	}

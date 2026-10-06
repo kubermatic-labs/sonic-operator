@@ -91,3 +91,11 @@ func TestNetworkTimeouts(t *testing.T) {
 		})
 	}
 }
+
+func TestNetworkClientBufferRepairEligibility(t *testing.T) {
+	c := &defaultSwitchAgentClient{client: networkResponseClient{response: &pb.NetworkResponse{Status: &pb.Status{}, Result: &pb.NetworkResult{Exists: true, ConfigurationVerified: true, PersistenceVerified: true, BufferRepairEligible: true}}}}
+	out, err := c.GetNetworkResource(t.Context(), &agent.NetworkRequest{Kind: "BufferProfile", OwnerID: "owner", Spec: json.RawMessage(`{"name":"A"}`)})
+	if err != nil || !out.BufferRepairEligible || out.RuntimeVerified || !out.PersistenceVerified {
+		t.Fatalf("lost repair/persistence contract: %+v %v", out, err)
+	}
+}

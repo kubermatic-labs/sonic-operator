@@ -1,0 +1,100 @@
+{
+  "APPL_DB": {
+    "BUFFER_PG_TABLE:Ethernet11:7": {
+      "profile": "PORT3_INGRESS_PROFILE"
+    },
+    "BUFFER_POOL_TABLE:PORT3_INGRESS_POOL": {
+      "mode": "dynamic",
+      "size": "10875072",
+      "type": "ingress",
+      "xoff": "4194112"
+    },
+    "BUFFER_PROFILE_TABLE:PORT3_INGRESS_PROFILE": {
+      "dynamic_th": "3",
+      "pool": "PORT3_INGRESS_POOL",
+      "size": "0"
+    }
+  },
+  "ASIC_DB": {
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_POOL:oid:0x180000000006ce": {
+      "SAI_BUFFER_POOL_ATTR_SIZE": "10875072",
+      "SAI_BUFFER_POOL_ATTR_THRESHOLD_MODE": "SAI_BUFFER_POOL_THRESHOLD_MODE_DYNAMIC",
+      "SAI_BUFFER_POOL_ATTR_TYPE": "SAI_BUFFER_POOL_TYPE_INGRESS",
+      "SAI_BUFFER_POOL_ATTR_XOFF_SIZE": "4194112"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_PROFILE:oid:0x190000000006cf": {
+      "SAI_BUFFER_PROFILE_ATTR_POOL_ID": "oid:0x180000000006ce",
+      "SAI_BUFFER_PROFILE_ATTR_RESERVED_BUFFER_SIZE": "0",
+      "SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH": "3",
+      "SAI_BUFFER_PROFILE_ATTR_THRESHOLD_MODE": "SAI_BUFFER_PROFILE_THRESHOLD_MODE_DYNAMIC"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a0000000006aa": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006cf"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000629": {},
+    "VIDTORID": {
+      "oid:0x1000000000629": "oid:0x10000003d",
+      "oid:0x180000000006ce": "oid:0x1800000001",
+      "oid:0x190000000006cf": "oid:0x1900000006",
+      "oid:0x1a0000000006aa": "oid:0x3d001a00000008"
+    }
+  },
+  "CONFIG_DB": {
+    "BUFFER_PG|Ethernet11|7": {
+      "profile": "PORT3_INGRESS_PROFILE"
+    },
+    "BUFFER_POOL|PORT3_INGRESS_POOL": {
+      "mode": "dynamic",
+      "size": "10875072",
+      "type": "ingress",
+      "xoff": "4194112"
+    },
+    "BUFFER_PROFILE|PORT3_INGRESS_PROFILE": {
+      "dynamic_th": "3",
+      "pool": "PORT3_INGRESS_POOL",
+      "size": "0"
+    },
+    "DEVICE_METADATA|localhost": {
+      "buffer_model": "traditional",
+      "hwsku": "Force10-Z9100-C32",
+      "platform": "x86_64-dell_z9100_c2538-r0"
+    },
+    "PORT|Ethernet11": {
+      "admin_status": "up",
+      "lanes": "60"
+    }
+  },
+  "COUNTERS_DB": {
+    "COUNTERS_BUFFER_POOL_NAME_MAP": {
+      "PORT3_INGRESS_POOL": "oid:0x180000000006ce"
+    },
+    "COUNTERS_PG_INDEX_MAP": {
+      "oid:0x1a0000000006aa": "7"
+    },
+    "COUNTERS_PG_NAME_MAP": {
+      "Ethernet11:7": "oid:0x1a0000000006aa"
+    },
+    "COUNTERS_PG_PORT_MAP": {
+      "oid:0x1a0000000006aa": "oid:0x1000000000629"
+    },
+    "COUNTERS_PORT_NAME_MAP": {
+      "Ethernet11": "oid:0x1000000000629"
+    },
+    "COUNTERS_QUEUE_INDEX_MAP": {},
+    "COUNTERS_QUEUE_NAME_MAP": {},
+    "COUNTERS_QUEUE_PORT_MAP": {}
+  },
+  "NATIVE": {
+    "BUFFER_CONSUMER": {
+      "buffermgrd": "682a6b8bbe3b2b0ed132ba26eaad7c2b0992ef68866542336fc8083b698398bb",
+      "orchagent": "fed521d9700df9b79a22696d5b50f2308e1e7cf1bfccda59b458e7f59c7d2939"
+    }
+  },
+  "STATE_DB": {
+    "SWITCH_CAPABILITY|switch": {
+      "SWITCH|NUMBER_OF_TRAFFIC_CLASSES": "10",
+      "SWITCH|NUMBER_OF_UNICAST_QUEUES": "10"
+    }
+  }
+}

@@ -74,6 +74,12 @@ func qosCheckMapBounds(table string, fields, caps map[string]string) error {
 	if err := qosValidateMap(table, fields); err != nil {
 		return err
 	}
+	if table == "TC_TO_PRIORITY_GROUP_MAP" {
+		// The existing SWITCH_CAPABILITY reader publishes TC/queue bounds,
+		// not per-port ingress PG topology. Never substitute a queue count or
+		// the schema ceiling for independently qualified hardware PG limits.
+		return fmt.Errorf("native per-port priority-group capability reader is not qualified")
+	}
 	tcs, err := qosNumber(caps["SWITCH|NUMBER_OF_TRAFFIC_CLASSES"], 256)
 	if err != nil || tcs == 0 {
 		return fmt.Errorf("traffic-class capability is absent or invalid")
@@ -275,8 +281,13 @@ func qosSchedulerMatches(fields, attrs map[string]string) bool {
 }
 
 func qosMapMatches(kind qosMapKind, fields, attrs map[string]string) bool {
+	actual, err := qosMapEntries(kind, attrs)
+	return err == nil && reflect.DeepEqual(fields, actual)
+}
+
+func qosMapEntries(kind qosMapKind, attrs map[string]string) (map[string]string, error) {
 	if attrs["SAI_QOS_MAP_ATTR_TYPE"] != "SAI_QOS_MAP_TYPE_"+kind.sai {
-		return false
+		return nil, fmt.Errorf("unexpected native QoS map type")
 	}
 	// sairedis serializes sai_qos_map_list_t as {count,list:[{key,value}]}.
 	var list struct {
@@ -286,28 +297,28 @@ func qosMapMatches(kind qosMapKind, fields, attrs map[string]string) bool {
 			Value map[string]json.RawMessage `json:"value"`
 		} `json:"list"`
 	}
-	if json.Unmarshal([]byte(attrs["SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST"]), &list) != nil || list.Count == nil || int(*list.Count) != len(list.List) || len(list.List) != len(fields) {
-		return false
+	if json.Unmarshal([]byte(attrs["SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST"]), &list) != nil || list.Count == nil || int(*list.Count) != len(list.List) {
+		return nil, fmt.Errorf("invalid native QoS map count/list")
 	}
 	actual := map[string]string{}
 	for _, entry := range list.List {
 		from, ok1 := qosMapParameter(entry.Key, kind.from)
 		to, ok2 := qosMapParameter(entry.Value, kind.to)
 		if !ok1 || !ok2 {
-			return false
+			return nil, fmt.Errorf("invalid native QoS map entry")
 		}
 		// Other serialized union fields must be zero: no color/priority match
 		// can be silently discarded when comparing the supported map types.
 		if !qosZeroMapExtras(entry.Key, kind.from) || !qosZeroMapExtras(entry.Value, kind.to) {
-			return false
+			return nil, fmt.Errorf("unsupported native QoS map union fields")
 		}
 		key := qosUint(uint64(from))
 		if _, exists := actual[key]; exists {
-			return false
+			return nil, fmt.Errorf("duplicate native QoS map input")
 		}
 		actual[key] = qosUint(uint64(to))
 	}
-	return reflect.DeepEqual(fields, actual)
+	return actual, nil
 }
 
 func qosMapParameter(params map[string]json.RawMessage, name string) (uint32, bool) {

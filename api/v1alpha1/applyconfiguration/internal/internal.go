@@ -208,6 +208,8 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BreakoutManagementPolicy
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+  scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostResourceStatus
   map:
     fields:
@@ -631,6 +633,175 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
       default: default
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPG
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPGSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPGSpec
+  map:
+    fields:
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: profile
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+    - name: range
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPool
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPoolSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferPoolSpec
+  map:
+    fields:
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: mode
+      type:
+        scalar: string
+    - name: name
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+    - name: size
+      type:
+        scalar: numeric
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: type
+      type:
+        scalar: string
+    - name: xoff
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferProfile
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferProfileSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferProfileSpec
+  map:
+    fields:
+    - name: dynamicThreshold
+      type:
+        scalar: numeric
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: name
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+    - name: pool
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+    - name: size
+      type:
+        scalar: numeric
+    - name: staticThreshold
+      type:
+        scalar: numeric
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: xoff
+      type:
+        scalar: numeric
+    - name: xon
+      type:
+        scalar: numeric
+    - name: xonOffset
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferQueue
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferQueueSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBufferQueueSpec
+  map:
+    fields:
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: profile
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BufferName
+    - name: range
+      type:
+        scalar: string
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchCredentials
   map:
     fields:
@@ -1307,6 +1478,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: switchRef
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+    - name: tcToPriorityGroup
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.QoSPolicyName
     - name: tcToQueue
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.QoSPolicyName

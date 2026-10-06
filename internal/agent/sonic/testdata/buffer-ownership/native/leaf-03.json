@@ -1,0 +1,735 @@
+{
+  "APPL_DB": {
+    "BUFFER_PG_TABLE:Ethernet10:0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG_TABLE:Ethernet11:0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG_TABLE:Ethernet120:0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG_TABLE:Ethernet8:0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG_TABLE:Ethernet9:0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_POOL_TABLE:egress_lossless_pool": {
+      "mode": "static",
+      "size": "15982720",
+      "type": "egress"
+    },
+    "BUFFER_POOL_TABLE:egress_lossy_pool": {
+      "mode": "dynamic",
+      "size": "9243812",
+      "type": "egress"
+    },
+    "BUFFER_POOL_TABLE:ingress_lossless_pool": {
+      "mode": "dynamic",
+      "size": "10875072",
+      "type": "ingress",
+      "xoff": "4194112"
+    },
+    "BUFFER_PROFILE_TABLE:egress_lossless_profile": {
+      "pool": "egress_lossless_pool",
+      "size": "1518",
+      "static_th": "15982720"
+    },
+    "BUFFER_PROFILE_TABLE:egress_lossy_profile": {
+      "dynamic_th": "3",
+      "pool": "egress_lossy_pool",
+      "size": "1518"
+    },
+    "BUFFER_PROFILE_TABLE:ingress_lossy_profile": {
+      "dynamic_th": "3",
+      "pool": "ingress_lossless_pool",
+      "size": "0"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet10:0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet10:3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet10:5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet11:0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet11:3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet11:5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet120:0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet120:3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet120:5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet8:0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet8:3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet8:5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet9:0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet9:3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE_TABLE:Ethernet9:5-6": {
+      "profile": "egress_lossy_profile"
+    }
+  },
+  "ASIC_DB": {
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_POOL:oid:0x180000000006ce": {
+      "SAI_BUFFER_POOL_ATTR_SIZE": "15982720",
+      "SAI_BUFFER_POOL_ATTR_THRESHOLD_MODE": "SAI_BUFFER_POOL_THRESHOLD_MODE_STATIC",
+      "SAI_BUFFER_POOL_ATTR_TYPE": "SAI_BUFFER_POOL_TYPE_EGRESS"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_POOL:oid:0x180000000006cf": {
+      "SAI_BUFFER_POOL_ATTR_SIZE": "9243812",
+      "SAI_BUFFER_POOL_ATTR_THRESHOLD_MODE": "SAI_BUFFER_POOL_THRESHOLD_MODE_DYNAMIC",
+      "SAI_BUFFER_POOL_ATTR_TYPE": "SAI_BUFFER_POOL_TYPE_EGRESS"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_POOL:oid:0x180000000006d0": {
+      "SAI_BUFFER_POOL_ATTR_SIZE": "10875072",
+      "SAI_BUFFER_POOL_ATTR_THRESHOLD_MODE": "SAI_BUFFER_POOL_THRESHOLD_MODE_DYNAMIC",
+      "SAI_BUFFER_POOL_ATTR_TYPE": "SAI_BUFFER_POOL_TYPE_INGRESS",
+      "SAI_BUFFER_POOL_ATTR_XOFF_SIZE": "4194112"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_PROFILE:oid:0x190000000006d1": {
+      "SAI_BUFFER_PROFILE_ATTR_POOL_ID": "oid:0x180000000006ce",
+      "SAI_BUFFER_PROFILE_ATTR_RESERVED_BUFFER_SIZE": "1518",
+      "SAI_BUFFER_PROFILE_ATTR_SHARED_STATIC_TH": "15982720",
+      "SAI_BUFFER_PROFILE_ATTR_THRESHOLD_MODE": "SAI_BUFFER_PROFILE_THRESHOLD_MODE_STATIC"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_PROFILE:oid:0x190000000006d2": {
+      "SAI_BUFFER_PROFILE_ATTR_POOL_ID": "oid:0x180000000006cf",
+      "SAI_BUFFER_PROFILE_ATTR_RESERVED_BUFFER_SIZE": "1518",
+      "SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH": "3",
+      "SAI_BUFFER_PROFILE_ATTR_THRESHOLD_MODE": "SAI_BUFFER_PROFILE_THRESHOLD_MODE_DYNAMIC"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_PROFILE:oid:0x190000000006d3": {
+      "SAI_BUFFER_PROFILE_ATTR_POOL_ID": "oid:0x180000000006d0",
+      "SAI_BUFFER_PROFILE_ATTR_RESERVED_BUFFER_SIZE": "0",
+      "SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH": "3",
+      "SAI_BUFFER_PROFILE_ATTR_THRESHOLD_MODE": "SAI_BUFFER_PROFILE_THRESHOLD_MODE_DYNAMIC"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a00000000010c": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006d3"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a00000000062b": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006d3"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a000000000653": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006d3"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a00000000067b": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006d3"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_INGRESS_PRIORITY_GROUP:oid:0x1a0000000006a3": {
+      "NULL": "NULL",
+      "SAI_INGRESS_PRIORITY_GROUP_ATTR_BUFFER_PROFILE": "oid:0x190000000006d3"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000004": {
+      "SAI_PORT_ATTR_QOS_TC_TO_PRIORITY_GROUP_MAP": "oid:0x140000000006ee"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000626": {
+      "SAI_PORT_ATTR_QOS_TC_TO_PRIORITY_GROUP_MAP": "oid:0x140000000006ee"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000627": {
+      "SAI_PORT_ATTR_QOS_TC_TO_PRIORITY_GROUP_MAP": "oid:0x140000000006ee"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000628": {
+      "SAI_PORT_ATTR_QOS_TC_TO_PRIORITY_GROUP_MAP": "oid:0x140000000006ee"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_PORT:oid:0x1000000000629": {
+      "SAI_PORT_ATTR_QOS_TC_TO_PRIORITY_GROUP_MAP": "oid:0x140000000006ee"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QOS_MAP:oid:0x140000000006ee": {
+      "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST": "{\"count\":8,\"list\":[{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":2},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":4},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":5},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":6},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":7},\"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"fc\":0,\"mpls_exp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}}]}",
+      "SAI_QOS_MAP_ATTR_TYPE": "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000115": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "0",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000116": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "1",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000117": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "2",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000118": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "3",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000119": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "4",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000011a": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "5",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000011b": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "6",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000634": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "0",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000635": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "1",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000636": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "2",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000637": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "3",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000638": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "4",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000639": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "5",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000063a": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "6",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000065c": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "0",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000065d": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "1",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000065e": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "2",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000065f": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "3",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000660": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "4",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000661": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "5",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000662": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "6",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000684": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "0",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000685": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "1",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000686": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "2",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000687": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "3",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000688": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "4",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x15000000000689": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "5",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x1500000000068a": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "6",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006ac": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "0",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006ad": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "1",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006ae": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "2",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006af": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "3",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006b0": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d1",
+      "SAI_QUEUE_ATTR_INDEX": "4",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006b1": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "5",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:oid:0x150000000006b2": {
+      "NULL": "NULL",
+      "SAI_QUEUE_ATTR_BUFFER_PROFILE_ID": "oid:0x190000000006d2",
+      "SAI_QUEUE_ATTR_INDEX": "6",
+      "SAI_QUEUE_ATTR_TYPE": "SAI_QUEUE_TYPE_UNICAST"
+    },
+    "VIDTORID": {
+      "oid:0x1000000000004": "oid:0x10000000d",
+      "oid:0x1000000000626": "oid:0x10000003a",
+      "oid:0x1000000000627": "oid:0x10000003b",
+      "oid:0x1000000000628": "oid:0x10000003c",
+      "oid:0x1000000000629": "oid:0x10000003d",
+      "oid:0x140000000006ee": "oid:0x71400000001",
+      "oid:0x15000000000115": "oid:0xd011500000001",
+      "oid:0x15000000000116": "oid:0xd011500000002",
+      "oid:0x15000000000117": "oid:0xd011500000003",
+      "oid:0x15000000000118": "oid:0xd011500000004",
+      "oid:0x15000000000119": "oid:0xd011500000005",
+      "oid:0x1500000000011a": "oid:0xd011500000006",
+      "oid:0x1500000000011b": "oid:0xd011500000007",
+      "oid:0x15000000000634": "oid:0x3a011500000001",
+      "oid:0x15000000000635": "oid:0x3a011500000002",
+      "oid:0x15000000000636": "oid:0x3a011500000003",
+      "oid:0x15000000000637": "oid:0x3a011500000004",
+      "oid:0x15000000000638": "oid:0x3a011500000005",
+      "oid:0x15000000000639": "oid:0x3a011500000006",
+      "oid:0x1500000000063a": "oid:0x3a011500000007",
+      "oid:0x1500000000065c": "oid:0x3b011500000001",
+      "oid:0x1500000000065d": "oid:0x3b011500000002",
+      "oid:0x1500000000065e": "oid:0x3b011500000003",
+      "oid:0x1500000000065f": "oid:0x3b011500000004",
+      "oid:0x15000000000660": "oid:0x3b011500000005",
+      "oid:0x15000000000661": "oid:0x3b011500000006",
+      "oid:0x15000000000662": "oid:0x3b011500000007",
+      "oid:0x15000000000684": "oid:0x3c011500000001",
+      "oid:0x15000000000685": "oid:0x3c011500000002",
+      "oid:0x15000000000686": "oid:0x3c011500000003",
+      "oid:0x15000000000687": "oid:0x3c011500000004",
+      "oid:0x15000000000688": "oid:0x3c011500000005",
+      "oid:0x15000000000689": "oid:0x3c011500000006",
+      "oid:0x1500000000068a": "oid:0x3c011500000007",
+      "oid:0x150000000006ac": "oid:0x3d011500000001",
+      "oid:0x150000000006ad": "oid:0x3d011500000002",
+      "oid:0x150000000006ae": "oid:0x3d011500000003",
+      "oid:0x150000000006af": "oid:0x3d011500000004",
+      "oid:0x150000000006b0": "oid:0x3d011500000005",
+      "oid:0x150000000006b1": "oid:0x3d011500000006",
+      "oid:0x150000000006b2": "oid:0x3d011500000007",
+      "oid:0x180000000006ce": "oid:0x11800000001",
+      "oid:0x180000000006cf": "oid:0x11800000002",
+      "oid:0x180000000006d0": "oid:0x1800000001",
+      "oid:0x190000000006d1": "oid:0x1900000006",
+      "oid:0x190000000006d2": "oid:0x1900000007",
+      "oid:0x190000000006d3": "oid:0x1900000008",
+      "oid:0x1a00000000010c": "oid:0xd001a00000001",
+      "oid:0x1a00000000062b": "oid:0x3a001a00000001",
+      "oid:0x1a000000000653": "oid:0x3b001a00000001",
+      "oid:0x1a00000000067b": "oid:0x3c001a00000001",
+      "oid:0x1a0000000006a3": "oid:0x3d001a00000001"
+    }
+  },
+  "CONFIG_DB": {
+    "BUFFER_PG|Ethernet10|0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG|Ethernet11|0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG|Ethernet120|0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG|Ethernet8|0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_PG|Ethernet9|0": {
+      "profile": "ingress_lossy_profile"
+    },
+    "BUFFER_POOL|egress_lossless_pool": {
+      "mode": "static",
+      "size": "15982720",
+      "type": "egress"
+    },
+    "BUFFER_POOL|egress_lossy_pool": {
+      "mode": "dynamic",
+      "size": "9243812",
+      "type": "egress"
+    },
+    "BUFFER_POOL|ingress_lossless_pool": {
+      "mode": "dynamic",
+      "size": "10875072",
+      "type": "ingress",
+      "xoff": "4194112"
+    },
+    "BUFFER_PROFILE|egress_lossless_profile": {
+      "pool": "egress_lossless_pool",
+      "size": "1518",
+      "static_th": "15982720"
+    },
+    "BUFFER_PROFILE|egress_lossy_profile": {
+      "dynamic_th": "3",
+      "pool": "egress_lossy_pool",
+      "size": "1518"
+    },
+    "BUFFER_PROFILE|ingress_lossy_profile": {
+      "dynamic_th": "3",
+      "pool": "ingress_lossless_pool",
+      "size": "0"
+    },
+    "BUFFER_QUEUE|Ethernet10|0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet10|3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE|Ethernet10|5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet11|0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet11|3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE|Ethernet11|5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet120|0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet120|3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE|Ethernet120|5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet8|0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet8|3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE|Ethernet8|5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet9|0-2": {
+      "profile": "egress_lossy_profile"
+    },
+    "BUFFER_QUEUE|Ethernet9|3-4": {
+      "profile": "egress_lossless_profile"
+    },
+    "BUFFER_QUEUE|Ethernet9|5-6": {
+      "profile": "egress_lossy_profile"
+    },
+    "DEVICE_METADATA|localhost": {
+      "buffer_model": "traditional",
+      "hwsku": "Force10-Z9100",
+      "platform": "x86_64-dell_z9100_c2538-r0"
+    },
+    "PORT_QOS_MAP|Ethernet10": {
+      "tc_to_pg_map": "PROVISIONING_LOSSY"
+    },
+    "PORT_QOS_MAP|Ethernet11": {
+      "tc_to_pg_map": "PROVISIONING_LOSSY"
+    },
+    "PORT_QOS_MAP|Ethernet120": {
+      "tc_to_pg_map": "PROVISIONING_LOSSY"
+    },
+    "PORT_QOS_MAP|Ethernet8": {
+      "tc_to_pg_map": "PROVISIONING_LOSSY"
+    },
+    "PORT_QOS_MAP|Ethernet9": {
+      "tc_to_pg_map": "PROVISIONING_LOSSY"
+    },
+    "PORT|Ethernet10": {
+      "admin_status": "up",
+      "lanes": "59"
+    },
+    "PORT|Ethernet11": {
+      "admin_status": "up",
+      "lanes": "60"
+    },
+    "PORT|Ethernet120": {
+      "admin_status": "up",
+      "lanes": "13,14,15,16"
+    },
+    "PORT|Ethernet8": {
+      "admin_status": "up",
+      "lanes": "57"
+    },
+    "PORT|Ethernet9": {
+      "admin_status": "up",
+      "lanes": "58"
+    },
+    "TC_TO_PRIORITY_GROUP_MAP|PROVISIONING_LOSSY": {
+      "0": "0",
+      "1": "0",
+      "2": "0",
+      "3": "0",
+      "4": "0",
+      "5": "0",
+      "6": "0",
+      "7": "0"
+    }
+  },
+  "COUNTERS_DB": {
+    "COUNTERS_BUFFER_POOL_NAME_MAP": {
+      "egress_lossless_pool": "oid:0x180000000006ce",
+      "egress_lossy_pool": "oid:0x180000000006cf",
+      "ingress_lossless_pool": "oid:0x180000000006d0"
+    },
+    "COUNTERS_PG_INDEX_MAP": {
+      "oid:0x1a00000000010c": "0",
+      "oid:0x1a00000000062b": "0",
+      "oid:0x1a000000000653": "0",
+      "oid:0x1a00000000067b": "0",
+      "oid:0x1a0000000006a3": "0"
+    },
+    "COUNTERS_PG_NAME_MAP": {
+      "Ethernet10:0": "oid:0x1a00000000067b",
+      "Ethernet11:0": "oid:0x1a0000000006a3",
+      "Ethernet120:0": "oid:0x1a00000000010c",
+      "Ethernet8:0": "oid:0x1a00000000062b",
+      "Ethernet9:0": "oid:0x1a000000000653"
+    },
+    "COUNTERS_PG_PORT_MAP": {
+      "oid:0x1a00000000010c": "oid:0x1000000000004",
+      "oid:0x1a00000000062b": "oid:0x1000000000626",
+      "oid:0x1a000000000653": "oid:0x1000000000627",
+      "oid:0x1a00000000067b": "oid:0x1000000000628",
+      "oid:0x1a0000000006a3": "oid:0x1000000000629"
+    },
+    "COUNTERS_PORT_NAME_MAP": {
+      "Ethernet10": "oid:0x1000000000628",
+      "Ethernet11": "oid:0x1000000000629",
+      "Ethernet120": "oid:0x1000000000004",
+      "Ethernet8": "oid:0x1000000000626",
+      "Ethernet9": "oid:0x1000000000627"
+    },
+    "COUNTERS_QUEUE_INDEX_MAP": {
+      "oid:0x15000000000115": "0",
+      "oid:0x15000000000116": "1",
+      "oid:0x15000000000117": "2",
+      "oid:0x15000000000118": "3",
+      "oid:0x15000000000119": "4",
+      "oid:0x1500000000011a": "5",
+      "oid:0x1500000000011b": "6",
+      "oid:0x15000000000634": "0",
+      "oid:0x15000000000635": "1",
+      "oid:0x15000000000636": "2",
+      "oid:0x15000000000637": "3",
+      "oid:0x15000000000638": "4",
+      "oid:0x15000000000639": "5",
+      "oid:0x1500000000063a": "6",
+      "oid:0x1500000000065c": "0",
+      "oid:0x1500000000065d": "1",
+      "oid:0x1500000000065e": "2",
+      "oid:0x1500000000065f": "3",
+      "oid:0x15000000000660": "4",
+      "oid:0x15000000000661": "5",
+      "oid:0x15000000000662": "6",
+      "oid:0x15000000000684": "0",
+      "oid:0x15000000000685": "1",
+      "oid:0x15000000000686": "2",
+      "oid:0x15000000000687": "3",
+      "oid:0x15000000000688": "4",
+      "oid:0x15000000000689": "5",
+      "oid:0x1500000000068a": "6",
+      "oid:0x150000000006ac": "0",
+      "oid:0x150000000006ad": "1",
+      "oid:0x150000000006ae": "2",
+      "oid:0x150000000006af": "3",
+      "oid:0x150000000006b0": "4",
+      "oid:0x150000000006b1": "5",
+      "oid:0x150000000006b2": "6"
+    },
+    "COUNTERS_QUEUE_NAME_MAP": {
+      "Ethernet10:0": "oid:0x15000000000684",
+      "Ethernet10:1": "oid:0x15000000000685",
+      "Ethernet10:2": "oid:0x15000000000686",
+      "Ethernet10:3": "oid:0x15000000000687",
+      "Ethernet10:4": "oid:0x15000000000688",
+      "Ethernet10:5": "oid:0x15000000000689",
+      "Ethernet10:6": "oid:0x1500000000068a",
+      "Ethernet11:0": "oid:0x150000000006ac",
+      "Ethernet11:1": "oid:0x150000000006ad",
+      "Ethernet11:2": "oid:0x150000000006ae",
+      "Ethernet11:3": "oid:0x150000000006af",
+      "Ethernet11:4": "oid:0x150000000006b0",
+      "Ethernet11:5": "oid:0x150000000006b1",
+      "Ethernet11:6": "oid:0x150000000006b2",
+      "Ethernet120:0": "oid:0x15000000000115",
+      "Ethernet120:1": "oid:0x15000000000116",
+      "Ethernet120:2": "oid:0x15000000000117",
+      "Ethernet120:3": "oid:0x15000000000118",
+      "Ethernet120:4": "oid:0x15000000000119",
+      "Ethernet120:5": "oid:0x1500000000011a",
+      "Ethernet120:6": "oid:0x1500000000011b",
+      "Ethernet8:0": "oid:0x15000000000634",
+      "Ethernet8:1": "oid:0x15000000000635",
+      "Ethernet8:2": "oid:0x15000000000636",
+      "Ethernet8:3": "oid:0x15000000000637",
+      "Ethernet8:4": "oid:0x15000000000638",
+      "Ethernet8:5": "oid:0x15000000000639",
+      "Ethernet8:6": "oid:0x1500000000063a",
+      "Ethernet9:0": "oid:0x1500000000065c",
+      "Ethernet9:1": "oid:0x1500000000065d",
+      "Ethernet9:2": "oid:0x1500000000065e",
+      "Ethernet9:3": "oid:0x1500000000065f",
+      "Ethernet9:4": "oid:0x15000000000660",
+      "Ethernet9:5": "oid:0x15000000000661",
+      "Ethernet9:6": "oid:0x15000000000662"
+    },
+    "COUNTERS_QUEUE_PORT_MAP": {
+      "oid:0x15000000000115": "oid:0x1000000000004",
+      "oid:0x15000000000116": "oid:0x1000000000004",
+      "oid:0x15000000000117": "oid:0x1000000000004",
+      "oid:0x15000000000118": "oid:0x1000000000004",
+      "oid:0x15000000000119": "oid:0x1000000000004",
+      "oid:0x1500000000011a": "oid:0x1000000000004",
+      "oid:0x1500000000011b": "oid:0x1000000000004",
+      "oid:0x15000000000634": "oid:0x1000000000626",
+      "oid:0x15000000000635": "oid:0x1000000000626",
+      "oid:0x15000000000636": "oid:0x1000000000626",
+      "oid:0x15000000000637": "oid:0x1000000000626",
+      "oid:0x15000000000638": "oid:0x1000000000626",
+      "oid:0x15000000000639": "oid:0x1000000000626",
+      "oid:0x1500000000063a": "oid:0x1000000000626",
+      "oid:0x1500000000065c": "oid:0x1000000000627",
+      "oid:0x1500000000065d": "oid:0x1000000000627",
+      "oid:0x1500000000065e": "oid:0x1000000000627",
+      "oid:0x1500000000065f": "oid:0x1000000000627",
+      "oid:0x15000000000660": "oid:0x1000000000627",
+      "oid:0x15000000000661": "oid:0x1000000000627",
+      "oid:0x15000000000662": "oid:0x1000000000627",
+      "oid:0x15000000000684": "oid:0x1000000000628",
+      "oid:0x15000000000685": "oid:0x1000000000628",
+      "oid:0x15000000000686": "oid:0x1000000000628",
+      "oid:0x15000000000687": "oid:0x1000000000628",
+      "oid:0x15000000000688": "oid:0x1000000000628",
+      "oid:0x15000000000689": "oid:0x1000000000628",
+      "oid:0x1500000000068a": "oid:0x1000000000628",
+      "oid:0x150000000006ac": "oid:0x1000000000629",
+      "oid:0x150000000006ad": "oid:0x1000000000629",
+      "oid:0x150000000006ae": "oid:0x1000000000629",
+      "oid:0x150000000006af": "oid:0x1000000000629",
+      "oid:0x150000000006b0": "oid:0x1000000000629",
+      "oid:0x150000000006b1": "oid:0x1000000000629",
+      "oid:0x150000000006b2": "oid:0x1000000000629"
+    }
+  },
+  "NATIVE": {
+    "BUFFER_CONSUMER": {
+      "buffermgrd": "682a6b8bbe3b2b0ed132ba26eaad7c2b0992ef68866542336fc8083b698398bb",
+      "orchagent": "fed521d9700df9b79a22696d5b50f2308e1e7cf1bfccda59b458e7f59c7d2939"
+    }
+  },
+  "STATE_DB": {
+    "SWITCH_CAPABILITY|switch": {
+      "SWITCH|NUMBER_OF_TRAFFIC_CLASSES": "10",
+      "SWITCH|NUMBER_OF_UNICAST_QUEUES": "10"
+    }
+  }
+}

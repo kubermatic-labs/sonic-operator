@@ -28,12 +28,15 @@ type NetworkRequest struct {
 }
 
 type NetworkResult struct {
-	Exists                bool            `json:"exists"`
-	ConfigurationVerified bool            `json:"configurationVerified"`
-	RuntimeVerified       bool            `json:"runtimeVerified"`
-	PersistenceVerified   bool            `json:"persistenceVerified"`
-	Observed              json.RawMessage `json:"observed,omitempty"`
-	Message               string          `json:"message,omitempty"`
+	Exists                bool `json:"exists"`
+	ConfigurationVerified bool `json:"configurationVerified"`
+	RuntimeVerified       bool `json:"runtimeVerified"`
+	PersistenceVerified   bool `json:"persistenceVerified"`
+	// BufferRepairEligible is a fresh, UID-bound qualification of repairable
+	// nonconvergence. It is false for probe/identity/capability failures.
+	BufferRepairEligible bool            `json:"bufferRepairEligible,omitempty"`
+	Observed             json.RawMessage `json:"observed,omitempty"`
+	Message              string          `json:"message,omitempty"`
 }
 
 // ValidateNetworkRequest validates the envelope. Each planner additionally
@@ -43,6 +46,7 @@ func ValidateNetworkRequest(r *NetworkRequest, write bool) error {
 		return fmt.Errorf("network request required")
 	}
 	switch r.Kind {
+	case "BufferPool", "BufferProfile", "BufferPG", "BufferQueue":
 	case "Port", "PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration",
 		"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding",
 		"MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer", "EVPN":

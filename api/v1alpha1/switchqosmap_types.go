@@ -25,13 +25,14 @@ type QoSMapEntry struct {
 
 // SwitchQoSMapSpec defines a map; actual TC and queue bounds require device capabilities.
 // +kubebuilder:validation:XValidation:rule="self.entries.all(e, self.type == 'DSCPToTC' ? e.from <= 63 : (self.type == 'Dot1pToTC' ? e.from <= 7 : true))",message="DSCP inputs must be 0..63 and dot1p inputs 0..7"
+// +kubebuilder:validation:XValidation:rule="self.type != 'TCToPriorityGroup' || self.entries.all(e, e.from <= 15 && e.to <= 7)",message="TC-to-PG schema ceilings are TC 15 and PG 7; hardware bounds require native evidence"
 type SwitchQoSMapSpec struct {
 	NetworkResourceSpec `json:",inline"`
 	// +required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name QoSPolicyName `json:"name"`
 	// +required
-	// +kubebuilder:validation:Enum=DSCPToTC;Dot1pToTC;TCToQueue
+	// +kubebuilder:validation:Enum=DSCPToTC;Dot1pToTC;TCToQueue;TCToPriorityGroup
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="type is immutable"
 	Type string `json:"type"`
 	// +required
