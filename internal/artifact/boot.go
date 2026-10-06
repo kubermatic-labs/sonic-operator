@@ -10,13 +10,17 @@ import (
 // RestoreBoot restores confirmed generating inputs before native platform
 // services. It only runs across boot identities, never as blind drift repair.
 func (e *Engine) RestoreBoot() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	if e.MutationGuard != nil {
-		return e.MutationGuard(context.Background(), e.restoreBoot)
+		return e.MutationGuard(ctx, func() error { return e.restoreBoot(ctx) })
 	}
-	return e.restoreBoot()
+	return e.restoreBoot(ctx)
 }
-func (e *Engine) restoreBoot() error {
-	e.mu.Lock()
+func (e *Engine) restoreBoot(ctx context.Context) error {
+	if err := e.mu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer e.mu.Unlock()
 	return e.restoreBootLocked()
 }

@@ -103,6 +103,12 @@ func (b *transportHostBackend) Observe(_ context.Context, q host.Request) (host.
 	match := reflect.DeepEqual(b.state, *q.Management)
 	return host.Result{ConfigurationVerified: match, RuntimeVerified: match, PersistenceVerified: match, GatewayVerified: match}, nil
 }
+func (b *transportHostBackend) VerifySaved(_ context.Context, q host.Request) error {
+	if q.Management == nil || !reflect.DeepEqual(b.state, *q.Management) {
+		return host.ErrNative
+	}
+	return nil
+}
 func (b *transportHostBackend) Snapshot(context.Context) (host.Snapshot, error) {
 	return host.Snapshot{Management: b.state, ActiveMAC: b.state.MAC}, nil
 }

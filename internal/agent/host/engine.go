@@ -27,6 +27,9 @@ type Backend interface {
 	CheckPublication(context.Context) error
 	RecoverDependencies(context.Context) error
 	Observe(context.Context, Request) (Result, error)
+	// VerifySaved rechecks saved host inputs without native processes. Called
+	// only under final ordered admission after a complete read-only proof.
+	VerifySaved(context.Context, Request) error
 	Snapshot(context.Context) (Snapshot, error)
 	Validate(context.Context, Request) error
 	WatchdogReady(context.Context) error
@@ -154,119 +157,191 @@ func (e *Engine) Ensure(ctx context.Context, q Request, conn string) (out Result
 	if ValidateRequest(q) != nil || conn == "" {
 		return out, ErrInvalid
 	}
-	err = e.backend.Exclusive(ctx, func(locked context.Context) error {
-		ctx = locked
-		return e.withRecord(ctx, func(r *record) error {
-			c := r.System
+	// Re-prove an exact existing claim without holding configuration writers
+	// during native observation. This is native-authoritative: Ready from Get (or
+	// an unowned native match) cannot adopt or advance a claim revision.
+	verified := false
+	var observedRecord *record
+	err = e.withRecord(ctx, func(r *record) error {
+		c := r.System
+		if q.Kind == "Management" {
+			c = r.Management
+		}
+		if c == nil || *c != *requestClaim(q) || r.Pending != nil ||
+			(q.Kind == "Management" && r.RolledBack != nil && *r.RolledBack == *requestClaim(q)) {
+			return nil
+		}
+		if err := e.backend.CheckPublication(ctx); err != nil {
+			return err
+		}
+		current, err := e.observe(ctx, q, r, conn)
+		if err != nil {
+			return nil // The guarded path retains repair/recovery authority.
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if current.Ready() && current.Recovery == "Idle" {
+			out, verified = current, true
+			observedRecord = r
+		}
+		return nil
+	})
+	if err != nil {
+		return out, err
+	}
+	if verified {
+		// Retain every writer-side admission fence, but only for a short record
+		// revalidation and fresh saved-host read. No process probe or claim
+		// write runs here: ordinary whole-DB saves may invalidate earlier proof.
+		err = e.withExclusiveRecord(ctx, e.backend.Exclusive, func(locked context.Context, r *record) error {
+			verified = reflect.DeepEqual(r, observedRecord)
+			if verified {
+				if err := e.backend.VerifySaved(locked, q); err != nil {
+					out.PersistenceVerified = false
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil || verified {
+			return out, err
+		}
+	}
+	out = Result{}
+	err = e.withExclusiveRecord(ctx, e.backend.Exclusive, func(ctx context.Context, r *record) error {
+		c := r.System
+		if q.Kind == "Management" {
+			c = r.Management
+		}
+		if !ownerMatches(c, q) {
+			return ErrConflict
+		}
+		if q.Kind == "Management" && r.RolledBack != nil && *r.RolledBack == *requestClaim(q) {
+			return ErrConflict
+		}
+		// Host mutations share the management connection; freeze all host writes
+		// until its pending transaction is independently confirmed or recovered.
+		if r.Pending != nil {
+			if !pendingMatches(r.Pending, q) {
+				return ErrConflict
+			}
+			var er error
+			out, er = e.observe(ctx, q, r, conn)
+			return er
+		}
+		if er := e.backend.CheckPublication(ctx); er != nil {
+			return er
+		}
+		current, er := e.backend.Observe(ctx, q)
+		if er != nil {
+			return ErrNative
+		}
+		if current.ConfigurationVerified && current.RuntimeVerified && current.PersistenceVerified {
 			if q.Kind == "Management" {
-				c = r.Management
-			}
-			if !ownerMatches(c, q) {
-				return ErrConflict
-			}
-			if q.Kind == "Management" && r.RolledBack != nil && *r.RolledBack == *requestClaim(q) {
-				return ErrConflict
-			}
-			// Host mutations share the management connection; freeze all host writes
-			// until its pending transaction is independently confirmed or recovered.
-			if r.Pending != nil {
-				if !pendingMatches(r.Pending, q) {
-					return ErrConflict
-				}
-				var er error
-				out, er = e.observe(ctx, q, r, conn)
-				return er
-			}
-			if er := e.backend.CheckPublication(ctx); er != nil {
-				return er
-			}
-			current, er := e.backend.Observe(ctx, q)
-			if er != nil {
-				return ErrNative
-			}
-			if current.ConfigurationVerified && current.RuntimeVerified && current.PersistenceVerified {
-				if q.Kind == "Management" {
-					r.Management = requestClaim(q)
-				} else {
-					r.System = requestClaim(q)
-				}
-				if er = e.save(r); er != nil {
-					return er
-				}
-				out = current
-				out.Owner = q.Owner
-				out.Recovery = "Idle"
-				return nil
-			}
-			if e.backend.Validate(ctx, q) != nil {
-				return ErrNative
-			}
-			if q.Kind == "System" {
+				r.Management = requestClaim(q)
+			} else {
 				r.System = requestClaim(q)
-				if er = e.save(r); er != nil {
-					return er
-				}
-				if e.backend.ApplySystem(ctx, q) != nil {
-					return ErrNative
-				}
-				out, er = e.observe(ctx, q, r, conn)
-				return er
-			}
-			if e.backend.WatchdogReady(ctx) != nil {
-				return ErrNative
-			}
-			before, er := e.backend.Snapshot(ctx)
-			if er != nil {
-				return ErrNative
-			}
-			old := q
-			old.Management = &before.Management
-			baseline, er := e.backend.Observe(ctx, old)
-			repairRuntime := current.ConfigurationVerified && current.PersistenceVerified
-			if er != nil || !baseline.ConfigurationVerified || (!baseline.RuntimeVerified && !repairRuntime) {
-				return ErrNative
-			}
-			recoveryBefore := before
-			if repairRuntime && q.Management.MAC != "" {
-				recoveryBefore.ActiveMAC = q.Management.MAC
-			}
-			now := e.now()
-			clock, er := e.bootNow()
-			if er != nil {
-				return ErrStorage
-			}
-			r.Management = requestClaim(q)
-			r.Pending = &transaction{ID: randomID(), Claim: *requestClaim(q), Before: recoveryBefore, Candidate: *q.Management, ObservedActiveMAC: before.ActiveMAC, Created: now, Deadline: now.Add(time.Duration(q.RollbackSeconds) * time.Second), Connection: conn}
-			owned := q.Management.MAC != ""
-			r.Pending.MACOwned = &owned
-			r.Pending.BootID, r.Pending.DeadlineUptime = clock.ID, clock.Seconds+float64(q.RollbackSeconds)
-			if er = e.backend.CheckPublication(ctx); er != nil {
-				return er
 			}
 			if er = e.save(r); er != nil {
 				return er
 			}
-			applyCtx, cancelApply := context.WithTimeout(ctx, time.Duration(q.RollbackSeconds-5)*time.Second)
-			defer cancelApply()
-			if e.backend.ApplyManagement(applyCtx, before, *q.Management) != nil {
-				r.Pending.RollbackRequired = true
-				if er = e.save(r); er != nil {
-					return er
-				}
-				// Detach the lost RPC while retaining the exclusion capability held
-				// by this callback. Background would attempt to relock our own mutex.
-				recovery, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
-				defer cancel()
-				if restoreErr := e.restore(recovery, r); restoreErr != nil {
-					return errors.Join(ErrNative, restoreErr)
-				}
+			out = current
+			out.Owner = q.Owner
+			out.Recovery = "Idle"
+			return nil
+		}
+		if e.backend.Validate(ctx, q) != nil {
+			return ErrNative
+		}
+		if q.Kind == "System" {
+			r.System = requestClaim(q)
+			if er = e.save(r); er != nil {
+				return er
+			}
+			if e.backend.ApplySystem(ctx, q) != nil {
 				return ErrNative
 			}
-			out, er = e.observe(applyCtx, q, r, conn)
+			out, er = e.observe(ctx, q, r, conn)
 			return er
-		})
+		}
+		if e.backend.WatchdogReady(ctx) != nil {
+			return ErrNative
+		}
+		before, er := e.backend.Snapshot(ctx)
+		if er != nil {
+			return ErrNative
+		}
+		old := q
+		old.Management = &before.Management
+		baseline, er := e.backend.Observe(ctx, old)
+		repairRuntime := current.ConfigurationVerified && current.PersistenceVerified
+		if er != nil || !baseline.ConfigurationVerified || (!baseline.RuntimeVerified && !repairRuntime) {
+			return ErrNative
+		}
+		recoveryBefore := before
+		if repairRuntime && q.Management.MAC != "" {
+			recoveryBefore.ActiveMAC = q.Management.MAC
+		}
+		now := e.now()
+		clock, er := e.bootNow()
+		if er != nil {
+			return ErrStorage
+		}
+		r.Management = requestClaim(q)
+		r.Pending = &transaction{ID: randomID(), Claim: *requestClaim(q), Before: recoveryBefore, Candidate: *q.Management, ObservedActiveMAC: before.ActiveMAC, Created: now, Deadline: now.Add(time.Duration(q.RollbackSeconds) * time.Second), Connection: conn}
+		owned := q.Management.MAC != ""
+		r.Pending.MACOwned = &owned
+		r.Pending.BootID, r.Pending.DeadlineUptime = clock.ID, clock.Seconds+float64(q.RollbackSeconds)
+		if er = e.backend.CheckPublication(ctx); er != nil {
+			return er
+		}
+		if er = e.save(r); er != nil {
+			return er
+		}
+		applyCtx, cancelApply := context.WithTimeout(ctx, time.Duration(q.RollbackSeconds-5)*time.Second)
+		defer cancelApply()
+		if e.backend.ApplyManagement(applyCtx, before, *q.Management) != nil {
+			r.Pending.RollbackRequired = true
+			if er = e.save(r); er != nil {
+				return er
+			}
+			// Detach the lost RPC while retaining the exclusion capability held
+			// by this callback. Background would attempt to relock our own mutex.
+			recovery, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+			defer cancel()
+			if restoreErr := e.restore(recovery, r); restoreErr != nil {
+				return errors.Join(ErrNative, restoreErr)
+			}
+			return ErrNative
+		}
+		out, er = e.observe(applyCtx, q, r, conn)
+		return er
 	})
 	return out, err
+}
+
+// Every attempt acquires writers before the host mutex/flock. Busy readers must
+// never turn a short admission check into a writer-lock convoy. Only contention
+// before callback entry is retried, never an action that may have mutated state.
+func (e *Engine) withExclusiveRecord(ctx context.Context, exclusive func(context.Context, func(context.Context) error) error, action func(context.Context, *record) error) error {
+	for {
+		entered := false
+		err := exclusive(ctx, func(locked context.Context) error {
+			return e.withRecordMode(locked, true, func(r *record) error {
+				entered = true
+				return action(locked, r)
+			})
+		})
+		if entered || !errors.Is(err, ErrBusy) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
 }
 
 func (e *Engine) Confirm(ctx context.Context, c Confirmation, conn string) (out Result, err error) {

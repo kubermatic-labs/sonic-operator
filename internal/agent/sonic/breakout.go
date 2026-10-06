@@ -182,13 +182,31 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 			return fail(err.Error())
 		}
 	}
-	// Verify the old runtime before deleting anything; a known no-op is still
-	// journaled and saved, but never resets admin state on existing interfaces.
+	// Verify the old runtime before deleting anything. First adoption still
+	// journals and saves, without resetting existing interface admin state.
 	if err := m.checkBreakoutRuntime(ctx, p, before); err != nil {
 		return fail("current runtime is not verified: " + err.Error())
 	}
 	if err := m.checkNativeBreakoutConfig(ctx); err != nil {
 		return fail(err.Error())
+	}
+	if !transition && record != nil && !record.Pending && record.NativeSucceeded &&
+		record.Request == r && reflect.DeepEqual(record.Platform, *p) &&
+		reflect.DeepEqual(record.After, before) && record.UnrelatedHash == breakoutUnrelatedHash(db, p) &&
+		m.breakoutPersisted(p, record.After) {
+		// Saved/native probes may take time. Revalidate the full live snapshot
+		// and platform before returning the existing durable confirmation.
+		latest, _, err := m.readBreakoutDB(ctx)
+		if err != nil || vlanAuthorityHash(latest) != vlanAuthorityHash(db) {
+			return fail("CONFIG_DB changed during confirmed breakout verification; retry")
+		}
+		latestPlatform, err := m.breakoutCapability(ctx, r.Port, latest)
+		if err != nil || !reflect.DeepEqual(latestPlatform, p) || ctx.Err() != nil {
+			return fail("platform changed or request canceled during confirmed breakout verification; retry")
+		}
+		out := breakoutResult(latest, p, record)
+		out.ConfigurationVerified, out.RuntimeVerified, out.PersistenceVerified = true, true, true
+		return out, nil
 	}
 	record = &breakoutRecord{Version: 1, Request: r, Platform: *p, Before: before, Native: native, After: after, UnrelatedHash: breakoutUnrelatedHash(db, p), Pending: true, NativeSucceeded: !transition}
 	if err := storeBreakoutRecord(j, record); err != nil {

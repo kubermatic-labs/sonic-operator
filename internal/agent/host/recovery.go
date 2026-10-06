@@ -41,12 +41,10 @@ func (e *Engine) RecoverExpired(ctx context.Context) error {
 	if err := e.backend.RecoverDependencies(ctx); err != nil {
 		return err
 	}
-	return e.backend.ExclusiveRecovery(ctx, func(locked context.Context) error {
-		return e.withRecord(locked, func(r *record) error {
-			if r.Pending == nil || !e.expired(r.Pending) {
-				return nil
-			}
-			return e.restore(locked, r)
-		})
+	return e.withExclusiveRecord(ctx, e.backend.ExclusiveRecovery, func(locked context.Context, r *record) error {
+		if r.Pending == nil || !e.expired(r.Pending) {
+			return nil
+		}
+		return e.restore(locked, r)
 	})
 }

@@ -239,12 +239,16 @@ func (n *Native) profile(ctx context.Context, kind string) (NativeProfile, error
 	return p, nil
 }
 func (n *Native) saved() (Database, error) {
-	b, e := n.read("/etc/sonic/config_db.json")
+	read := n.ReadFile
+	if read == nil {
+		read = readSavedConfigFile
+	}
+	b, e := read("/etc/sonic/config_db.json")
 	if e != nil {
 		return nil, e
 	}
 	var raw map[string]json.RawMessage
-	if json.Unmarshal(b, &raw) != nil {
+	if strictDecodeLimit(b, &raw, savedConfigLimit) != nil {
 		return nil, ErrNative
 	}
 	db := Database{}

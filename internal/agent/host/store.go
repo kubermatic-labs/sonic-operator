@@ -64,15 +64,31 @@ func secureFile(info os.FileInfo, dir bool) error {
 	return nil
 }
 func (e *Engine) withRecord(ctx context.Context, fn func(*record) error) error {
-	if err := lockMutex(ctx, &e.mu); err != nil {
+	return e.withRecordMode(ctx, false, fn)
+}
+
+func (e *Engine) withRecordMode(ctx context.Context, attempt bool, fn func(*record) error) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if attempt {
+		if !e.mu.TryLock() {
+			return ErrBusy
+		}
+	} else {
+		if err := lockMutex(ctx, &e.mu); err != nil {
+			return err
+		}
+	}
 	defer e.mu.Unlock()
-	r, unlock, err := lockRecord(ctx, e.dir, e.syncDir)
+	r, unlock, err := lockRecordMode(ctx, e.dir, e.syncDir, attempt)
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return fn(r)
 }
 func (e *Engine) save(r *record) error {

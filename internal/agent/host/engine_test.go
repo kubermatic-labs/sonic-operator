@@ -29,6 +29,12 @@ func (f *fakeBackend) Exclusive(ctx context.Context, fn func(context.Context) er
 }
 func (f *fakeBackend) RecoverDependencies(context.Context) error { return nil }
 func (f *fakeBackend) CheckPublication(context.Context) error    { return nil }
+func (f *fakeBackend) VerifySaved(context.Context, Request) error {
+	if !f.persist {
+		return ErrNative
+	}
+	return nil
+}
 func (f *fakeBackend) ExclusiveRecovery(ctx context.Context, fn func(context.Context) error) error {
 	return f.Exclusive(ctx, fn)
 }

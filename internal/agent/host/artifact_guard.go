@@ -11,6 +11,7 @@ import (
 
 // WithArtifactExclusion holds the real host lock across artifact publication.
 // Unlike CheckPending it is only called after the complete writer lock set.
+// ErrBusy requires releasing that entire set before retrying.
 func WithArtifactExclusion(ctx context.Context, dir string, action func() error) error {
 	return withArtifactExclusion(ctx, dir, false, action)
 }
@@ -22,7 +23,7 @@ func WithArtifactAgentRecoveryExclusion(ctx context.Context, dir string, action 
 }
 
 func withArtifactExclusion(ctx context.Context, dir string, recovery bool, action func() error) error {
-	r, unlock, err := lockRecord(ctx, dir, nil)
+	r, unlock, err := lockRecordMode(ctx, dir, nil, true)
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// ErrBusy means no host lock was acquired. A caller holding writer locks must
+// release the complete lock set before retrying; it is not a recovery permit.
+var ErrBusy = errors.New("host record lock busy")
+
 func syncDirectory(f *os.File, syncFn func(*os.File) error) error {
 	if syncFn != nil {
 		return syncFn(f)
@@ -80,6 +84,10 @@ func sameRecordIdentity(a, b os.FileInfo) bool {
 	return a != nil && b != nil && os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime()) && a.Mode() == b.Mode()
 }
 func lockRecord(ctx context.Context, dir string, syncFn func(*os.File) error) (*record, func(), error) {
+	return lockRecordMode(ctx, dir, syncFn, false)
+}
+
+func lockRecordMode(ctx context.Context, dir string, syncFn func(*os.File) error, attempt bool) (*record, func(), error) {
 	root, e := openStore(dir)
 	if e != nil {
 		return nil, nil, e
@@ -107,6 +115,10 @@ func lockRecord(ctx context.Context, dir string, syncFn func(*os.File) error) (*
 		if !errors.Is(e, syscall.EWOULDBLOCK) && !errors.Is(e, syscall.EAGAIN) {
 			unlock()
 			return nil, nil, ErrStorage
+		}
+		if attempt {
+			unlock()
+			return nil, nil, ErrBusy
 		}
 		select {
 		case <-ctx.Done():

@@ -165,6 +165,13 @@ func TestBreakoutTypedPortOwnership(t *testing.T) {
 			}
 			// Pending no-op recovery must still use the exact recorded request,
 			// even though it is compatible with the confirmed typed owner.
+			// A healthy confirmed repeat is now read-only; actual saved drift
+			// forces persistence repair and exercises the same Pending authority.
+			savesBeforeRepeat := saves
+			if got, st := m.ReconcilePortBreakout(ctx, adopt); st != nil || !got.PersistenceVerified || got.Pending || saves != savesBeforeRepeat {
+				t.Fatalf("confirmed adoption repeated save: %+v %+v", got, st)
+			}
+			saved = []byte(`{"PORT":`)
 			save := m.saveConfig
 			m.saveConfig = func(context.Context) *agent.Status { return &agent.Status{Code: 500} }
 			if got, st := m.ReconcilePortBreakout(ctx, adopt); st == nil || !got.Pending || calls != 0 {
