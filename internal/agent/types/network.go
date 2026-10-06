@@ -43,7 +43,9 @@ func ValidateNetworkRequest(r *NetworkRequest, write bool) error {
 		return fmt.Errorf("network request required")
 	}
 	switch r.Kind {
-	case "PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration":
+	case "PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration",
+		"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding",
+		"EVPNPeer":
 	default:
 		return fmt.Errorf("unsupported network kind")
 	}

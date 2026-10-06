@@ -59,8 +59,9 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	}
 	// FRR mode is mutable intent, not a target selector. Always recover the
 	// saved mode and approval before considering a transition in either direction.
-	for _, field := range []string{"switchRef", "name", "vrf", "prefix", "address", "vlanID"} {
+	for _, field := range []string{"switchRef", "name", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "domainID", "peerSwitchRef", "tunnel"} {
 		current, previous := currentFields[field], savedFields[field]
+
 		if field == "vrf" {
 			if current == nil || current == "" {
 				current = "default"

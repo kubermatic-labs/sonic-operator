@@ -112,6 +112,17 @@ func TestNetworkRecoveryDeletion(t *testing.T) {
 					case *api.SwitchFRRMigration:
 						o.Spec.ApprovedDigest = "invalid-new-approval"
 						o.Spec.Mode = "Traditional"
+					case *api.SwitchACLPolicy:
+						o.Spec.DefaultAction = "invalid"
+					case *api.SwitchACLBinding:
+						o.Spec.Interfaces = nil
+					case *api.SwitchQoSMap:
+						o.Spec.Entries = nil
+					case *api.SwitchScheduler:
+						o.Spec.Algorithm = "invalid"
+					case *api.SwitchQoSBinding:
+						o.Spec.Queues = nil
+						o.Spec.DSCPToTC = ""
 					}
 					if err := c.Update(t.Context(), obj); err != nil {
 						t.Fatal(err)

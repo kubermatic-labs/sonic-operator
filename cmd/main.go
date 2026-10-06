@@ -59,6 +59,7 @@ func main() {
 	var allowBreakout bool
 	var allowNetworkConfig bool
 	var allowFRRMigration bool
+	var allowTrafficPolicy bool
 	var disableProvisionsingServer bool
 	var httpServerAddr, onieImagesDir, onieConfigFile, ztpConfigFile, ztpMode, bootstrapControlKubeconfigFile string
 	var tlsOpts []func(*tls.Config)
@@ -89,6 +90,8 @@ func main() {
 		"Allow additive network configuration. Requires observe-only=false, individual managementPolicy=Manage and agent network/write gates. Resource deletion leaves device configuration intact.")
 	flag.BoolVar(&allowFRRMigration, "allow-frr-migration", false,
 		"Allow approved empty-routing FRR migration. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage, a matching approvedDigest and agent migration/write gates.")
+	flag.BoolVar(&allowTrafficPolicy, "allow-traffic-policy", false,
+		"Allow guarded ACL and QoS configuration and recovery. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage and agent traffic/network/write gates.")
 	flag.StringVar(&httpServerAddr, "http-server-address", "0", "The address the HTTP server for ZTP and ONIE binds to.")
 	flag.StringVar(&ztpConfigFile, "ztp-config-file", "/etc/ztp.json", "Config file containing the parameters to render ZTP scripts.")
 	flag.StringVar(&ztpMode, "ztp-mode", "templates", "ZTP source: templates, configmap, or generated. Configmap mode serves the referenced script verbatim; generated mode renders from Switch objects.")
@@ -239,11 +242,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SwitchPortBreakout")
 		os.Exit(1)
 	}
-	for _, kind := range []string{"PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration"} {
+	for _, kind := range []string{"PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding"} {
 		if err := (&controller.NetworkReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Kind: kind,
 			ObserveOnly: observeOnly, AllowNetworkConfig: allowNetworkConfig,
-			AllowFRRMigration: allowFRRMigration,
+			AllowFRRMigration:  allowFRRMigration,
+			AllowTrafficPolicy: allowTrafficPolicy,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create network controller", "controller", "Switch"+kind)
 			os.Exit(1)

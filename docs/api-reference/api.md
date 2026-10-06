@@ -12,6 +12,8 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 
 ### Resource Types
 - [Switch](#switch)
+- [SwitchACLBinding](#switchaclbinding)
+- [SwitchACLPolicy](#switchaclpolicy)
 - [SwitchBGP](#switchbgp)
 - [SwitchBGPPeer](#switchbgppeer)
 - [SwitchCredentials](#switchcredentials)
@@ -21,10 +23,51 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 - [SwitchL3Interface](#switchl3interface)
 - [SwitchPortBreakout](#switchportbreakout)
 - [SwitchPortChannel](#switchportchannel)
+- [SwitchQoSBinding](#switchqosbinding)
+- [SwitchQoSMap](#switchqosmap)
+- [SwitchScheduler](#switchscheduler)
 - [SwitchStaticRoute](#switchstaticroute)
 - [SwitchVLAN](#switchvlan)
 - [SwitchVRF](#switchvrf)
 
+
+
+#### ACLAction
+
+_Underlying type:_ _string_
+
+
+
+_Validation:_
+- Enum: [Permit Drop]
+
+_Appears in:_
+- [ACLRule](#aclrule)
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
+
+
+
+#### ACLRule
+
+
+
+ACLRule matches one IP family. Ports require an explicit TCP or UDP protocol.
+
+
+
+_Appears in:_
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _[TrafficPolicyName](#trafficpolicyname)_ |  |  | MaxLength: 64 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]\{0,63\}$` <br /> |
+| `priority` _integer_ |  |  | Maximum: 999999 <br />Minimum: 2 <br /> |
+| `action` _[ACLAction](#aclaction)_ |  |  | Enum: [Permit Drop] <br /> |
+| `source` _[NetworkPrefix](#networkprefix)_ |  |  | MaxLength: 49 <br /> |
+| `destination` _[NetworkPrefix](#networkprefix)_ |  |  | MaxLength: 49 <br /> |
+| `protocol` _integer_ |  |  | Maximum: 143 <br />Minimum: 1 <br /> |
+| `sourcePort` _integer_ |  |  | Maximum: 65535 <br />Minimum: 0 <br /> |
+| `destinationPort` _integer_ |  |  | Maximum: 65535 <br />Minimum: 0 <br /> |
 
 
 #### AdminState
@@ -205,12 +248,17 @@ _Validation:_
 
 _Appears in:_
 - [NetworkResourceSpec](#networkresourcespec)
+- [SwitchACLBindingSpec](#switchaclbindingspec)
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
+- [SwitchQoSBindingSpec](#switchqosbindingspec)
+- [SwitchQoSMapSpec](#switchqosmapspec)
+- [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 - [SwitchVRFSpec](#switchvrfspec)
 
@@ -230,6 +278,7 @@ _Validation:_
 - MaxLength: 49
 
 _Appears in:_
+- [ACLRule](#aclrule)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 
@@ -239,17 +288,22 @@ _Appears in:_
 
 
 
-NetworkResourceSpec is shared by the eight network resources.
+NetworkResourceSpec is shared by the allowlisted network resources.
 
 
 
 _Appears in:_
+- [SwitchACLBindingSpec](#switchaclbindingspec)
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
+- [SwitchQoSBindingSpec](#switchqosbindingspec)
+- [SwitchQoSMapSpec](#switchqosmapspec)
+- [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 - [SwitchVRFSpec](#switchvrfspec)
 
@@ -268,12 +322,17 @@ NetworkResourceStatus reports independent proof, not inferred forwarding health.
 
 
 _Appears in:_
+- [SwitchACLBinding](#switchaclbinding)
+- [SwitchACLPolicy](#switchaclpolicy)
 - [SwitchBGP](#switchbgp)
 - [SwitchBGPPeer](#switchbgppeer)
 - [SwitchDHCPRelay](#switchdhcprelay)
 - [SwitchFRRMigration](#switchfrrmigration)
 - [SwitchL3Interface](#switchl3interface)
 - [SwitchPortChannel](#switchportchannel)
+- [SwitchQoSBinding](#switchqosbinding)
+- [SwitchQoSMap](#switchqosmap)
+- [SwitchScheduler](#switchscheduler)
 - [SwitchStaticRoute](#switchstaticroute)
 - [SwitchVRF](#switchvrf)
 
@@ -298,12 +357,17 @@ _Appears in:_
 
 _Appears in:_
 - [NetworkResourceSpec](#networkresourcespec)
+- [SwitchACLBindingSpec](#switchaclbindingspec)
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
+- [SwitchQoSBindingSpec](#switchqosbindingspec)
+- [SwitchQoSMapSpec](#switchqosmapspec)
+- [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 - [SwitchVRFSpec](#switchvrfspec)
 
@@ -401,6 +465,58 @@ _Appears in:_
 | `interfaceRefs` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core) array_ | InterfaceRefs lists the references to Interfaces connected to this port. |  |  |
 
 
+#### QoSMapEntry
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchQoSMapSpec](#switchqosmapspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `from` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 0 <br /> |
+| `to` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 0 <br /> |
+
+
+#### QoSPolicyName
+
+_Underlying type:_ _string_
+
+QoSPolicyName is the native map or scheduler identifier.
+
+_Validation:_
+- MaxLength: 32
+- Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]{0,31}$`
+
+_Appears in:_
+- [QoSQueueBinding](#qosqueuebinding)
+- [SwitchQoSBindingSpec](#switchqosbindingspec)
+- [SwitchQoSMapSpec](#switchqosmapspec)
+- [SwitchSchedulerSpec](#switchschedulerspec)
+
+
+
+#### QoSQueueBinding
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchQoSBindingSpec](#switchqosbindingspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `index` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 0 <br /> |
+| `scheduler` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+
+
 #### StaticRouteNextHop
 
 
@@ -436,6 +552,84 @@ Switch is the Schema for the switch API
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
 | `spec` _[SwitchSpec](#switchspec)_ | spec defines the desired state of Switch |  |  |
 | `status` _[SwitchStatus](#switchstatus)_ | status defines the observed state of Switch |  |  |
+
+
+#### SwitchACLBinding
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchACLBinding` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchACLBindingSpec](#switchaclbindingspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchACLBindingSpec
+
+
+
+SwitchACLBindingSpec attaches a complete, applied ingress policy to data ports.
+
+
+
+_Appears in:_
+- [SwitchACLBinding](#switchaclbinding)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `policy` _[TrafficPolicyName](#trafficpolicyname)_ |  |  | MaxLength: 64 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]\{0,63\}$` <br /> |
+| `interfaces` _string array_ |  |  | MaxItems: 256 <br />MinItems: 1 <br />items:MaxLength: 32 <br />items:Pattern: ^(Ethernet(0\|[1-9][0-9]*)\|PortChannel(0\|[1-9][0-9]\{0,3\}))$ <br /> |
+
+
+#### SwitchACLPolicy
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchACLPolicy` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchACLPolicySpec](#switchaclpolicyspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchACLPolicySpec
+
+
+
+SwitchACLPolicySpec stages an unbound ingress table with an explicit priority-1 catchall.
+
+
+
+_Appears in:_
+- [SwitchACLPolicy](#switchaclpolicy)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[TrafficPolicyName](#trafficpolicyname)_ |  |  | MaxLength: 64 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]\{0,63\}$` <br /> |
+| `family` _string_ |  |  | Enum: [IPv4 IPv6] <br /> |
+| `defaultAction` _[ACLAction](#aclaction)_ |  |  | Enum: [Permit Drop] <br /> |
+| `rules` _[ACLRule](#aclrule) array_ |  |  | MaxItems: 256 <br /> |
 
 
 #### SwitchBGP
@@ -886,6 +1080,131 @@ _Appears in:_
 | `adminState` _[AdminState](#adminstate)_ |  | Up | Enum: [Up Down] <br /> |
 
 
+#### SwitchQoSBinding
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchQoSBinding` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchQoSBindingSpec](#switchqosbindingspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchQoSBindingSpec
+
+
+
+SwitchQoSBindingSpec references existing, applied maps and schedulers on one data port.
+
+
+
+_Appears in:_
+- [SwitchQoSBinding](#switchqosbinding)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `interfaceName` _string_ |  |  | MaxLength: 32 <br />Pattern: `^Ethernet(0\|[1-9][0-9]*)$` <br /> |
+| `dscpToTC` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `dot1pToTC` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `tcToQueue` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `queues` _[QoSQueueBinding](#qosqueuebinding) array_ |  |  | MaxItems: 256 <br /> |
+
+
+#### SwitchQoSMap
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchQoSMap` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchQoSMapSpec](#switchqosmapspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchQoSMapSpec
+
+
+
+SwitchQoSMapSpec defines a map; actual TC and queue bounds require device capabilities.
+
+
+
+_Appears in:_
+- [SwitchQoSMap](#switchqosmap)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `type` _string_ |  |  | Enum: [DSCPToTC Dot1pToTC TCToQueue] <br /> |
+| `entries` _[QoSMapEntry](#qosmapentry) array_ |  |  | MaxItems: 256 <br />MinItems: 1 <br /> |
+
+
+#### SwitchScheduler
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchScheduler` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchSchedulerSpec](#switchschedulerspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchSchedulerSpec
+
+
+
+SwitchSchedulerSpec configures scheduling and optional shaping, not policing.
+Rates are bytes/second or packets/second according to meterType; bursts use the same unit.
+
+
+
+_Appears in:_
+- [SwitchScheduler](#switchscheduler)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `algorithm` _string_ |  |  | Enum: [STRICT WRR DWRR] <br /> |
+| `weight` _integer_ |  |  | Maximum: 100 <br />Minimum: 1 <br /> |
+| `meterType` _string_ |  | Bytes | Enum: [Bytes Packets] <br /> |
+| `committedRate` _integer_ | CEL retains the exact integer bound; OpenAPI maximum is float64 and rounds it. |  | Format: int64 <br />Minimum: 1 <br /> |
+| `peakRate` _integer_ |  |  | Format: int64 <br />Minimum: 1 <br /> |
+| `committedBurst` _integer_ |  |  | Format: int64 <br />Minimum: 1 <br /> |
+| `peakBurst` _integer_ |  |  | Format: int64 <br />Minimum: 1 <br /> |
+
+
 #### SwitchSpec
 
 
@@ -1139,6 +1458,23 @@ _Appears in:_
 | `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
 | `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
 | `name` _string_ |  |  | MaxLength: 15 <br />Pattern: `^Vrf[A-Za-z0-9_-]\{1,12\}$` <br /> |
+
+
+#### TrafficPolicyName
+
+_Underlying type:_ _string_
+
+TrafficPolicyName is a SONiC policy identifier, never a CONFIG_DB key.
+
+_Validation:_
+- MaxLength: 64
+- Pattern: `^[A-Za-z][A-Za-z0-9_-]{0,63}$`
+
+_Appears in:_
+- [ACLRule](#aclrule)
+- [SwitchACLBindingSpec](#switchaclbindingspec)
+- [SwitchACLPolicySpec](#switchaclpolicyspec)
+
 
 
 #### VLANDeletionPolicy

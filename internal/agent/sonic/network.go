@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +71,7 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 	if _, err := d.Token(); err != io.EOF {
 		return "", fmt.Errorf("trailing spec JSON")
 	}
-	for _, key := range []string{"name", "vrf", "address", "prefix"} {
+	for _, key := range []string{"name", "vrf", "address", "prefix", "policy", "type", "interfaceName", "tunnel"} {
 		if raw, ok := fields[key]; ok {
 			var value string
 			if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || json.Unmarshal(raw, &value) != nil {
@@ -92,6 +93,26 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 		return e == nil && n <= max && s == prefix+strconv.FormatUint(n, 10)
 	}
 	switch r.Kind {
+	case "ACLPolicy":
+		if networkTrafficIdentifier.MatchString(name) {
+			return r.Kind + "|" + name, nil
+		}
+	case "Scheduler":
+		if networkQoSIdentifier.MatchString(name) {
+			return r.Kind + "|" + name, nil
+		}
+	case "ACLBinding":
+		if policy := text("policy"); networkTrafficIdentifier.MatchString(policy) {
+			return r.Kind + "|" + policy, nil
+		}
+	case "QoSMap":
+		if typ := text("type"); networkQoSIdentifier.MatchString(name) && (typ == "DSCPToTC" || typ == "Dot1pToTC" || typ == "TCToQueue") {
+			return r.Kind + "|" + typ + "|" + name, nil
+		}
+	case "QoSBinding":
+		if iface := text("interfaceName"); canonicalNumber(iface, "Ethernet", 1<<32-1) {
+			return r.Kind + "|" + iface, nil
+		}
 	case "FRRMigration":
 		if text("mode") == "Unified" || text("mode") == "Traditional" {
 			return "FRRMigration|unified", nil
@@ -131,6 +152,16 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 
 func planNetworkResource(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	switch r.Kind {
+	case "ACLPolicy":
+		return planNetworkACLPolicy(db, r)
+	case "ACLBinding":
+		return planNetworkACLBinding(db, r)
+	case "QoSMap":
+		return planNetworkQoSMap(db, r)
+	case "Scheduler":
+		return planNetworkScheduler(db, r)
+	case "QoSBinding":
+		return planNetworkQoSBinding(db, r)
 	case "FRRMigration":
 		return planNetworkFRRMigration(db, r)
 	case "PortChannel":
@@ -152,6 +183,12 @@ func planNetworkResource(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan
 	}
 }
 
+var networkTrafficIdentifier = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
+
+// QoS names follow the native 32-character map/scheduler schema, including a
+// numeric first character. ACL names retain their separate letter-leading rule.
+var networkQoSIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
+
 // Defense in depth for planner outputs and durable records. RPC callers never
 // supply these tables or fields; kind-specific planners validate their values.
 func validateNetworkFields(kind string, desired vlanChangeDB) error {
@@ -164,6 +201,16 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		"BGP":          {"BGP_GLOBALS": "local_asn router_id default_ipv4_unicast default_shutdown", "BGP_GLOBALS_AF_NETWORK": "backdoor", "PREFIX_SET": "mode", "PREFIX": "action"},
 		"BGPPeer":      {"BGP_NEIGHBOR": "asn local_addr admin_status", "BGP_NEIGHBOR_AF": "admin_status max_prefix_limit max_prefix_warning_threshold prefix_list_out send_default_route"},
 		"DHCPRelay":    {"VLAN": "dhcp_servers@", "DHCP_RELAY": "dhcpv6_servers@", "DHCPV4_RELAY": "dhcpv4_servers@"},
+		"MLAG":         {"MCLAG_DOMAIN": "source_ip peer_ip peer_link keepalive_interval session_timeout", "MCLAG_INTERFACE": "if_type"},
+		"VXLANTunnel":  {"VXLAN_TUNNEL": "src_ip", "VXLAN_EVPN_NVO": "source_vtep"},
+		"VLANVNI":      {"VXLAN_TUNNEL_MAP": "vlan vni", "BGP_GLOBALS_EVPN_VNI": "route-distinguisher", "BGP_GLOBALS_EVPN_VNI_RT": "route-target-type"},
+		"EVPNPeer":     {"BGP_NEIGHBOR_AF": "admin_status"},
+		// Policy and binding deliberately reserve disjoint fields on ACL_TABLE.
+		"ACLPolicy":  {"ACL_TABLE": "type stage policy_desc", "ACL_RULE": "PRIORITY PACKET_ACTION IP_TYPE SRC_IP DST_IP SRC_IPV6 DST_IPV6 IP_PROTOCOL NEXT_HEADER L4_SRC_PORT L4_DST_PORT"},
+		"ACLBinding": {"ACL_TABLE": "ports@"},
+		"QoSMap":     {"DSCP_TO_TC_MAP": "", "DOT1P_TO_TC_MAP": "", "TC_TO_QUEUE_MAP": ""},
+		"Scheduler":  {"SCHEDULER": "type weight meter_type cir pir cbs pbs"},
+		"QoSBinding": {"PORT_QOS_MAP": "dscp_to_tc_map dot1p_to_tc_map tc_to_queue_map", "QUEUE": "scheduler"},
 	}[kind]
 	if allowed == nil || len(desired) == 0 {
 		return fmt.Errorf("empty or unsupported network plan")
@@ -176,13 +223,70 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		if !ok || name == "" || strings.ContainsAny(key, "\x00\r\n") || len(fields) == 0 {
 			return fmt.Errorf("invalid network target")
 		}
+		if !networkTrafficTarget(kind, table, name) {
+			return fmt.Errorf("invalid traffic policy target %s", key)
+		}
+
 		for field := range fields {
-			if !strings.Contains(" "+allowed[table]+" ", " "+field+" ") || field == "" {
+			if kind == "QoSMap" && networkQoSMapField(table, field) {
+				continue
+			}
+			if !slices.Contains(strings.Fields(allowed[table]), field) {
 				return fmt.Errorf("unsupported network target table/field %s/%s", table, field)
 			}
 		}
 	}
 	return nil
+}
+
+func networkTrafficTarget(kind, table, name string) bool {
+	switch kind {
+	case "ACLPolicy":
+		if table == "ACL_RULE" {
+			policy, rule, ok := strings.Cut(name, "|")
+			return ok && networkTrafficIdentifier.MatchString(policy) && networkTrafficIdentifier.MatchString(rule)
+		}
+		return table == "ACL_TABLE" && networkTrafficIdentifier.MatchString(name)
+	case "ACLBinding":
+		return table == "ACL_TABLE" && networkTrafficIdentifier.MatchString(name)
+	case "QoSMap", "Scheduler":
+		return networkQoSIdentifier.MatchString(name)
+	case "QoSBinding":
+		iface := name
+		if table == "QUEUE" {
+			var index string
+			var ok bool
+			iface, index, ok = strings.Cut(name, "|")
+			n, err := strconv.ParseUint(index, 10, 32)
+			if !ok || err != nil || index != strconv.FormatUint(n, 10) {
+				return false
+			}
+		} else if table != "PORT_QOS_MAP" {
+			return false
+		}
+		n, err := strconv.ParseUint(strings.TrimPrefix(iface, "Ethernet"), 10, 32)
+		return err == nil && iface == "Ethernet"+strconv.FormatUint(n, 10)
+	default:
+		return true
+	}
+}
+
+// Numeric map fields are a bounded schema, never a wildcard for Redis fields.
+// Planners additionally enforce the actual device's TC and queue capabilities.
+func networkQoSMapField(table, field string) bool {
+	var max uint64
+	switch table {
+	case "DSCP_TO_TC_MAP":
+		max = 63
+	case "DOT1P_TO_TC_MAP":
+		max = 7
+	case "TC_TO_QUEUE_MAP":
+		max = 255
+	default:
+		return false
+	}
+	n, err := strconv.ParseUint(field, 10, 8)
+	return err == nil && n <= max && field == strconv.FormatUint(n, 10)
 }
 
 func networkSubset(db, desired vlanChangeDB) bool {
@@ -312,6 +416,7 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		if original == nil || original.Identity != identity || !reflect.DeepEqual(original.Desired, pending.After) {
 			return failure(fmt.Errorf("pending planner output changed; manual inspection required"))
 		}
+
 		if (original.Activate != nil) != (pending.Activation != "") {
 			return failure(fmt.Errorf("pending activation contract changed; manual inspection required"))
 		}
@@ -344,6 +449,7 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 	if !write {
 		return m.observeNetwork(ctx, db, p, record)
 	}
+
 	fail := func(message string) (*agent.NetworkResult, *agent.Status) {
 		out, _ := m.observeNetwork(ctx, db, p, record)
 		out.PersistenceVerified = false
@@ -398,14 +504,14 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 				return fail("owned network field drifted; inspect before reconciliation")
 			}
 			if exists && old != value {
-				// Only peer admin state and validated relay destination fields are
+				// Only peer/EVPN AF admin state and validated relay destination fields are
 				// mutable. Never adopt foreign fields or overwrite ownership drift.
 				previous, ours := owned[key][field]
 				peerAdmin := r.Kind == "BGPPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR|") && field == "admin_status" && (value == "up" || value == "down")
 				relayServers := r.Kind == "DHCPRelay" && routingRelayMutableField(key, field)
 				modeUpdate := migrationUpdate && frrMigrationModeUpdate(key, field, old, value) && (record == nil || (ours && previous == old))
 				if !modeUpdate && (!ours || previous != old || (!peerAdmin && !relayServers)) {
-					return fail("conflicting network field; only durably owned peer admin_status and relay destinations support updates")
+					return fail("conflicting network field; only durably owned peer/EVPN AF admin_status and relay destinations support updates")
 				}
 			}
 			if !exists || (exists && old != value) {

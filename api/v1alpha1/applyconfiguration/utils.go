@@ -19,6 +19,8 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=sonic.networking.metal.ironcore.dev, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithKind("ACLRule"):
+		return &apiv1alpha1.ACLRuleApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Neighbor"):
 		return &apiv1alpha1.NeighborApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkResourceSpec"):
@@ -27,8 +29,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.NetworkResourceStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkSwitchReference"):
 		return &apiv1alpha1.NetworkSwitchReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("QoSMapEntry"):
+		return &apiv1alpha1.QoSMapEntryApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("QoSQueueBinding"):
+		return &apiv1alpha1.QoSQueueBindingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StaticRouteNextHop"):
 		return &apiv1alpha1.StaticRouteNextHopApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchACLBinding"):
+		return &apiv1alpha1.SwitchACLBindingApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchACLBindingSpec"):
+		return &apiv1alpha1.SwitchACLBindingSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchACLPolicy"):
+		return &apiv1alpha1.SwitchACLPolicyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchACLPolicySpec"):
+		return &apiv1alpha1.SwitchACLPolicySpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGP"):
 		return &apiv1alpha1.SwitchBGPApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPPeer"):
@@ -71,6 +85,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchPortChannelApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchPortChannelSpec"):
 		return &apiv1alpha1.SwitchPortChannelSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchQoSBinding"):
+		return &apiv1alpha1.SwitchQoSBindingApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchQoSBindingSpec"):
+		return &apiv1alpha1.SwitchQoSBindingSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchQoSMap"):
+		return &apiv1alpha1.SwitchQoSMapApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchQoSMapSpec"):
+		return &apiv1alpha1.SwitchQoSMapSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchScheduler"):
+		return &apiv1alpha1.SwitchSchedulerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchSchedulerSpec"):
+		return &apiv1alpha1.SwitchSchedulerSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchStaticRoute"):
 		return &apiv1alpha1.SwitchStaticRouteApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchStaticRouteSpec"):

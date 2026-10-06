@@ -36,7 +36,7 @@ const (
 	networkRecoveryFinalizer = "sonic.networking.metal.ironcore.dev/network-recovery"
 )
 
-// NetworkReconciler shares safety checks but accepts only the eight known kinds.
+// NetworkReconciler shares safety checks but accepts only allowlisted kinds.
 // Deletion is Orphan after the recovery finalizer confirms no unsaved operation.
 type NetworkReconciler struct {
 	client.Client
@@ -45,6 +45,7 @@ type NetworkReconciler struct {
 	ObserveOnly        bool
 	AllowNetworkConfig bool
 	AllowFRRMigration  bool
+	AllowTrafficPolicy bool
 	NewAgentClient     func(context.Context, client.Reader, *corev1.LocalObjectReference, string) (agentclient.SwitchAgentClient, error)
 }
 
@@ -52,6 +53,12 @@ type NetworkReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchportchannels/status;switchvrfs/status;switchl3interfaces/status;switchstaticroutes/status;switchbgps/status;switchbgppeers/status;switchdhcprelays/status;switchfrrmigrations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchportchannels/finalizers;switchvrfs/finalizers;switchl3interfaces/finalizers;switchstaticroutes/finalizers;switchbgps/finalizers;switchbgppeers/finalizers;switchdhcprelays/finalizers;switchfrrmigrations/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches,verbs=get;list;watch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies;switchaclbindings;switchqosmaps;switchschedulers;switchqosbindings,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies/status;switchaclbindings/status;switchqosmaps/status;switchschedulers/status;switchqosbindings/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies/finalizers;switchaclbindings/finalizers;switchqosmaps/finalizers;switchschedulers/finalizers;switchqosbindings/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags;switchvxlantunnels;switchvlanvnis;switchevpnpeers,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags/status;switchvxlantunnels/status;switchvlanvnis/status;switchevpnpeers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchmlags/finalizers;switchvxlantunnels/finalizers;switchvlanvnis/finalizers;switchevpnpeers/finalizers,verbs=update;patch
 
 func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
@@ -179,6 +186,7 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if message == "" {
 		message = "Configuration, runtime and persistence are reported independently"
 	}
+
 	if r.networkWritesDisabled(common) {
 		reason = "WritesDisabled"
 		return result, nil
@@ -188,6 +196,7 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if current.Exists && current.ConfigurationVerified && current.PersistenceVerified {
 		return result, nil
 	}
+
 	if migration, ok := obj.(*api.SwitchFRRMigration); ok {
 		if err := approveNetworkFRRMigration(migration, sw, current); err != nil {
 			reason = "ApprovalRequired"
@@ -224,6 +233,7 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 	// Once Ensure starts, the pre-write snapshot no longer proves current state.
+
 	observed = false
 	status.Exists, status.ConfigurationVerified, status.RuntimeVerified, status.PersistenceVerified = false, false, false, false
 	status.Observed.Raw = nil

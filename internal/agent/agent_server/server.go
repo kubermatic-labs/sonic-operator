@@ -39,6 +39,7 @@ var (
 	breakoutJournalDir      = flag.String("breakout-journal-dir", "", "Private persistent absolute breakout journal directory; required for breakout writes")
 	allowNetworkConfig      = flag.Bool("allow-network-config", false, "Allow network configuration when read-only is disabled")
 	allowFRRMigration       = flag.Bool("allow-frr-migration", false, "Allow FRR migration when network configuration is enabled and read-only is disabled")
+	allowTrafficPolicy      = flag.Bool("allow-traffic-policy", false, "Allow ACL and QoS configuration when network configuration is enabled and read-only is disabled")
 	networkJournalDir       = flag.String("network-journal-dir", "", "Private persistent absolute network journal directory; required for network writes and all cooperating writers after first use")
 )
 
@@ -349,6 +350,11 @@ func newGRPCServerWithNetwork(certFile, keyFile, clientCAFile string, readOnly, 
 
 // Migration always requires its own explicit opt-in, including for journal recovery.
 func newGRPCServerWithFRRMigration(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration bool) (*grpc.Server, error) {
+	return newGRPCServerWithTrafficPolicy(certFile, keyFile, clientCAFile, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, false)
+}
+
+// Traffic policy requires an independent opt-in for both Ensure and Recover.
+func newGRPCServerWithTrafficPolicy(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic bool) (*grpc.Server, error) {
 	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
 	if err != nil {
 		return nil, err
@@ -372,6 +378,12 @@ func newGRPCServerWithFRRMigration(certFile, keyFile, clientCAFile string, readO
 			}
 			if r.GetKind() == "FRRMigration" && !allowMigration {
 				return nil, grpcstatus.Error(codes.PermissionDenied, "FRR migration requires --allow-frr-migration=true")
+			}
+			switch r.GetKind() {
+			case "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
+				if !allowTraffic {
+					return nil, grpcstatus.Error(codes.PermissionDenied, "traffic policy requires --allow-traffic-policy=true")
+				}
 			}
 		case pb.SwitchAgentService_ReconcileVLANAuthority_FullMethodName, pb.SwitchAgentService_ReleaseVLANAuthority_FullMethodName:
 			if !allow {
@@ -402,7 +414,7 @@ func StartServer() {
 	flag.Parse()
 
 	// Validate security configuration before opening a listener or contacting the backend.
-	s, err := newGRPCServerWithFRRMigration(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration)
+	s, err := newGRPCServerWithTrafficPolicy(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration, *allowTrafficPolicy)
 	if err != nil {
 		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}
