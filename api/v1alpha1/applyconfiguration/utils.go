@@ -21,6 +21,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=sonic.networking.metal.ironcore.dev, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("ACLRule"):
 		return &apiv1alpha1.ACLRuleApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactAgentOptions"):
+		return &apiv1alpha1.ArtifactAgentOptionsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactBootstrapSpec"):
+		return &apiv1alpha1.ArtifactBootstrapSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactContentRef"):
+		return &apiv1alpha1.ArtifactContentRefApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactFile"):
+		return &apiv1alpha1.ArtifactFileApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactHostRecoverySpec"):
+		return &apiv1alpha1.ArtifactHostRecoverySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ArtifactMACHookSpec"):
+		return &apiv1alpha1.ArtifactMACHookSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HostResourceStatus"):
 		return &apiv1alpha1.HostResourceStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HostSecretKeyReference"):
@@ -49,6 +61,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchACLPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchACLPolicySpec"):
 		return &apiv1alpha1.SwitchACLPolicySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchArtifact"):
+		return &apiv1alpha1.SwitchArtifactApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchArtifactSpec"):
+		return &apiv1alpha1.SwitchArtifactSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchArtifactStatus"):
+		return &apiv1alpha1.SwitchArtifactStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGP"):
 		return &apiv1alpha1.SwitchBGPApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPPeer"):

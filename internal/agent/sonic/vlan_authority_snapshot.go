@@ -70,7 +70,7 @@ func (m *SonicAgent) vlanChangeSnapshot(ctx context.Context) (vlanChangeDB, stri
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	rdb, err := m.Connect("CONFIG_DB")
+	rdb, err := m.ConnectContext(ctx, "CONFIG_DB")
 	if err != nil {
 		return nil, "", err
 	}
@@ -341,6 +341,9 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 }
 
 func (m *SonicAgent) casVLANChange(ctx context.Context, raw string, from, to vlanChangeDB) (bool, error) {
+	if err := m.artifactAdmission(ctx); err != nil {
+		return false, err
+	}
 	if bypass, _ := ctx.Value(hostCASKey{}).(bool); !bypass {
 		if err := host.CheckPending(m.hostJournalDir); err != nil {
 			return false, err

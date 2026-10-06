@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -47,6 +49,9 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	if releaseinfo.PrintRequested() {
+		return
+	}
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -62,6 +67,7 @@ func main() {
 	var allowFRRMigration bool
 	var allowTrafficPolicy bool
 	var allowRedundancy bool
+	var allowArtifacts bool
 	var disableProvisionsingServer bool
 	var httpServerAddr, onieImagesDir, onieConfigFile, ztpConfigFile, ztpMode, bootstrapControlKubeconfigFile string
 	var tlsOpts []func(*tls.Config)
@@ -91,6 +97,7 @@ func main() {
 	flag.BoolVar(&allowNetworkConfig, "allow-network-config", false,
 		"Allow additive network configuration. Requires observe-only=false, individual managementPolicy=Manage and agent network/write gates. Resource deletion leaves device configuration intact.")
 	flag.BoolVar(&allowHostConfig, "allow-host-config", false, "Allow typed management and system configuration with switch-local management rollback; requires observe-only=false and per-resource Manage policy.")
+	flag.BoolVar(&allowArtifacts, "allow-artifacts", false, "Allow immutable declared artifact lifecycle with an independently installed switch-local recovery supervisor.")
 	flag.BoolVar(&allowFRRMigration, "allow-frr-migration", false,
 		"Allow approved empty-routing FRR migration. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage, a matching approvedDigest and agent migration/write gates.")
 	flag.BoolVar(&allowTrafficPolicy, "allow-traffic-policy", false,
@@ -266,6 +273,10 @@ func main() {
 		}
 	}
 	// +kubebuilder:scaffold:builder
+	if err := (&controller.ArtifactReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), ObserveOnly: observeOnly, AllowArtifacts: allowArtifacts}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create artifact controller")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

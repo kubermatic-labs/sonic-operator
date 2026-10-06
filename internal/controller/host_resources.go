@@ -37,10 +37,10 @@ func hostFields(obj client.Object) (*api.NetworkResourceSpec, *api.HostResourceS
 	}
 	panic("unsupported host resource")
 }
-func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, target string) (host.Request, func() error, error) {
+func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, target string) (host.Request, *resolvedInputReader, error) {
 	common, _ := hostFields(obj)
 	q := host.Request{Owner: string(obj.GetUID()), Target: target, Revision: strconv.FormatInt(obj.GetGeneration(), 10)}
-	fresh := func() error { return nil }
+	fresh := &resolvedInputReader{Reader: r.APIReader}
 	if q.Owner == "" || len(validation.IsDNS1123Subdomain(common.SwitchRef.Name)) != 0 || (common.ManagementPolicy != "" && common.ManagementPolicy != api.NetworkManagementPolicyObserve && common.ManagementPolicy != api.NetworkManagementPolicyManage) {
 		return q, fresh, host.ErrInvalid
 	}
@@ -58,6 +58,14 @@ func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, tar
 		for _, a := range o.Spec.Addresses {
 			q.Management.Addresses = append(q.Management.Addresses, host.Address{Prefix: string(a.Prefix), Gateway: string(a.Gateway)})
 		}
+		if common.ManagementPolicy == api.NetworkManagementPolicyManage {
+			if r.APIReader == nil {
+				return q, fresh, host.ErrInvalid
+			}
+			if err := validateHostRetainedSources(ctx, fresh, common.SwitchRef.Name, q); err != nil {
+				return q, fresh, err
+			}
+		}
 	case *api.SwitchSystem:
 		q.Kind = "System"
 		q.System = &host.System{}
@@ -74,7 +82,7 @@ func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, tar
 			}
 			secret := &corev1.Secret{}
 			key := client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}
-			if r.APIReader.Get(ctx, key, secret) != nil {
+			if fresh.Get(ctx, key, secret) != nil {
 				return q, fresh, fmt.Errorf("host Secret reference could not be resolved")
 			}
 			value, ok := secret.Data[ref.Key]
@@ -84,13 +92,6 @@ func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, tar
 			q.System.SNMP = &host.SNMP{Location: o.Spec.SNMP.Location, Contact: o.Spec.SNMP.Contact, Community: host.Credential(value)}
 			identity := sha256.Sum256([]byte(string(secret.UID) + "/" + secret.ResourceVersion))
 			q.Revision += "-" + hex.EncodeToString(identity[:])
-			fresh = func() error {
-				latest := &corev1.Secret{}
-				if r.APIReader.Get(ctx, key, latest) != nil || latest.UID != secret.UID || latest.ResourceVersion != secret.ResourceVersion || !latest.DeletionTimestamp.IsZero() {
-					return fmt.Errorf("host Secret reference changed before write")
-				}
-				return nil
-			}
 		}
 	default:
 		return q, fresh, host.ErrInvalid

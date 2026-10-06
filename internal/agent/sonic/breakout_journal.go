@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
+
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
 
@@ -60,7 +62,7 @@ func (m *SonicAgent) lockBreakoutJournal(ctx context.Context) (*vlanAuthorityJou
 	if m.breakoutJournalDir == "" {
 		return nil, fmt.Errorf("breakout journal is not configured")
 	}
-	j := &SonicAgent{journalDir: m.breakoutJournalDir, journalSync: m.journalSync}
+	j := &SonicAgent{journalDir: m.breakoutJournalDir, journalSync: m.journalSync, artifactStateDir: m.artifactStateDir}
 	return j.lockVLANAuthorityJournal(ctx)
 }
 
@@ -121,6 +123,16 @@ func loadBreakoutRecord(j *vlanAuthorityJournal) (*breakoutRecord, error) {
 }
 
 func storeBreakoutRecord(j *vlanAuthorityJournal, r *breakoutRecord) error {
+	old, err := loadBreakoutRecord(j)
+	if err != nil {
+		return err
+	}
+	if err := j.artifactPublication(old != nil && old.Pending); err != nil {
+		return err
+	}
+	if artifactstate.CheckPending(j.artifactDir) != nil && r.Pending && (old == nil || !old.Pending || old.Request != r.Request) {
+		return artifactstate.ErrReserved
+	}
 	copy := *r
 	copy.Checksum = ""
 	data, err := json.Marshal(copy)

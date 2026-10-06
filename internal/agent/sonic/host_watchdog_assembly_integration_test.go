@@ -7,9 +7,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
@@ -90,6 +92,15 @@ func TestStandaloneWatchdogAssemblyRecoversConfiguredLegacyDependency(t *testing
 			delete(k.Routes, hostRoute("10.0.0.0/24", ""))
 			f.putKernel(k)
 			seedLegacyHostPending(t, f)
+			// The artifact reservation must permit this exact recorded dependency
+			// without granting a new VLAN/network/host publication.
+			f.agent.artifactStateDir = filepath.Join(f.dir, "artifacts")
+			if err := os.Mkdir(f.agent.artifactStateDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := artifactstate.Store(f.agent.artifactStateDir, artifactstate.Reservation{Version: 1, Owner: "artifact", Token: strings.Repeat("a", 32), Manifest: strings.Repeat("b", 64), Phase: "ForeignRecovery"}); err != nil {
+				t.Fatal(err)
+			}
 			cfg := host.RecoveryConfig{JournalDir: filepath.Join(f.dir, "journal"), RedisAddress: rdb.Options().Addr, VLANJournalDir: f.agent.journalDir, NetworkJournalDir: f.agent.networkJournalDir}
 			f.agent.hostJournalDir = ""
 			f.agent.networkJournalDir = ""

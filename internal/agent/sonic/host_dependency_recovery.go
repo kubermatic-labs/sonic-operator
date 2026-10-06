@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
@@ -21,8 +22,12 @@ func (m *SonicAgent) recoverHostDependencies(ctx context.Context) error {
 		return e
 	}
 	return m.withHostWriterLocks(ctx, func(locks hostWriterLocks) error {
+		if err := artifactstate.CheckRecovery(m.artifactStateDir); err != nil {
+			return err
+		}
 		type recovery func(context.Context, vlanChangeDB, string) *agent.Status
 		var work []recovery
+		var networkState *networkJournalState
 		if locks.vlan != nil {
 			d, e := locks.vlan.root.Open(".")
 			if e != nil {
@@ -60,7 +65,7 @@ func (m *SonicAgent) recoverHostDependencies(ctx context.Context) error {
 			}
 			if r != nil && r.Pending {
 				work = append(work, func(ctx context.Context, db vlanChangeDB, raw string) *agent.Status {
-					_, st := m.finishBreakout(ctx, locks.breakout, r, db, raw)
+					_, st := m.finishBreakout(ctx, locks.breakout, r, networkState, db, raw)
 					return st
 				})
 			}
@@ -70,6 +75,7 @@ func (m *SonicAgent) recoverHostDependencies(ctx context.Context) error {
 			if e != nil {
 				return host.ErrStorage
 			}
+			networkState = state
 			for identity, r := range state.Records {
 				if r.Pending != nil {
 					work = append(work, func(ctx context.Context, db vlanChangeDB, raw string) *agent.Status {
@@ -102,7 +108,8 @@ func (m *SonicAgent) recoverHostDependencies(ctx context.Context) error {
 		if e != nil {
 			return host.ErrNative
 		}
-		if st := work[0](context.WithValue(ctx, hostCASKey{}, true), db, raw); st != nil && st.Code != 0 {
+		recoveryCtx := context.WithValue(context.WithValue(ctx, hostCASKey{}, true), artifactRecoveryKey{}, true)
+		if st := work[0](recoveryCtx, db, raw); st != nil && st.Code != 0 {
 			return host.ErrConflict
 		}
 		return nil

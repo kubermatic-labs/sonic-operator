@@ -10,9 +10,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"syscall"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
 
@@ -76,7 +79,7 @@ func (m *SonicAgent) lockNetworkJournal(ctx context.Context) (*vlanAuthorityJour
 	if m.networkJournalDir == "" {
 		return nil, fmt.Errorf("network journal is not configured")
 	}
-	j := &SonicAgent{journalDir: m.networkJournalDir, journalSync: m.journalSync}
+	j := &SonicAgent{journalDir: m.networkJournalDir, journalSync: m.journalSync, artifactStateDir: m.artifactStateDir}
 	return j.lockVLANAuthorityJournal(ctx)
 }
 
@@ -206,6 +209,28 @@ func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 }
 
 func storeNetworkJournal(j *vlanAuthorityJournal, state *networkJournalState) error {
+	old, err := loadNetworkJournal(j)
+	if err != nil {
+		return err
+	}
+	pending := false
+	for _, record := range old.Records {
+		pending = pending || record.Pending != nil
+	}
+	if err := j.artifactPublication(pending); err != nil {
+		return err
+	}
+	if artifactstate.CheckPending(j.artifactDir) != nil {
+		for identity, record := range state.Records {
+			before := old.Records[identity]
+			if before == nil {
+				return artifactstate.ErrReserved
+			}
+			if record.Pending != nil && (before.Pending == nil || !reflect.DeepEqual(record.Pending.Request, before.Pending.Request)) {
+				return artifactstate.ErrReserved
+			}
+		}
+	}
 	copy := *state
 	copy.Checksum = ""
 	data, err := json.Marshal(copy)
@@ -254,6 +279,9 @@ func (m *SonicAgent) guardNetworkWrites(ctx context.Context) (func(), error) {
 // Return the validated state under the same lock so specialized writers can
 // check confirmed ownership too. The caller must hold the lock through save.
 func (m *SonicAgent) guardNetworkWriteState(ctx context.Context) (*networkJournalState, func(), error) {
+	if err := m.artifactAdmission(ctx); err != nil {
+		return nil, nil, err
+	}
 	if m.networkJournalDir == "" {
 		if err := host.CheckPending(m.hostJournalDir); err != nil {
 			return nil, nil, err
@@ -265,6 +293,9 @@ func (m *SonicAgent) guardNetworkWriteState(ctx context.Context) (*networkJourna
 		return nil, nil, err
 	}
 	state, err := loadNetworkJournal(j)
+	if err == nil {
+		err = m.artifactAdmission(ctx)
+	}
 	if err == nil {
 		for _, r := range state.Records {
 			if r.Pending != nil {

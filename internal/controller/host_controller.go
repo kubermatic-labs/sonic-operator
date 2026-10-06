@@ -96,7 +96,7 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 	if e != nil || port < 1 || port > 65535 || sw.UID == "" || sw.Spec.MacAddress == "" || sw.Spec.Management.Host == "" || !sw.DeletionTimestamp.IsZero() {
 		return result, fmt.Errorf("host target identity and endpoint required")
 	}
-	q, secretFresh, err := r.hostDesired(ctx, obj, string(sw.UID))
+	q, inputs, err := r.hostDesired(ctx, obj, string(sw.UID))
 	if err != nil {
 		return result, err
 	}
@@ -138,11 +138,16 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 		if r.checkHostClaims(ctx, obj, common.SwitchRef.Name) != nil {
 			return host.ErrConflict
 		}
-		return secretFresh()
+		if q.Management != nil {
+			if err := validateHostRetainedSources(ctx, inputs, common.SwitchRef.Name, q); err != nil {
+				return err
+			}
+		}
+		return inputs.fresh(ctx)
 	}
-	a, nc, err := r.hostClient(ctx, sw, sw.Spec.Management.Host)
+	a, nc, err := r.hostClient(ctx, inputs, sw, sw.Spec.Management.Host)
 	if err != nil && q.Kind == "Management" && candidateHost(q, sw.Spec.Management.Host) != sw.Spec.Management.Host {
-		a, nc, err = r.hostClient(ctx, sw, candidateHost(q, sw.Spec.Management.Host))
+		a, nc, err = r.hostClient(ctx, inputs, sw, candidateHost(q, sw.Spec.Management.Host))
 	}
 	if err != nil {
 		return result, err
@@ -168,7 +173,7 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 		if err = closeAgentClient(a); err != nil {
 			return result, err
 		}
-		freshAgent, freshHost, e := r.hostClient(ctx, sw, candidateHost(q, sw.Spec.Management.Host))
+		freshAgent, freshHost, e := r.hostClient(ctx, inputs, sw, candidateHost(q, sw.Spec.Management.Host))
 		if e != nil {
 			return result, e
 		}
@@ -211,14 +216,14 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 	}
 	return result, nil
 }
-func (r *HostReconciler) hostClient(ctx context.Context, sw *api.Switch, address string) (agentclient.SwitchAgentClient, agentclient.HostClient, error) {
+func (r *HostReconciler) hostClient(ctx context.Context, reader client.Reader, sw *api.Switch, address string) (agentclient.SwitchAgentClient, agentclient.HostClient, error) {
 	factory := r.NewAgentClient
 	if factory == nil {
 		factory = switchutil.NewAgentClientFromSwitchRef
 	}
 	target := sw.DeepCopy()
 	target.Spec.Management.Host = address
-	a, e := factory(ctx, networkBoundReader{Reader: r.APIReader, target: target}, &corev1.LocalObjectReference{Name: sw.Name}, "")
+	a, e := factory(ctx, networkBoundReader{Reader: reader, target: target}, &corev1.LocalObjectReference{Name: sw.Name}, "")
 	if e != nil || a == nil {
 		return nil, nil, fmt.Errorf("host agent connection unavailable")
 	}

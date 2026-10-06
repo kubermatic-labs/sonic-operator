@@ -4,6 +4,7 @@
 resources:
 - bases/sonic.networking.metal.ironcore.dev_switchmanagements.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchsystems.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchartifacts.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchevpns.yaml
 - bases/sonic.networking.metal.ironcore.dev_switches.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchinterfaces.yaml

@@ -146,17 +146,28 @@ cleandocs: ## Cleanup local docs Docker artifacts (image + dangling layers).
 
 ##@ proto
 .PHONY: proto
-proto:
+proto: protoc-gen-go protoc-gen-go-grpc goimports
 	@echo "Generating protobuf files..."
-	protoc --go_out=. --go_opt=paths=source_relative \
+	protoc --plugin=protoc-gen-go=$(PROTOC_GEN_GO) --plugin=protoc-gen-go-grpc=$(PROTOC_GEN_GO_GRPC) --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		$(PROTO_DIR)/switch_agent.proto
-	protoc --go_out=. --go_opt=paths=source_relative \
+		$(PROTO_DIR)/switch_agent.proto $(PROTO_DIR)/artifact.proto
+	protoc --plugin=protoc-gen-go=$(PROTOC_GEN_GO) --plugin=protoc-gen-go-grpc=$(PROTOC_GEN_GO_GRPC) --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		internal/agent/hostproto/host.proto
+	$(GOIMPORTS) -w $(PROTO_DIR) internal/agent/hostproto
 
 
 ##@ Build
+
+# Production release bytes are measured after stripping. Keep the source checkout
+# clean/committed: Go's embedded VCS provenance is checked by the release tool.
+.PHONY: host-artifact-binaries
+host-artifact-binaries:
+	test -z "$$(git status --porcelain --untracked-files=normal)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/agent ./cmd/agent
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/supervisor ./cmd/artifact-supervisor
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/watchdog ./cmd/host-recovery
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/controller ./cmd
 
 .PHONY: docs
 docs: crd-ref-docs ## Generate API reference documentation.
@@ -259,6 +270,8 @@ GOIMPORTS ?= $(LOCALBIN)/goimports
 ADDLICENSE ?= $(LOCALBIN)/addlicense
 GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
+PROTOC_GEN_GO ?= $(LOCALBIN)/protoc-gen-go
+PROTOC_GEN_GO_GRPC ?= $(LOCALBIN)/protoc-gen-go-grpc
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.7.1
@@ -272,6 +285,18 @@ ADDLICENSE_VERSION ?= v1.1.1
 GOIMPORTS_VERSION ?= v0.31.0
 GEN_CRD_API_REFERENCE_DOCS_VERSION ?= v0.3.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
+PROTOC_GEN_GO_VERSION ?= v1.36.12
+PROTOC_GEN_GO_GRPC_VERSION ?= v1.6.1
+
+.PHONY: protoc-gen-go protoc-gen-go-grpc
+protoc-gen-go: $(PROTOC_GEN_GO)
+protoc-gen-go-grpc: $(PROTOC_GEN_GO_GRPC)
+
+$(PROTOC_GEN_GO): $(LOCALBIN)
+	$(call go-install-tool,$(PROTOC_GEN_GO),google.golang.org/protobuf/cmd/protoc-gen-go,$(PROTOC_GEN_GO_VERSION))
+
+$(PROTOC_GEN_GO_GRPC): $(LOCALBIN)
+	$(call go-install-tool,$(PROTOC_GEN_GO_GRPC),google.golang.org/grpc/cmd/protoc-gen-go-grpc,$(PROTOC_GEN_GO_GRPC_VERSION))
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

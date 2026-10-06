@@ -533,6 +533,14 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		}
 	}
 	record := state.Records[identity]
+	if write {
+		if record != nil && record.Pending != nil {
+			ctx = context.WithValue(ctx, artifactRecoveryKey{}, true)
+		}
+		if err := m.artifactAdmission(ctx); err != nil {
+			return failure(err)
+		}
+	}
 	if r.Kind == "EVPN" && record != nil && len(record.EVPNMappings) > 0 && operation != "recover" {
 		var spec evpnGlobalSpec
 		if err := mlagJSON(r.Spec, &spec, false); err != nil {

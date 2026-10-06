@@ -90,6 +90,12 @@ func rpcTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 		if method == hp.HostService_Get_FullMethodName || method == hp.HostService_Confirm_FullMethodName {
 			callTimeout = 15 * time.Second
 		}
+		if method == pb.ArtifactService_Stage_FullMethodName || method == pb.ArtifactService_Bootstrap_FullMethodName || method == pb.ArtifactService_PrepareContent_FullMethodName {
+			callTimeout = 90 * time.Second
+		}
+		if method == pb.ArtifactService_Observe_FullMethodName || method == pb.ArtifactService_Confirm_FullMethodName {
+			callTimeout = 75 * time.Second
+		}
 		if method == pb.SwitchAgentService_ReconcilePortBreakout_FullMethodName {
 			callTimeout = 180 * time.Second
 		}

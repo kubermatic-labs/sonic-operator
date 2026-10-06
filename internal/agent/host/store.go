@@ -18,6 +18,8 @@ type Snapshot struct {
 // RecoveryScope remains durable until restoration is independently verified.
 // Candidate is removal authority even after CONFIG_DB has already reverted.
 type RecoveryScope struct {
+	// Nil preserves historical MAC restoration authority. False owns addresses only.
+	MACOwned  *bool
 	Before    Snapshot
 	Candidate Management
 	// ObservedActiveMAC is the actually observed pre-dispatch state. Before's
@@ -30,6 +32,7 @@ type claim struct {
 	Revision string `json:"revision"`
 }
 type transaction struct {
+	MACOwned          *bool      `json:"macOwned,omitempty"`
 	ID                string     `json:"id"`
 	Claim             claim      `json:"claim"`
 	Before            Snapshot   `json:"before"`

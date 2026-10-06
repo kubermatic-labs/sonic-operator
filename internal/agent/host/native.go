@@ -42,20 +42,42 @@ type NativeProfile struct {
 // Native callbacks are internal and wired by the SONiC adapter. Load/CAS operate
 // solely on allowlisted host tables. WithMutation holds cooperating-writer locks.
 type Native struct {
-	Load           func(context.Context) (Database, error)
-	CAS            func(context.Context, Database, Database) error
-	Save           func(context.Context) error
-	WithMutation   func(context.Context, func() error) error
-	Run            func(context.Context, []string, []byte) ([]byte, error)
-	ReadFile       func(string) ([]byte, error)
-	WriteFile      func(string, []byte, os.FileMode) error
-	SNMPExchange   func(context.Context, []byte) ([]byte, error)
-	BeforeRecovery func(context.Context) error
-	stateDir       string
-	bootNow        func() (bootClock, error)
+	BaseMAC           func(context.Context) (string, error)
+	Load              func(context.Context) (Database, error)
+	CAS               func(context.Context, Database, Database) error
+	Save              func(context.Context) error
+	WithMutation      func(context.Context, func() error) error
+	WithRecovery      func(context.Context, func(context.Context) error) error
+	BeforePublication func(context.Context) error
+	Run               func(context.Context, []string, []byte) ([]byte, error)
+	ReadFile          func(string) ([]byte, error)
+	WriteFile         func(string, []byte, os.FileMode) error
+	SNMPExchange      func(context.Context, []byte) ([]byte, error)
+	BeforeRecovery    func(context.Context) error
+	stateDir          string
+	journalDir        string
+	bootNow           func() (bootClock, error)
 }
 
 type nativeExclusiveKey struct{}
+
+func (n *Native) CheckPublication(ctx context.Context) error {
+	if n.BeforePublication == nil {
+		return ErrStorage
+	}
+	if err := n.BeforePublication(ctx); err != nil {
+		return err
+	}
+	return n.WatchdogReady(ctx)
+}
+func (n *Native) ExclusiveRecovery(ctx context.Context, fn func(context.Context) error) error {
+	if n.WithRecovery == nil {
+		return ErrStorage
+	}
+	return n.WithRecovery(ctx, func(locked context.Context) error {
+		return fn(context.WithValue(locked, nativeExclusiveKey{}, n))
+	})
+}
 
 func (n *Native) Exclusive(ctx context.Context, fn func(context.Context) error) error {
 	if n.WithMutation == nil {
@@ -84,6 +106,7 @@ func boundedRun(ctx context.Context, args []string, input []byte) ([]byte, error
 		return nil, ErrNative
 	}
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C", "LC_ALL=C"}
 	cmd.Stdin = bytes.NewReader(input)
 	// Native stderr is deliberately discarded: SONiC validators may echo a
 	// community or other secret. No argument list or command output is logged.
@@ -123,13 +146,28 @@ func (n *Native) read(path string) ([]byte, error) {
 	if n.ReadFile != nil {
 		return n.ReadFile(path)
 	}
+	if path == "/usr/bin/python3" || path == "/bin/sh" {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return nil, ErrNative
+		}
+		allowed := resolved == "/usr/bin/dash" || resolved == "/bin/dash" || resolved == "/usr/bin/python3.11" || resolved == "/usr/bin/python3.13"
+		if !allowed {
+			return nil, ErrNative
+		}
+		path = resolved
+	}
 	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if e != nil {
 		return nil, e
 	}
 	defer f.Close()
 	i, e := f.Stat()
-	if e != nil || !i.Mode().IsRegular() || i.Size() > 4<<20 {
+	limit := int64(4 << 20)
+	if path == RecoveryBinaryFile {
+		limit = 96 << 20
+	}
+	if e != nil || !i.Mode().IsRegular() || i.Size() > limit {
 		return nil, ErrNative
 	}
 	return io.ReadAll(f)
@@ -179,7 +217,7 @@ func hashMatches(data []byte, want string) bool {
 func (n *Native) profile(ctx context.Context, kind string) (NativeProfile, error) {
 	var p NativeProfile
 	b, e := n.read(profileFile)
-	if e != nil || StrictDecode(b, &p) != nil {
+	if e != nil || strictDecodeLimit(b, &p, 256<<10) != nil {
 		return p, ErrNative
 	}
 	b, e = n.read("/etc/sonic/sonic_version.yml")
@@ -387,6 +425,12 @@ func (n *Native) Validate(ctx context.Context, q Request) error {
 	return e
 }
 func (n *Native) WatchdogReady(ctx context.Context) error {
+	if _, err := n.InstallationReceipt(true); err != nil {
+		return err
+	}
+	if err := n.VerifyRecoveryUnits(ctx); err != nil {
+		return err
+	}
 	for _, op := range []string{"is-enabled", "is-active"} {
 		b, e := n.run(ctx, "systemctl", op, "sonic-operator-host-recovery.timer")
 		if e != nil || strings.TrimSpace(string(b)) != map[string]string{"is-enabled": "enabled", "is-active": "active"}[op] {

@@ -19,7 +19,11 @@ var serverName = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9
 
 // StrictDecode rejects unknown AND duplicate fields at every nesting level.
 func StrictDecode(data []byte, out any) error {
-	if len(data) == 0 || len(data) > 64<<10 {
+	return strictDecodeLimit(data, out, 64<<10)
+}
+
+func strictDecodeLimit(data []byte, out any, limit int) error {
+	if len(data) == 0 || len(data) > limit {
 		return ErrInvalid
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
@@ -162,11 +166,8 @@ func ValidateManagement(m Management) error {
 	if m.Interface != "eth0" || len(m.Addresses) < 1 || len(m.Addresses) > 8 {
 		return ErrInvalid
 	}
-	if m.MAC != "" {
-		mac, e := net.ParseMAC(m.MAC)
-		if e != nil || len(mac) != 6 || mac.String() != m.MAC || mac[0]&1 != 0 || m.MAC == "00:00:00:00:00:00" {
-			return ErrInvalid
-		}
+	if m.MAC != "" && validateActiveMAC(m.MAC) != nil {
+		return ErrInvalid
 	}
 	seen := map[netip.Addr]bool{}
 	gateways := map[bool]string{}
@@ -189,6 +190,31 @@ func ValidateManagement(m Management) error {
 	}
 	return nil
 }
+
+// An observed/restoration MAC is required even when desired MAC ownership is
+// omitted. Keep canonical, nonzero, unicast validation shared with that spec.
+func validateActiveMAC(value string) error {
+	mac, err := net.ParseMAC(value)
+	if err != nil || len(mac) != 6 || mac.String() != value || mac[0]&1 != 0 || value == "00:00:00:00:00:00" {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func validateRecoveryScope(scope RecoveryScope) error {
+	if scope.MACOwned != nil && (*scope.MACOwned != (scope.Candidate.MAC != "")) {
+		return ErrInvalid
+	}
+	if ValidateManagement(scope.Before.Management) != nil || ValidateManagement(scope.Candidate) != nil || validateActiveMAC(scope.Before.ActiveMAC) != nil {
+		return ErrInvalid
+	}
+	// Historical records legitimately lack the separate pre-dispatch observation.
+	if scope.ObservedActiveMAC != "" && validateActiveMAC(scope.ObservedActiveMAC) != nil {
+		return ErrInvalid
+	}
+	return nil
+}
+
 func ValidateSystem(s System) error {
 	if s.NTP == nil && s.SNMP == nil {
 		return ErrInvalid

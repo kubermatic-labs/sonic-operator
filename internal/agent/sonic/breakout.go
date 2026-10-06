@@ -129,6 +129,9 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
 	}
+	if record != nil && record.Pending {
+		ctx = context.WithValue(ctx, artifactRecoveryKey{}, true)
+	}
 	networkState, networkUnlock, err := m.guardNetworkWriteState(ctx)
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, err.Error())
@@ -151,15 +154,7 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 		if record.Request != r || !reflect.DeepEqual(record.Platform, *p) {
 			return fail("another request/platform has pending breakout; recover the exact recorded request first")
 		}
-		// A recorded transition remains destructive even if its target is now
-		// visible. Retain its exact recovery contract without advancing through
-		// typed ownership left by an older writer.
-		if !reflect.DeepEqual(record.Before, record.After) || !reflect.DeepEqual(record.Native, record.After) {
-			if err := breakoutNetworkDependencies(p, networkState); err != nil {
-				return fail("pending breakout unsafe: " + err.Error())
-			}
-		}
-		return m.finishBreakout(ctx, j, record, db, raw)
+		return m.finishBreakout(ctx, j, record, networkState, db, raw)
 	}
 	if p.Modes[r.Mode] == nil {
 		return fail("requested mode is not an exact platform capability")
@@ -223,10 +218,12 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 	if err != nil {
 		return fail("post-command observation failed; breakout pending")
 	}
-	return m.finishBreakout(ctx, j, record, db, raw)
+	return m.finishBreakout(ctx, j, record, networkState, db, raw)
 }
 
-func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal, r *breakoutRecord, db vlanChangeDB, raw string) (*agent.PortBreakout, *agent.Status) {
+// Every caller retains the validated network state under its existing flock.
+// Recovery must apply typed ownership checks even after native CLI completion.
+func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal, r *breakoutRecord, networkState *networkJournalState, db vlanChangeDB, raw string) (*agent.PortBreakout, *agent.Status) {
 	p := &r.Platform
 	runtimeVerified := false
 	configurationVerified := false
@@ -243,6 +240,9 @@ func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal
 	// Only an exactly recorded no-op can coexist with populated dependencies.
 	// A transition remains subject to dependency checks even after its CLI ran.
 	if !reflect.DeepEqual(r.Before, r.After) || !reflect.DeepEqual(r.Native, r.After) {
+		if err := breakoutNetworkDependencies(p, networkState); err != nil {
+			return fail("pending breakout unsafe: " + err.Error())
+		}
 		if err := breakoutDependencies(db, p); err != nil {
 			return fail("pending breakout unsafe: " + err.Error())
 		}

@@ -107,6 +107,29 @@ func (f *hostDeviceFixture) run(_ context.Context, args []string, input []byte) 
 		return nil, nil
 	}
 	if args[0] == "systemctl" {
+		if strings.Contains(args[len(args)-1], "sonic-operator-host-recovery") {
+			for _, a := range args {
+				if a == "--property=TimersCalendar" {
+					return nil, nil
+				}
+				if a == "--property=After" {
+					return []byte("database.service"), nil
+				}
+				if value, ok := map[string]string{"--property=Type": "oneshot", "--property=User": "root", "--property=UMask": "0077", "--property=TimeoutStartUSec": "45s", "--property=RequiresMountsFor": "/host", "--property=Unit": "sonic-operator-host-recovery.service", "--property=AccuracyUSec": "1s", "--property=TimersMonotonic": "{ OnBootUSec=1s ; } { OnUnitActiveUSec=5s ; }"}[a]; ok {
+					return []byte(value), nil
+				}
+				switch a {
+				case "--property=FragmentPath":
+					return []byte("/etc/systemd/system/" + args[len(args)-1]), nil
+				case "--property=DropInPaths":
+					return nil, nil
+				case "--property=NeedDaemonReload":
+					return []byte("no"), nil
+				case "--property=ExecStart":
+					return []byte("{ path=" + host.RecoveryBinaryFile + " ; argv[]=" + host.RecoveryBinaryFile + " ; }"), nil
+				}
+			}
+		}
 		if args[1] == "is-active" {
 			return []byte("active"), nil
 		}
@@ -280,11 +303,28 @@ func seedHostDeviceFixture(t *testing.T, rdb *redis.Client) *hostDeviceFixture {
 	_ = rdb.HSet(t.Context(), "MGMT_INTERFACE|eth1|192.0.2.2/24", "gwaddr", "192.0.2.1").Err()
 	_ = rdb.HSet(t.Context(), "PORT|Ethernet0", "unmanaged", "preserve").Err()
 	f.putKernel(hostKernel{MAC: m.MAC, Up: true, Addresses: map[string]bool{m.Addresses[0].Prefix: true}, Rules: map[string]bool{"10.0.1.99": true}, Routes: map[string]bool{hostRoute("10.0.1.0/24", ""): true, hostRoute("default", "10.0.1.1"): true, hostRoute("203.0.113.0/24", ""): true}})
-	profile, _ := json.Marshal(host.NativeProfile{ImageSHA256: hostDigest("image"), InterfacesSHA256: hostDigest("template"), ConsumerSHA256: map[string]string{"interfaces-generator": hostDigest("generator")}})
+	p := host.NativeProfile{ImageSHA256: hostDigest("image"), InterfacesSHA256: hostDigest("template"), NTPBackend: "chrony", ChronySHA256: hostDigest("chrony"), SNMPSHA256: hostDigest("snmp"), ConsumerSHA256: map[string]string{"interfaces-generator": hostDigest("generator")}}
+	for _, key := range []string{"ntp-generator", "ntp-startup", "ntp-daemon", "snmp-init", "snmp-startup", "snmp-importer", "snmp-supervisor-template", "snmp-daemon", "snmp-library"} {
+		p.ConsumerSHA256[key] = hostDigest(key)
+	}
+	profile, _ := json.Marshal(p)
 	for path, b := range map[string][]byte{"/etc/sonic/sonic-operator-host-profile.json": profile, "/etc/sonic/sonic_version.yml": []byte("image"), "/usr/share/sonic/templates/interfaces.j2": []byte("template"), "/usr/bin/interfaces-config.sh": []byte("generator"), "/etc/sonic/sonic-operator-management.json": []byte(`{"mac":"02:00:00:00:00:99"}`), "/etc/systemd/system/interfaces-config.service.d/90-sonic-operator-management.conf": []byte("[Service]\nExecStartPost=/usr/local/sbin/sonic-operator-host-recovery --apply-boot-mac\n")} {
 		if e := f.write(path, b); e != nil {
 			t.Fatal(e)
 		}
+	}
+	cfg, _ := host.EncodeRecoveryConfig(host.FleetRecoveryConfig())
+	suite := map[string][]byte{host.RecoveryBinaryFile: []byte("fixture-watchdog"), host.RecoveryConfigFile: cfg, host.RecoveryServiceFile: host.RecoveryServiceUnit(), host.RecoveryTimerFile: host.RecoveryTimerUnit(), host.RecoveryProfileFile: profile}
+	receipt := host.InstallationReceipt{Owner: "fixture", Target: "switch", Baseline: "fixture", SuiteSHA256: hostDigest("suite"), Phase: "Confirmed", Files: map[string]string{}}
+	for path, b := range suite {
+		if err := f.write(path, b); err != nil {
+			t.Fatal(err)
+		}
+		receipt.Files[path] = hostDigest(string(b))
+	}
+	rawReceipt, _ := json.Marshal(receipt)
+	if err := f.write(host.RecoveryReceiptFile, rawReceipt); err != nil {
+		t.Fatal(err)
 	}
 	b, _ := f.fullDB()
 	_ = f.write("/etc/sonic/config_db.json", b)
@@ -355,7 +395,11 @@ func TestHostNativeCrashWorker(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if cfg.Mode == "ensure" {
+	if cfg.Mode == "ensure-foreign-mac" {
+		m := hostBefore()
+		m.MAC = ""
+		_, e = engine.Ensure(t.Context(), host.Request{Kind: "Management", Owner: "uid", Target: "switch", Revision: "2", Management: &m, RollbackSeconds: 60}, "original-rpc")
+	} else if cfg.Mode == "ensure" {
 		_, e = engine.Ensure(t.Context(), hostRepairRequest(), "original-rpc")
 	} else {
 		e = engine.RecoverExpired(t.Context())

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sonic-operator.local/schemas/host-artifact-v1.json",
+  "title": "Offline host/artifact release candidate; independent review required",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "reviewRequired", "builds", "fallbacks", "agentBuilds", "sourceFloors"],
+  "properties": {
+    "format": {"const": "host-artifact-v1"},
+    "reviewRequired": {"const": true},
+    "builds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agent", "supervisor", "watchdog", "controller"],
+      "properties": {
+        "agent": {"$ref": "#/$defs/binary"},
+        "supervisor": {"$ref": "#/$defs/binary"},
+        "watchdog": {"$ref": "#/$defs/binary"},
+        "controller": {"$ref": "#/$defs/binary"}
+      }
+    },
+    "fallbacks": {"type": "array", "minItems": 1, "maxItems": 15, "items": {"$ref": "#/$defs/binary"}},
+    "sourceFloors": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/commit"}},
+    "agentBuilds": {
+      "type": "object", "minProperties": 1, "maxProperties": 16,
+      "propertyNames": {"$ref": "#/$defs/hash"},
+      "additionalProperties": {"$ref": "#/$defs/info"}
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "capabilities": {
+      "type": "array", "minItems": 8, "maxItems": 8, "uniqueItems": true,
+      "items": {"enum": [
+        "routing-safe-writers-v1", "artifact-reservation-v1", "artifact-chunks-v1",
+        "host-observed-active-mac-v1", "host-causal-runtime-v1", "host-artifact-admission-v1",
+        "host-mac-ownership-v1", "host-bootstrap-v1"
+      ]}
+    },
+    "info": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceCommit", "capabilities"],
+      "properties": {
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "capabilities": {"$ref": "#/$defs/capabilities"}
+      }
+    },
+    "binary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceCommit", "capabilities", "sha256", "size", "goVersion"],
+      "properties": {
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "capabilities": {"$ref": "#/$defs/capabilities"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "size": {"type": "integer", "minimum": 1, "maximum": 100663296},
+        "goVersion": {"type": "string", "pattern": "^go[0-9]+\\.[0-9]+", "maxLength": 64}
+      }
+    }
+  }
+}
