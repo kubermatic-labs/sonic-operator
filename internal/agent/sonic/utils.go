@@ -6,8 +6,34 @@ package sonic
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+
+	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
+	"github.com/vishvananda/netlink"
 )
+
+func parseDeviceStatus(value string) agent.DeviceStatus {
+	if value == string(agent.StatusUp) || value == string(agent.StatusDown) {
+		return agent.DeviceStatus(value)
+	}
+	return agent.StatusUnknown
+}
+
+func ethernetNumber(name string) (int, bool) {
+	if !strings.HasPrefix(name, "Ethernet") {
+		return 0, false
+	}
+	number, err := strconv.Atoi(strings.TrimPrefix(name, "Ethernet"))
+	return number, err == nil && number >= 0 && name == "Ethernet"+strconv.Itoa(number)
+}
+
+func (m *SonicAgent) getLinkByName(name string) (netlink.Link, error) {
+	if m.linkByName != nil {
+		return m.linkByName(name)
+	}
+	return netlink.LinkByName(name)
+}
 
 func GetSonicVersionInfo() (map[string]string, error) {
 	info := make(map[string]string)

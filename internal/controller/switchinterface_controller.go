@@ -5,6 +5,12 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	agentclient "github.com/ironcore-dev/sonic-operator/internal/agent/agent_client/client"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -23,6 +29,10 @@ import (
 type SwitchInterfaceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	// ObserveOnly disables all device writes. The manager defaults this to true.
+	ObserveOnly bool
+	// NewAgentClient optionally overrides agent construction.
+	NewAgentClient func(context.Context, client.Reader, *corev1.LocalObjectReference, string) (agentclient.SwitchAgentClient, error)
 }
 
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchinterfaces,verbs=get;list;watch;create;update;patch;delete
@@ -61,7 +71,7 @@ func (r *SwitchInterfaceReconciler) delete(ctx context.Context, log logr.Logger,
 	return ctrl.Result{}, nil
 }
 
-func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logger, i *networkingv1alpha1.SwitchInterface) (ctrl.Result, error) {
+func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logger, i *networkingv1alpha1.SwitchInterface) (result ctrl.Result, retErr error) {
 	log.Info("Reconciling SwitchInterface")
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, i, networkingv1alpha1.SwitchFinalizer); err != nil || modified {
@@ -70,26 +80,39 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 
 	original := i.DeepCopy()
 	defer func() {
+		if retErr != nil {
+			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
+		}
 		if err := r.Status().Patch(ctx, i, client.MergeFrom(original)); err != nil {
-			log.Error(err, "Failed to update Switch status")
+			retErr = errors.Join(retErr, fmt.Errorf("update SwitchInterface status: %w", err))
 		}
 	}()
 
 	if i.Status.State == "" {
 		i.Status.State = networkingv1alpha1.SwitchInterfaceStatePending
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	if i.Spec.SwitchRef == nil {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-		return ctrl.Result{}, nil
+	i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
+	if i.Spec.SwitchRef == nil || i.Spec.SwitchRef.Name == "" {
+		return ctrl.Result{}, fmt.Errorf("SwitchInterface has no switch reference")
+	}
+	if i.Spec.Handle == "" || i.Spec.NativeName == "" {
+		return ctrl.Result{}, fmt.Errorf("SwitchInterface has incomplete interface identity")
 	}
 
-	switchAgentClient, err := switchUtil.NewAgentClientFromSwitchRef(ctx, r.Client, i.Spec.SwitchRef, i.Namespace)
+	newAgentClient := r.NewAgentClient
+	if newAgentClient == nil {
+		newAgentClient = switchUtil.NewAgentClientFromSwitchRef
+	}
+	switchAgentClient, err := newAgentClient(ctx, r.Client, i.Spec.SwitchRef, i.Namespace)
 	if err != nil {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
 		return ctrl.Result{}, err
 	}
+	if switchAgentClient == nil {
+		return ctrl.Result{}, fmt.Errorf("agent client is nil")
+	}
+	defer func() { retErr = errors.Join(retErr, closeAgentClient(switchAgentClient)) }()
 
 	iface, err := switchAgentClient.GetInterfaceByAbstractName(ctx, &agent.Interface{
 		TypeMeta: agent.TypeMeta{
@@ -98,97 +121,42 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 		Name: i.Spec.Handle,
 	})
 	if err != nil {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
 		return ctrl.Result{}, err
 	}
-
-	if iface != nil {
-		if iface.AliasName != i.Spec.Handle {
-			log.Info("Interface alias name does not match the expected handle, updating it", "expected", i.Spec.Handle, "actual", iface.AliasName)
-			if _, err := switchAgentClient.SetInterfaceAliasName(ctx, &agent.Interface{
-				TypeMeta: agent.TypeMeta{
-					Kind: agent.InterfaceKind,
-				},
-				Name:      iface.Name,
-				AliasName: i.Spec.Handle,
-			}); err != nil {
-				i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-				return ctrl.Result{}, err
-			}
-		}
-
-		if iface.OperationStatus == agent.StatusUp {
-			i.Status.OperationalState = networkingv1alpha1.OperationStateUp
-		} else {
-			i.Status.OperationalState = networkingv1alpha1.OperationStateDown
-		}
-
-		adminState, err := agent.AgentDeviceStatusToAPIAdminState(iface.AdminStatus)
-		if err != nil {
-			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-			return ctrl.Result{}, err
-		}
-		i.Status.AdminState = adminState
-	} else {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-		return ctrl.Result{}, nil
+	if iface == nil {
+		return ctrl.Result{}, fmt.Errorf("agent returned nil interface")
 	}
-
-	// ensure i.spec.AdminState is applied
-	desired_state, err := agent.APIAdminStateToAgentDeviceStatus(i.Spec.AdminState)
-	if err != nil {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-		return ctrl.Result{}, err
+	if iface.Status.Code != 0 {
+		return ctrl.Result{}, fmt.Errorf("get interface: %s", iface.Status.String())
 	}
-
-	var switchInterface *agent.Interface
-	if switchInterface, err = switchAgentClient.SetInterfaceAdminStatus(ctx, &agent.Interface{
-		TypeMeta: agent.TypeMeta{
-			Kind: agent.InterfaceKind,
-		},
-		Name:        i.Spec.NativeName,
-		AdminStatus: desired_state,
-	}); err != nil {
-		i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-		return ctrl.Result{}, err
+	if iface.NativeName == "" || iface.NativeName != i.Spec.NativeName {
+		return ctrl.Result{}, fmt.Errorf("interface identity conflict: discovered native name %q differs from spec %q", iface.NativeName, i.Spec.NativeName)
 	}
-
-	if switchInterface != nil {
-		adminState, err := agent.AgentDeviceStatusToAPIAdminState(switchInterface.AdminStatus)
-		if err != nil {
-			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-			return ctrl.Result{}, err
-		}
-		i.Status.AdminState = adminState
-
-		operationState, err := agent.AgentDeviceStatusToAPIOperationState(switchInterface.OperationStatus)
-		if err != nil {
-			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-			return ctrl.Result{}, err
-		}
-		i.Status.OperationalState = operationState
-
-		if switchInterface.OperationStatus == agent.StatusUp {
-			i.Status.OperationalState = networkingv1alpha1.OperationStateUp
-		} else {
-			i.Status.OperationalState = networkingv1alpha1.OperationStateDown
-		}
-	}
-	i.Status.State = networkingv1alpha1.SwitchInterfaceStateReady
+	nativeName := iface.NativeName
+	i.Status.AliasName = iface.AliasName
+	i.Status.MacAddress = iface.MacAddress
+	// Unknown observations stay Unknown; they are never interpreted as Down.
+	i.Status.AdminState, _ = agent.AgentDeviceStatusToAPIAdminState(iface.AdminStatus)
+	i.Status.OperationalState, _ = agent.AgentDeviceStatusToAPIOperationState(iface.OperationStatus)
 
 	neighbor, err := switchAgentClient.GetInterfaceNeighbor(ctx, &agent.Interface{
 		TypeMeta: agent.TypeMeta{
 			Kind: agent.InterfaceKind,
 		},
-		Name: i.Spec.NativeName,
+		Name: nativeName,
 	})
-	if err != nil {
-		if neighbor == nil || neighbor.Status.Code != agenterrors.NOT_FOUND {
-			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
-			return ctrl.Result{}, err
-		}
+	if neighbor != nil && neighbor.Status.Code == agenterrors.NOT_FOUND {
 		i.Status.Neighbor = networkingv1alpha1.Neighbor{}
 	} else {
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if neighbor == nil {
+			return ctrl.Result{}, fmt.Errorf("agent returned nil neighbor")
+		}
+		if neighbor.Status.Code != 0 {
+			return ctrl.Result{}, fmt.Errorf("get neighbor: %s", neighbor.Status.String())
+		}
 		i.Status.Neighbor = networkingv1alpha1.Neighbor{
 			MacAddress:      neighbor.MacAddress,
 			SystemName:      neighbor.SystemName,
@@ -196,8 +164,43 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 		}
 	}
 
+	if !r.ObserveOnly && i.Annotations["sonic.networking.metal.ironcore.dev/manage-admin-state"] == "true" {
+		desiredState, err := agent.APIAdminStateToAgentDeviceStatus(i.Spec.AdminState)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if desiredState != agent.StatusUp && desiredState != agent.StatusDown {
+			return ctrl.Result{}, fmt.Errorf("invalid desired admin state %q", i.Spec.AdminState)
+		}
+		if iface.AdminStatus != agent.StatusUp && iface.AdminStatus != agent.StatusDown {
+			return ctrl.Result{}, fmt.Errorf("cannot manage unknown current admin state %q", iface.AdminStatus)
+		}
+		if iface.AdminStatus != desiredState {
+			updated, err := switchAgentClient.SetInterfaceAdminStatus(ctx, &agent.Interface{
+				TypeMeta:    agent.TypeMeta{Kind: agent.InterfaceKind},
+				Name:        nativeName,
+				NativeName:  nativeName,
+				AdminStatus: desiredState,
+			})
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if updated == nil {
+				return ctrl.Result{}, fmt.Errorf("agent returned nil interface after admin update")
+			}
+			if updated.Status.Code != 0 {
+				return ctrl.Result{}, fmt.Errorf("set admin state: %s", updated.Status.String())
+			}
+			if updated.NativeName != nativeName || updated.AdminStatus != desiredState {
+				return ctrl.Result{}, fmt.Errorf("agent did not confirm admin state for native interface %q", nativeName)
+			}
+			i.Status.AdminState, _ = agent.AgentDeviceStatusToAPIAdminState(updated.AdminStatus)
+			i.Status.OperationalState, _ = agent.AgentDeviceStatusToAPIOperationState(updated.OperationStatus)
+		}
+	}
+	i.Status.State = networkingv1alpha1.SwitchInterfaceStateReady
 	log.Info("Reconciled SwitchInterface")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 60 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

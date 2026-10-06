@@ -54,6 +54,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var observeOnly bool
 	var disableProvisionsingServer bool
 	var httpServerAddr, onieImagesDir, onieConfigFile, ztpConfigFile, ztpMode, bootstrapControlKubeconfigFile string
 	var tlsOpts []func(*tls.Config)
@@ -74,6 +75,8 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(&observeOnly, "observe-only", true,
+		"Observe switches without device writes or ZTP/ONIE provisioning. Admin-state changes also require the individual interface annotation sonic.networking.metal.ironcore.dev/manage-admin-state=true.")
 	flag.StringVar(&httpServerAddr, "http-server-address", "0", "The address the HTTP server for ZTP and ONIE binds to.")
 	flag.StringVar(&ztpConfigFile, "ztp-config-file", "/etc/ztp.json", "Config file containing the parameters to render ZTP scripts.")
 	flag.StringVar(&ztpMode, "ztp-mode", "templates", "ZTP source: templates, configmap, or generated. Configmap mode serves the referenced script verbatim; generated mode renders from Switch objects.")
@@ -88,6 +91,10 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	if observeOnly {
+		disableProvisionsingServer = true
+		setupLog.Info("observe-only mode disables the ZTP and ONIE provisioning server")
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -188,8 +195,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.SwitchInterfaceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ObserveOnly: observeOnly,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SwitchInterface")
 		os.Exit(1)
