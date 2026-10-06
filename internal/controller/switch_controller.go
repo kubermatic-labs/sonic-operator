@@ -5,9 +5,12 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	agentclient "github.com/ironcore-dev/sonic-operator/internal/agent/agent_client/client"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -17,18 +20,17 @@ import (
 	switchUtil "github.com/ironcore-dev/sonic-operator/internal/switch_util"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	networkingv1alpha1 "github.com/ironcore-dev/sonic-operator/api/v1alpha1"
-	v1alpha1ac "github.com/ironcore-dev/sonic-operator/api/v1alpha1/applyconfiguration/api/v1alpha1"
-	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 var (
-	fieldOwner      = client.FieldOwner("switch-controller")
 	agentRetryAfter = time.Minute
 )
 
@@ -36,6 +38,8 @@ var (
 type SwitchReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	// NewAgentClient optionally overrides agent construction.
+	NewAgentClient func(context.Context, *networkingv1alpha1.Switch) (agentclient.SwitchAgentClient, error)
 }
 
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches,verbs=get;list;watch;create;update;patch;delete
@@ -76,7 +80,7 @@ func (r *SwitchReconciler) delete(ctx context.Context, log logr.Logger, s *netwo
 	return ctrl.Result{}, nil
 }
 
-func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *networkingv1alpha1.Switch) (ctrl.Result, error) {
+func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *networkingv1alpha1.Switch) (result ctrl.Result, retErr error) {
 	log.Info("Reconciling Switch")
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, s, networkingv1alpha1.SwitchFinalizer); err != nil || modified {
@@ -85,8 +89,12 @@ func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *ne
 
 	original := s.DeepCopy()
 	defer func() {
+		if retErr != nil {
+			s.Status.State = networkingv1alpha1.SwitchStateFailed
+			s.Status.Ports = original.Status.Ports
+		}
 		if err := r.Status().Patch(ctx, s, client.MergeFrom(original)); err != nil {
-			log.Error(err, "Failed to update Switch status")
+			retErr = errors.Join(retErr, fmt.Errorf("update Switch status: %w", err))
 		}
 	}()
 
@@ -98,16 +106,30 @@ func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *ne
 		return ctrl.Result{}, nil
 	}
 
-	switchAgentClient, err := switchUtil.NewAgentClientForSwitch(ctx, s)
+	newAgentClient := r.NewAgentClient
+	if newAgentClient == nil {
+		newAgentClient = switchUtil.NewAgentClientForSwitch
+	}
+	switchAgentClient, err := newAgentClient(ctx, s)
 	if err != nil {
 		log.Info("Switch agent is unavailable; keeping Switch ready", "err", err)
 		return ctrl.Result{RequeueAfter: agentRetryAfter}, nil
 	}
+	if switchAgentClient == nil {
+		return ctrl.Result{}, fmt.Errorf("agent client is nil")
+	}
+	defer func() { retErr = errors.Join(retErr, closeAgentClient(switchAgentClient)) }()
 
 	switchDevice, err := switchAgentClient.GetDeviceInfo(ctx)
 	if err != nil {
 		log.Info("Switch agent is unavailable; keeping Switch ready", "err", err)
 		return ctrl.Result{RequeueAfter: agentRetryAfter}, nil
+	}
+	if switchDevice == nil {
+		return ctrl.Result{}, fmt.Errorf("agent returned nil device info")
+	}
+	if switchDevice.Status.Code != 0 {
+		return ctrl.Result{}, fmt.Errorf("get device info: %s", switchDevice.Status.String())
 	}
 
 	s.Status.MACAddress = switchDevice.LocalMacAddress
@@ -118,6 +140,12 @@ func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *ne
 	if err != nil {
 		log.Info("Switch agent is unavailable; keeping Switch ready", "err", err)
 		return ctrl.Result{RequeueAfter: agentRetryAfter}, nil
+	}
+	if interfaceList == nil {
+		return ctrl.Result{}, fmt.Errorf("agent returned nil interface list")
+	}
+	if interfaceList.Status.Code != 0 {
+		return ctrl.Result{}, fmt.Errorf("list interfaces: %s", interfaceList.Status.String())
 	}
 
 	for _, iface := range interfaceList.Items {
@@ -131,55 +159,81 @@ func (r *SwitchReconciler) reconcile(ctx context.Context, log logr.Logger, s *ne
 		log.Info("Switch agent is unavailable; keeping Switch ready", "err", err)
 		return ctrl.Result{RequeueAfter: agentRetryAfter}, nil
 	}
-
-	if len(portList.Items) > 0 {
-		s.Status.Ports = make([]networkingv1alpha1.PortStatus, 0, len(portList.Items))
+	if portList == nil {
+		return ctrl.Result{}, fmt.Errorf("agent returned nil port list")
+	}
+	if portList.Status.Code != 0 {
+		return ctrl.Result{}, fmt.Errorf("list ports: %s", portList.Status.String())
 	}
 
+	var ports []networkingv1alpha1.PortStatus
 	for _, p := range portList.Items {
-		s.Status.Ports = append(s.Status.Ports, networkingv1alpha1.PortStatus{Name: p.Name})
+		if p.Status.Code != 0 {
+			return ctrl.Result{}, fmt.Errorf("port %q: %s", p.Name, p.Status.String())
+		}
+		ports = append(ports, networkingv1alpha1.PortStatus{Name: p.Name})
 	}
+	s.Status.Ports = ports
 
 	s.Status.State = networkingv1alpha1.SwitchStateReady
 
-	// TODO: ensure s.spec is applied
-
 	log.Info("Reconciled Switch")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 60 * time.Second}, nil
 }
 
 func (r *SwitchReconciler) EnsureInterface(ctx context.Context, log logr.Logger, s *networkingv1alpha1.Switch, iface agent.Interface) error {
 	log.Info("Ensuring Interface")
 
-	adminState, err := agent.AgentDeviceStatusToAPIAdminState(iface.AdminStatus)
+	if iface.Status.Code != 0 {
+		return fmt.Errorf("discovered interface %q: %s", iface.Name, iface.Status.String())
+	}
+	if iface.Name == "" || iface.NativeName == "" || s.UID == "" {
+		return fmt.Errorf("cannot adopt interface with incomplete identity or switch UID")
+	}
+
+	key := client.ObjectKey{Name: strings.ToLower(fmt.Sprintf("%s-%s", s.Name, iface.Name))}
+	existing := &networkingv1alpha1.SwitchInterface{}
+	err := r.Get(ctx, key, existing)
+	if apierrors.IsNotFound(err) {
+		// Seed desired state only at creation. Discovery must never overwrite user intent.
+		adminState, _ := agent.AgentDeviceStatusToAPIAdminState(iface.AdminStatus)
+		discovered := &networkingv1alpha1.SwitchInterface{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            key.Name,
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(s, networkingv1alpha1.GroupVersion.WithKind("Switch"))},
+			},
+			Spec: networkingv1alpha1.SwitchInterfaceSpec{
+				Handle:     iface.Name,
+				NativeName: iface.NativeName,
+				SwitchRef:  &corev1.LocalObjectReference{Name: s.Name},
+				AdminState: adminState,
+			},
+		}
+		if err := r.Create(ctx, discovered); !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		// A concurrent creator wins; validate its object without applying over it.
+		err = r.Get(ctx, key, existing)
+	}
 	if err != nil {
 		return err
 	}
-
-	isController := true
-	blockOwnerDeletion := true
-	ac := v1alpha1ac.SwitchInterface(strings.ToLower(fmt.Sprintf("%s-%s", s.Name, iface.Name))).
-		WithOwnerReferences(
-			metav1ac.OwnerReference().
-				WithAPIVersion(networkingv1alpha1.GroupVersion.String()).
-				WithKind("Switch").
-				WithName(s.Name).
-				WithUID(s.UID).
-				WithController(isController).
-				WithBlockOwnerDeletion(blockOwnerDeletion),
-		).
-		WithSpec(v1alpha1ac.SwitchInterfaceSpec().
-			WithHandle(iface.Name).
-			WithNativeName(iface.NativeName).
-			WithSwitchRef(corev1.LocalObjectReference{Name: s.Name}).
-			WithAdminState(adminState),
-		)
-
-	if err := r.Apply(ctx, ac, client.ForceOwnership, fieldOwner); err != nil {
-		return err
+	owner := metav1.GetControllerOf(existing)
+	if owner == nil || owner.UID != s.UID || owner.Name != s.Name || owner.Kind != "Switch" || owner.APIVersion != networkingv1alpha1.GroupVersion.String() ||
+		existing.Spec.SwitchRef == nil || existing.Spec.SwitchRef.Name != s.Name || existing.Spec.NativeName != iface.NativeName || existing.Spec.Handle != iface.Name || !existing.DeletionTimestamp.IsZero() {
+		return fmt.Errorf("interface adoption conflict for %q: existing ownership or identity does not match switch %q and native interface %q", key.Name, s.Name, iface.NativeName)
 	}
 
 	log.Info("Ensured Interface")
+	return nil
+}
+
+func closeAgentClient(agentClient agentclient.SwitchAgentClient) error {
+	if closer, ok := agentClient.(interface{ Close() error }); ok {
+		if err := closer.Close(); err != nil {
+			return fmt.Errorf("close agent client: %w", err)
+		}
+	}
 	return nil
 }
 

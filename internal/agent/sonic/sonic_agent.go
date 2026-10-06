@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,9 +33,14 @@ const (
 )
 
 type SonicAgent struct {
-	redisAddr  string
-	clientPool map[string]*redis.Client
-	poolMutex  sync.RWMutex
+	redisAddr   string
+	clientPool  map[string]*redis.Client
+	poolMutex   sync.RWMutex
+	linkByName  func(string) (netlink.Link, error)
+	saveConfig  func(context.Context) *agent.Status
+	versionInfo func() (map[string]string, error)
+	configMutex sync.Mutex
+	configDirty bool // A failed write/save may leave Redis and persisted config inconsistent.
 }
 
 func getRedisDBIDByName(name string) int {
@@ -139,13 +146,14 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 	}
 
 	client := redis.NewClient(&redis.Options{
-		Addr:         m.redisAddr,
-		DB:           dbID,
-		DialTimeout:  RedisDialTimeout,
-		ReadTimeout:  RedisReadTimeout,
-		WriteTimeout: RedisWriteTimeout,
-		PoolTimeout:  RedisPoolTimeout,
-		MaxRetries:   RedisMaxRetries,
+		Addr:                  m.redisAddr,
+		DB:                    dbID,
+		DialTimeout:           RedisDialTimeout,
+		ReadTimeout:           RedisReadTimeout,
+		WriteTimeout:          RedisWriteTimeout,
+		PoolTimeout:           RedisPoolTimeout,
+		MaxRetries:            RedisMaxRetries,
+		ContextTimeoutEnabled: true,
 
 		// Connection pool settings
 		PoolSize:     10, // Maximum number of socket connections
@@ -195,12 +203,19 @@ func (m *SonicAgent) GetDeviceInfo(ctx context.Context) (*agent.SwitchDevice, *a
 
 	// If values are missing from Redis, try to get from sonic_version.yml
 	if hwsku == "" || sonicOSVersion == "" || asicType == "" {
-		if versionInfo, err := GetSonicVersionInfo(); err == nil {
+		readVersion := m.versionInfo
+		if readVersion == nil {
+			readVersion = GetSonicVersionInfo
+		}
+		if versionInfo, err := readVersion(); err == nil {
 			if hwsku == "" {
 				hwsku = versionInfo["hwsku"]
 			}
 			if sonicOSVersion == "" {
 				sonicOSVersion = versionInfo["sonic_os_version"]
+				if sonicOSVersion == "" {
+					sonicOSVersion = versionInfo["build_version"]
+				}
 			}
 			if asicType == "" {
 				asicType = versionInfo["asic_type"]
@@ -226,13 +241,6 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to CONFIG_DB: %v", err))
 	}
 
-	// Connect to STATE_DB for operational status
-	stateDB, err := m.Connect("STATE_DB")
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to STATE_DB: %v", err))
-	}
-	// defer stateDB.Close()
-
 	applDB, err := m.Connect("APPL_DB")
 	if err != nil {
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to APPL_DB: %v", err))
@@ -252,12 +260,9 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 			return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to parse interface name from key %s: %v", key, err))
 		}
 
-		// Get operational status from STATE_DB
-		stateKey := fmt.Sprintf("PORT_TABLE|%s", name)
-		stateFields, err := stateDB.HGetAll(ctx, stateKey).Result()
+		configFields, err := configDB.HGetAll(ctx, key).Result()
 		if err != nil {
-			// If state info is not available, use default values
-			stateFields = make(map[string]string)
+			return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get config for interface %s: %v", name, err))
 		}
 		applKey := fmt.Sprintf("PORT_TABLE:%s", name)
 		applFields, err := applDB.HGetAll(ctx, applKey).Result()
@@ -265,19 +270,11 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 			return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to get state info for interface %s: %v", name, err))
 		}
 
-		// Determine operational status
-		operStatus := agent.StatusDown
-		if applFields["oper_status"] == "up" {
-			operStatus = agent.StatusUp
-		}
-
-		adminStatus := agent.StatusDown
-		if stateFields["admin_status"] == "up" {
-			adminStatus = agent.StatusUp
-		}
+		operStatus := parseDeviceStatus(applFields["oper_status"])
+		adminStatus := parseDeviceStatus(configFields["admin_status"])
 
 		// Use device MAC as interface MAC (common in SONiC)
-		link, err := netlink.LinkByName(name)
+		link, err := m.getLinkByName(name)
 		if err != nil {
 			return nil, agent.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("failed to get interface %s: %v", name, err))
 		}
@@ -292,18 +289,13 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 			return nil, agent.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to convert native name to abstract name: %v", err))
 		}
 
-		alias, err := configDB.HGet(ctx, fmt.Sprintf("PORT|%s", name), "alias").Result()
-		if err != nil {
-			return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get alias: %v", err))
-		}
-
 		iface := agent.Interface{
 			TypeMeta: agent.TypeMeta{
 				Kind: agent.InterfaceKind,
 			},
 			Name:            abstractName,
 			NativeName:      name,
-			AliasName:       alias,
+			AliasName:       configFields["alias"],
 			MacAddress:      mac.String(),
 			OperationStatus: operStatus,
 			AdminStatus:     adminStatus,
@@ -321,6 +313,9 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 }
 
 func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
+	if m.saveConfig != nil {
+		return m.saveConfig(ctx)
+	}
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		log.Printf("Failed to connect to system bus: %v", err)
@@ -345,123 +340,13 @@ func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
 }
 
 func (m *SonicAgent) SetInterfaceAdminStatus(ctx context.Context, iface *agent.Interface) (*agent.Interface, *agent.Status) {
-	// Validate input
-	var ifaceName string
-	var err error
-
-	if iface == nil || iface.Name == "" {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "interface name cannot be empty")
+	if iface == nil {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "interface cannot be nil")
 	}
-	if !strings.HasPrefix(iface.Name, "Ethernet") && !strings.HasPrefix(iface.Name, "eth") {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "invalid interface name. Must start with 'Ethernet' or 'eth'")
+	if _, err := agent.ValidateDeviceStatusStr(string(iface.AdminStatus)); err != nil {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, err.Error())
 	}
-	if strings.HasPrefix(iface.Name, "eth") {
-		ifaceName, err = agent.AbstractNameToNativeName(iface.Name)
-		if err != nil {
-			return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to convert abstract name to native name: %v", err))
-		}
-	} else {
-		ifaceName = iface.Name
-	}
-
-	configDB, err := m.Connect("CONFIG_DB")
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to CONFIG_DB: %v", err))
-	}
-
-	portKey := fmt.Sprintf("PORT|%s", ifaceName)
-
-	// store the current admin status for rollback
-	fields, err := configDB.HGetAll(ctx, portKey).Result()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get current admin status: %v", err))
-	}
-	currentAdminStatus := fields["admin_status"]
-
-	// Set admin status in CONFIG_DB
-	adminStatusStr := string(iface.AdminStatus)
-	err = configDB.HSet(ctx, portKey, "admin_status", adminStatusStr).Err()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to set admin status: %v", err))
-	}
-	// Persist changes to config_db.json
-	if status := m.SaveConfig(ctx); status != nil {
-		// Try to rollback if save fails
-		_ = configDB.HSet(ctx, portKey, "admin_status", currentAdminStatus).Err()
-		return nil, status
-	}
-
-	// Verify the interface exists by checking if we can get its current state
-	exists, err := configDB.Exists(ctx, portKey).Result()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to verify interface existence: %v", err))
-	}
-	if exists == 0 {
-		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("interface %s not found", ifaceName))
-	}
-
-	time.Sleep(1000 * time.Millisecond)
-
-	// Get updated interface status from STATE_DB
-	stateDB, err := m.Connect("STATE_DB")
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to STATE_DB: %v", err))
-	}
-
-	stateKey := fmt.Sprintf("PORT_TABLE|%s", ifaceName)
-	stateFields, err := stateDB.HGetAll(ctx, stateKey).Result()
-	_ = stateFields // currently we don't use any field from stateFields, but we get it anyway to check if the interface is still there after the update. If the key is gone, it means the interface is deleted during the update, we can return not found error in that case.
-	if err != nil {
-		// rollback admin status
-		err = configDB.HSet(ctx, portKey, "admin_status", currentAdminStatus).Err()
-		if err != nil {
-			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to rollback admin status: %v", err))
-		}
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get state info: %v", err))
-	}
-
-	applDB, err := m.Connect("APPL_DB")
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to APPL_DB: %v", err))
-	}
-	// get the newest operational status
-	applKey := fmt.Sprintf("PORT_TABLE:%s", ifaceName)
-	applFields, err := applDB.HGetAll(ctx, applKey).Result()
-	if err != nil {
-		// If state info is not available, use default values
-		applFields = make(map[string]string)
-	}
-
-	// Determine operational status
-	operStatus := agent.StatusDown
-	if applFields["oper_status"] == "up" {
-		operStatus = agent.StatusUp
-	}
-
-	alias, err := configDB.HGet(ctx, fmt.Sprintf("PORT|%s", ifaceName), "alias").Result()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get alias: %v", err))
-	}
-
-	// Return updated interface
-	updatedIface := *iface
-	updatedIface.OperationStatus = operStatus
-	updatedIface.AliasName = alias // alias name should not be changed by this function, but we return it anyway for the caller to have the latest info
-
-	abstractName, _ := agent.NativeNameToAbstractName(ifaceName)
-	resultInterface := &agent.Interface{
-		TypeMeta: agent.TypeMeta{
-			Kind: agent.InterfaceKind,
-		},
-		Name:            abstractName,
-		NativeName:      ifaceName,
-		AliasName:       alias, // In SONiC, abstract name is the same as native name for physical interfaces
-		MacAddress:      "",
-		OperationStatus: operStatus,
-		AdminStatus:     iface.AdminStatus,
-		Status:          agent.Status{Code: 0, Message: "ok"},
-	}
-	return resultInterface, nil
+	return m.setInterfaceField(ctx, iface, "admin_status", string(iface.AdminStatus))
 }
 
 func (m *SonicAgent) GetInterface(ctx context.Context, iface *agent.Interface) (*agent.Interface, *agent.Status) {
@@ -489,29 +374,16 @@ func (m *SonicAgent) GetInterface(ctx context.Context, iface *agent.Interface) (
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to CONFIG_DB: %v", err))
 	}
 
-	// Connect to STATE_DB for operational status
-	stateDB, err := m.Connect("STATE_DB")
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to STATE_DB: %v", err))
-	}
-
 	// Check if interface exists in CONFIG_DB
 	portKey := fmt.Sprintf("PORT|%s", ifaceName)
-	exists, err := configDB.Exists(ctx, portKey).Result()
+	configFields, err := configDB.HGetAll(ctx, portKey).Result()
 	if err != nil {
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to check interface existence: %v", err))
 	}
-	if exists == 0 {
+	if len(configFields) == 0 {
 		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("interface %s not found", ifaceName))
 	}
 
-	// Get operational status from STATE_DB
-	stateKey := fmt.Sprintf("PORT_TABLE|%s", ifaceName)
-	stateFields, err := stateDB.HGetAll(ctx, stateKey).Result()
-	if err != nil {
-		// If state info is not available, use default values
-		stateFields = make(map[string]string)
-	}
 	applDB, err := m.Connect("APPL_DB")
 	if err != nil {
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to APPL_DB: %v", err))
@@ -523,19 +395,11 @@ func (m *SonicAgent) GetInterface(ctx context.Context, iface *agent.Interface) (
 		applFields = make(map[string]string)
 	}
 
-	// Determine operational status
-	operStatus := agent.StatusDown
-	if applFields["oper_status"] == "up" {
-		operStatus = agent.StatusUp
-	}
-
-	adminStatus := agent.StatusDown
-	if stateFields["admin_status"] == "up" {
-		adminStatus = agent.StatusUp
-	}
+	operStatus := parseDeviceStatus(applFields["oper_status"])
+	adminStatus := parseDeviceStatus(configFields["admin_status"])
 
 	// Get interface MAC address using netlink
-	link, err := netlink.LinkByName(ifaceName)
+	link, err := m.getLinkByName(ifaceName)
 	if err != nil {
 		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("failed to get interface %s: %v", ifaceName, err))
 	}
@@ -543,11 +407,6 @@ func (m *SonicAgent) GetInterface(ctx context.Context, iface *agent.Interface) (
 	mac := link.Attrs().HardwareAddr
 	if mac == nil {
 		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("no MAC address found for interface %s", ifaceName))
-	}
-
-	alias, err := configDB.HGet(ctx, fmt.Sprintf("PORT|%s", ifaceName), "alias").Result()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get alias: %v", err))
 	}
 
 	abstractName, err := agent.NativeNameToAbstractName(ifaceName)
@@ -561,7 +420,7 @@ func (m *SonicAgent) GetInterface(ctx context.Context, iface *agent.Interface) (
 		},
 		Name:            abstractName,
 		NativeName:      ifaceName,
-		AliasName:       alias, // In SONiC, abstract name is the same as native name for physical interfaces
+		AliasName:       configFields["alias"],
 		MacAddress:      mac.String(),
 		OperationStatus: operStatus,
 		AdminStatus:     adminStatus,
@@ -624,10 +483,10 @@ func (m *SonicAgent) GetInterfaceNeighbor(ctx context.Context, iface *agent.Inte
 	if handle == "" {
 		// Fallback to lldp_rem_port_id if port_desc is not available
 		handle = lldpFields["lldp_rem_port_id"]
-	} else {
-		handle, err = agent.NativeNameToAbstractName(handle)
-		if err != nil {
-			return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to convert native name to abstract name: %v", err))
+	} else if _, valid := ethernetNumber(handle); valid {
+		// Remote descriptions are arbitrary text, not necessarily SONiC names.
+		if abstract, err := agent.NativeNameToAbstractName(handle); err == nil {
+			handle = abstract
 		}
 	}
 
@@ -651,6 +510,40 @@ func (m *SonicAgent) GetInterfaceNeighbor(ctx context.Context, iface *agent.Inte
 }
 
 func (m *SonicAgent) ListPorts(ctx context.Context) (*agent.PortList, *agent.Status) {
+	configDB, err := m.Connect("CONFIG_DB")
+	if err != nil {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to connect to CONFIG_DB: %v", err))
+	}
+	configKeys, err := configDB.Keys(ctx, "PORT|*").Result()
+	if err != nil {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to obtain PORT keys: %v", err))
+	}
+	config := make(map[string]map[string]string, len(configKeys))
+	parents := make(map[int]string)
+	indexed := make(map[string]bool)
+	for _, key := range configKeys {
+		name := strings.TrimPrefix(key, "PORT|")
+		number, valid := ethernetNumber(name)
+		if !valid {
+			continue
+		}
+		fields, err := configDB.HGetAll(ctx, key).Result()
+		if err != nil {
+			return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get config for port %s: %v", name, err))
+		}
+		config[name] = fields
+		index, err := strconv.Atoi(fields["index"])
+		if err != nil || index < 0 {
+			continue // Without a usable physical index, require explicit parent metadata.
+		}
+		indexed[name] = true
+		parent, exists := parents[index]
+		parentNumber, _ := ethernetNumber(parent)
+		if !exists || number < parentNumber {
+			parents[index] = name
+		}
+	}
+
 	// Connect to APPL_DB (table 0)
 	applDB, err := m.Connect("APPL_DB")
 	if err != nil {
@@ -664,11 +557,19 @@ func (m *SonicAgent) ListPorts(ctx context.Context) (*agent.PortList, *agent.Sta
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to obtain PORT_TABLE keys: %v", err))
 	}
 
-	ports := make([]agent.Port, 0)
+	// Breakout members share a CONFIG_DB index. Use the lowest existing native
+	// name, not Ethernet(index*4): platforms can number the final cages sparsely.
+	portAliases := make(map[string]string)
+	for _, parent := range parents {
+		portAliases[parent] = config[parent]["alias"]
+	}
 	for _, key := range keys {
-		var portName string
-		if _, err := fmt.Sscanf(key, "PORT_TABLE:%s", &portName); err != nil {
+		portName := strings.TrimPrefix(key, "PORT_TABLE:")
+		if _, valid := ethernetNumber(portName); !valid {
 			continue // Skip malformed keys
+		}
+		if indexed[portName] {
+			continue // CONFIG_DB already selected exactly one parent for this index.
 		}
 
 		// Get the port configuration
@@ -684,12 +585,27 @@ func (m *SonicAgent) ListPorts(ctx context.Context) (*agent.PortList, *agent.Sta
 			continue // Skip non-physical ports (sub-interfaces, VLANs, etc.)
 		}
 
-		// Get alias if available
-		alias := fields["alias"]
-		if alias == "" {
-			alias = portName // Use port name as alias if not specified
+		alias, configured := config[portName]["alias"]
+		if !configured {
+			alias = fields["alias"]
 		}
-
+		portAliases[portName] = alias
+	}
+	names := make([]string, 0, len(portAliases))
+	for name := range portAliases {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		a, _ := ethernetNumber(names[i])
+		b, _ := ethernetNumber(names[j])
+		return a < b
+	})
+	ports := make([]agent.Port, 0, len(names))
+	for _, portName := range names {
+		alias := portAliases[portName]
+		if alias == "" {
+			alias = portName
+		}
 		port := agent.Port{
 			TypeMeta: agent.TypeMeta{
 				Kind: agent.PortKind,
@@ -711,7 +627,15 @@ func (m *SonicAgent) ListPorts(ctx context.Context) (*agent.PortList, *agent.Sta
 }
 
 func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Interface) (*agent.Interface, *agent.Status) {
-	// Validate input
+	if iface == nil {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "interface cannot be nil")
+	}
+	return m.setInterfaceField(ctx, iface, "alias", iface.AliasName)
+}
+
+// Both setters validate against the same CONFIG_DB snapshot and persist only a
+// changed field. In particular, an admin update never writes an alias.
+func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interface, field, desired string) (*agent.Interface, *agent.Status) {
 	var ifaceName string
 	var err error
 
@@ -729,6 +653,17 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 	} else {
 		ifaceName = iface.Name
 	}
+	if _, valid := ethernetNumber(ifaceName); !valid {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "invalid native interface name")
+	}
+	abstractName, err := agent.NativeNameToAbstractName(ifaceName)
+	if err != nil || (strings.HasPrefix(iface.Name, "eth") && abstractName != iface.Name) {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "invalid abstract interface name")
+	}
+	// SaveConfig persists the whole DB, so serialize setters and retain uncertain
+	// persistence across requests rather than treating matching Redis values as saved.
+	m.configMutex.Lock()
+	defer m.configMutex.Unlock()
 
 	configDB, err := m.Connect("CONFIG_DB")
 	if err != nil {
@@ -736,42 +671,43 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 	}
 
 	portKey := fmt.Sprintf("PORT|%s", ifaceName)
-	log.Printf("Setting alias for port: %s", portKey)
-
-	// store the current s Alias name for rollback
 	fields, err := configDB.HGetAll(ctx, portKey).Result()
 	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get current alias name: %v", err))
+		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get current interface config: %v", err))
 	}
-	currentAlias := fields["alias"]
-	futureAlias := iface.AliasName
-	if futureAlias == "" {
-		futureAlias = iface.Name // If alias is empty, use abstract name as alias
+	if len(fields) == 0 {
+		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("interface %s not found", ifaceName))
 	}
-
-	aliasStr := futureAlias
-	err = configDB.HSet(ctx, portKey, "alias", aliasStr).Err()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to set alias name: %v", err))
-	}
-	// Persist changes to config_db.json
-	if status := m.SaveConfig(ctx); status != nil {
-		log.Printf("Failed to save config after setting alias name: %v", status)
-		// Try to rollback if save fails
-		err = configDB.HSet(ctx, portKey, "alias", currentAlias).Err()
+	current, existed := fields[field]
+	changed := current != desired
+	if changed {
+		m.configDirty = true
+		err = configDB.HSet(ctx, portKey, field, desired).Err()
 		if err != nil {
-			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to rollback alias name: %v", err))
+			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to set %s: %v", field, err))
 		}
-		return nil, status
 	}
-
-	// Verify the interface exists by checking if we can get its current state
-	exists, err := configDB.Exists(ctx, portKey).Result()
-	if err != nil {
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to verify interface existence: %v", err))
+	if m.configDirty {
+		if status := m.SaveConfig(ctx); status != nil {
+			if changed {
+				// Request cancellation must not prevent restoring the pre-write value.
+				rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RedisDefaultTimeout)
+				if existed {
+					err = configDB.HSet(rollbackCtx, portKey, field, current).Err()
+				} else {
+					err = configDB.HDel(rollbackCtx, portKey, field).Err()
+				}
+				cancel()
+				if err != nil {
+					return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("%s; failed to rollback %s: %v", status.Message, field, err))
+				}
+			}
+			return nil, status
+		}
+		m.configDirty = false
 	}
-	if exists == 0 {
-		return nil, errors.NewErrorStatus(errors.NOT_FOUND, fmt.Sprintf("interface %s not found", iface.Name))
+	if changed {
+		fields[field] = desired
 	}
 
 	applDB, err := m.Connect("APPL_DB")
@@ -785,24 +721,13 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 		applFields = make(map[string]string)
 	}
 
-	if err != nil {
-		// rollback alias name
-		err = configDB.HSet(ctx, portKey, "alias", currentAlias).Err()
-		if err != nil {
-			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to rollback alias name: %v", err))
-		}
-		return nil, errors.NewErrorStatus(errors.REDIS_KEY_CHECK_FAIL, fmt.Sprintf("failed to get state info: %v", err))
-	}
-
-	// Determine operational status
-	operStatus := agent.StatusDown
-	if applFields["oper_status"] == "up" {
-		operStatus = agent.StatusUp
-	}
-
-	// Return updated interface
-	updatedIface := *iface
-	updatedIface.OperationStatus = operStatus
-
-	return &updatedIface, nil
+	return &agent.Interface{
+		TypeMeta:        agent.TypeMeta{Kind: agent.InterfaceKind},
+		Name:            abstractName,
+		NativeName:      ifaceName,
+		AliasName:       fields["alias"],
+		AdminStatus:     parseDeviceStatus(fields["admin_status"]),
+		OperationStatus: parseDeviceStatus(applFields["oper_status"]),
+		Status:          agent.Status{Code: 0, Message: "ok"},
+	}, nil
 }

@@ -5,11 +5,14 @@ package agent_server
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 
@@ -17,12 +20,19 @@ import (
 	"github.com/ironcore-dev/sonic-operator/internal/agent/sonic"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 var (
-	port      = flag.Int("port", 50051, "The server port")
-	redisAddr = flag.String("redis-addr", "127.0.0.1:6379", "The Redis address")
+	port            = flag.Int("port", 50051, "The server port")
+	redisAddr       = flag.String("redis-addr", "127.0.0.1:6379", "The Redis address")
+	bindAddress     = flag.String("bind-address", "127.0.0.1", "The server bind address")
+	readOnly        = flag.Bool("read-only", true, "Only allow explicitly approved read RPCs")
+	tlsCertFile     = flag.String("tls-cert-file", "", "Required PEM server certificate file")
+	tlsKeyFile      = flag.String("tls-key-file", "", "Required PEM server private key file")
+	tlsClientCAFile = flag.String("tls-client-ca-file", "", "Required PEM CA bundle trusted to issue client certificates")
 )
 
 type proxyServer struct {
@@ -45,6 +55,9 @@ func (s *proxyServer) GetDeviceInfo(ctx context.Context, request *pb.GetDeviceIn
 		}, nil
 	}
 
+	if device == nil {
+		return nil, grpcstatus.Error(codes.Internal, "backend returned no device information")
+	}
 	return &pb.GetDeviceInfoResponse{
 		Status: &pb.Status{
 			Code:    0,
@@ -71,6 +84,9 @@ func (s *proxyServer) ListInterfaces(ctx context.Context, request *pb.ListInterf
 		}, nil
 	}
 
+	if interfaceList == nil {
+		return nil, grpcstatus.Error(codes.Internal, "backend returned no interface list")
+	}
 	var interfaces = make([]*pb.Interface, 0, len(interfaceList.Items))
 	for _, iface := range interfaceList.Items {
 		interfaces = append(interfaces, &pb.Interface{
@@ -119,6 +135,7 @@ func (s *proxyServer) SetInterfaceAdminStatus(ctx context.Context, request *pb.S
 		},
 		Interface: &pb.Interface{
 			Name:              iface.Name,
+			NativeName:        iface.NativeName,
 			MacAddress:        "",
 			OperationalStatus: string(iface.OperationStatus),
 			AdminStatus:       string(iface.AdminStatus),
@@ -139,6 +156,9 @@ func (s *proxyServer) ListPorts(ctx context.Context, request *pb.ListPortsReques
 		}, nil
 	}
 
+	if portList == nil {
+		return nil, grpcstatus.Error(codes.Internal, "backend returned no port list")
+	}
 	var ports = make([]*pb.Port, 0, len(portList.Items))
 	for _, port := range portList.Items {
 		ports = append(ports, &pb.Port{
@@ -174,6 +194,9 @@ func (s *proxyServer) GetInterface(ctx context.Context, request *pb.GetInterface
 		}, nil
 	}
 
+	if iface == nil {
+		return nil, grpcstatus.Error(codes.Internal, "backend returned no interface")
+	}
 	return &pb.GetInterfaceResponse{
 		Status: &pb.Status{
 			Code:    0,
@@ -244,6 +267,9 @@ func (s *proxyServer) GetInterfaceNeighbor(ctx context.Context, request *pb.GetI
 		}, nil
 	}
 
+	if ifaceNeighbor == nil {
+		return nil, grpcstatus.Error(codes.Internal, "backend returned no interface neighbor")
+	}
 	return &pb.GetInterfaceNeighborResponse{
 		Status: &pb.Status{
 			Code:    0,
@@ -285,26 +311,64 @@ func NewProxyServer(switchAgentImpl switchAgent.SwitchAgent) pb.SwitchAgentServi
 	return &proxyServer{SwitchAgent: switchAgentImpl}
 }
 
+func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	switch info.FullMethod {
+	case pb.SwitchAgentService_GetDeviceInfo_FullMethodName,
+		pb.SwitchAgentService_ListInterfaces_FullMethodName,
+		pb.SwitchAgentService_ListPorts_FullMethodName,
+		pb.SwitchAgentService_GetInterface_FullMethodName,
+		pb.SwitchAgentService_GetInterfaceNeighbor_FullMethodName:
+		return handler(ctx, req)
+	default:
+		return nil, grpcstatus.Error(codes.PermissionDenied, "agent is read-only: RPC is not allowed")
+	}
+}
+
+func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool) (*grpc.Server, error) {
+	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig.ClientCAs = tlsConfig.RootCAs
+	tlsConfig.RootCAs = nil
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig))}
+	if readOnly {
+		opts = append(opts, grpc.UnaryInterceptor(readOnlyInterceptor),
+			// No streaming RPCs are approved, including reflection and unknown methods.
+			grpc.StreamInterceptor(func(any, grpc.ServerStream, *grpc.StreamServerInfo, grpc.StreamHandler) error {
+				return grpcstatus.Error(codes.PermissionDenied, "agent is read-only: streaming RPCs are not allowed")
+			}),
+			grpc.UnknownServiceHandler(func(any, grpc.ServerStream) error {
+				return grpcstatus.Error(codes.PermissionDenied, "agent is read-only: unknown RPC is not allowed")
+			}),
+		)
+	}
+	return grpc.NewServer(opts...), nil
+}
+
 func StartServer() {
 	flag.Parse()
 
-	lis, err := net.Listen("tcp4", fmt.Sprintf("0.0.0.0:%d", *port))
+	// Validate security configuration before opening a listener or contacting the backend.
+	s, err := newGRPCServer(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}
-
-	s := grpc.NewServer()
+	defer s.Stop()
 
 	swAgent, err := sonic.NewSonicRedisAgent(*redisAddr)
 	if err != nil {
 		log.Fatalf("failed to create SonicRedisAgent: %v", err)
-		panic(err)
 	}
 
 	pb.RegisterSwitchAgentServiceServer(s, NewProxyServer(swAgent))
 
-	// Register reflection service on gRPC server for debugging
-	reflection.Register(s)
+	lis, err := net.Listen("tcp", net.JoinHostPort(*bindAddress, strconv.Itoa(*port)))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	defer lis.Close()
 
 	log.Printf("gRPC server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {

@@ -6,11 +6,14 @@ package client
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
+	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 )
@@ -34,7 +37,7 @@ type defaultSwitchAgentClient struct {
 	Address        string
 	ConnectTimeout time.Duration
 
-	opts   []grpc.DialOption // Options for the gRPC connection
+	conn   *grpc.ClientConn
 	client pb.SwitchAgentServiceClient
 }
 
@@ -47,51 +50,65 @@ func NewDefaultSwitchAgentClient(address string, connectTimeout time.Duration) (
 		connectTimeout = 4 * time.Second
 	}
 
-	c := defaultSwitchAgentClient{
-		Address:        address,
-		ConnectTimeout: connectTimeout,
+	if connectTimeout < 0 {
+		return nil, fmt.Errorf("connect timeout must not be negative")
 	}
 
-	// Remove the println from here - flags haven't been parsed yet!
-	c.opts = []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	tlsConfig, err := transport.LoadTLSConfig(
+		os.Getenv("SONIC_AGENT_TLS_CERT_FILE"),
+		os.Getenv("SONIC_AGENT_TLS_KEY_FILE"),
+		os.Getenv("SONIC_AGENT_TLS_CA_FILE"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("configure agent client TLS (SONIC_AGENT_TLS_CERT_FILE, SONIC_AGENT_TLS_KEY_FILE, SONIC_AGENT_TLS_CA_FILE): %w", err)
 	}
-
-	return &c, nil
-}
-
-func (c *defaultSwitchAgentClient) dial() (func() error, error) {
-	println("connect to ", c.Address)
-
-	conn, err := grpc.NewClient(c.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	// conn, err := grpc.DialContext(dialCtx, c.Address,
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
-	// 	grpc.WithBlock(), // Wait for connection to be ready
-	// )
+	tlsConfig.ServerName = os.Getenv("SONIC_AGENT_TLS_SERVER_NAME")
+	conn, err := grpc.NewClient(address,
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
+		// Bound calls even when callers supply no deadline; shorter caller deadlines win.
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			ctx, cancel := context.WithTimeout(ctx, connectTimeout)
+			defer cancel()
+			return invoker(ctx, method, req, reply, cc, opts...)
+		}),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to switch proxy: %w", err)
 	}
 
-	c.client = pb.NewSwitchAgentServiceClient(conn)
-
-	// Return a cleanup function that ensures proper connection termination
-	return func() error {
-		return conn.Close()
+	return &defaultSwitchAgentClient{
+		Address:        address,
+		ConnectTimeout: connectTimeout,
+		conn:           conn,
+		client:         pb.NewSwitchAgentServiceClient(conn),
 	}, nil
 }
 
+// Close releases the reusable connection. It is optional on SwitchAgentClient so
+// existing fake clients do not need to implement connection lifecycle management.
+func (c *defaultSwitchAgentClient) Close() error {
+	if c.conn == nil {
+		return nil
+	}
+	return c.conn.Close()
+}
+
+func responseError(method string, status *pb.Status) error {
+	if status == nil {
+		return fmt.Errorf("%s: missing status in agent response", method)
+	}
+	if status.GetCode() != 0 {
+		return fmt.Errorf("%s: agent status %d: %s", method, status.GetCode(), status.GetMessage())
+	}
+	return nil
+}
+
 func (c *defaultSwitchAgentClient) GetDeviceInfo(ctx context.Context) (*agent.SwitchDevice, error) {
-	cleanup, err := c.dial()
+	resp, err := c.client.GetDeviceInfo(ctx, &pb.GetDeviceInfoRequest{})
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = cleanup()
-	}()
-
-	resp, err := c.client.GetDeviceInfo(ctx, &pb.GetDeviceInfoRequest{})
-	if err != nil {
+	if err := responseError("GetDeviceInfo", resp.GetStatus()); err != nil {
 		return nil, err
 	}
 
@@ -111,16 +128,11 @@ func (c *defaultSwitchAgentClient) GetDeviceInfo(ctx context.Context) (*agent.Sw
 }
 
 func (c *defaultSwitchAgentClient) ListInterfaces(ctx context.Context) (*agent.InterfaceList, error) {
-	cleanup, err := c.dial()
+	resp, err := c.client.ListInterfaces(ctx, &pb.ListInterfacesRequest{})
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = cleanup()
-	}()
-
-	resp, err := c.client.ListInterfaces(ctx, &pb.ListInterfacesRequest{})
-	if err != nil {
+	if err := responseError("ListInterfaces", resp.GetStatus()); err != nil {
 		return nil, err
 	}
 
@@ -151,14 +163,6 @@ func (c *defaultSwitchAgentClient) ListInterfaces(ctx context.Context) (*agent.I
 }
 
 func (c *defaultSwitchAgentClient) SetInterfaceAdminStatus(ctx context.Context, iface *agent.Interface) (*agent.Interface, error) {
-	cleanup, err := c.dial()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cleanup()
-	}()
-
 	resp, err := c.client.SetInterfaceAdminStatus(ctx, &pb.SetInterfaceAdminStatusRequest{
 		InterfaceName: iface.GetName(),
 		AdminStatus:   string(iface.AdminStatus),
@@ -186,14 +190,6 @@ func (c *defaultSwitchAgentClient) SetInterfaceAdminStatus(ctx context.Context, 
 }
 
 func (c *defaultSwitchAgentClient) GetInterfaceByAbstractName(ctx context.Context, iface *agent.Interface) (*agent.Interface, error) {
-	cleanup, err := c.dial()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cleanup()
-	}()
-
 	nativeName, err := agent.AbstractNameToNativeName(iface.GetName())
 	if err != nil {
 		return nil, err
@@ -206,10 +202,11 @@ func (c *defaultSwitchAgentClient) GetInterfaceByAbstractName(ctx context.Contex
 		return nil, err
 	}
 
-	if resp.GetStatus().Code != 0 {
-		return &agent.Interface{
-			Status: agent.ProtoStatusToStatus(resp.GetStatus()),
-		}, fmt.Errorf("failed to get interface: %s", resp.GetStatus().GetMessage())
+	if err := responseError("GetInterface", resp.GetStatus()); err != nil {
+		return nil, err
+	}
+	if resp.GetInterface() == nil {
+		return nil, fmt.Errorf("GetInterface: missing interface in agent response")
 	}
 
 	return &agent.Interface{
@@ -227,14 +224,6 @@ func (c *defaultSwitchAgentClient) GetInterfaceByAbstractName(ctx context.Contex
 }
 
 func (c *defaultSwitchAgentClient) GetInterfaceNeighbor(ctx context.Context, iface *agent.Interface) (*agent.InterfaceNeighbor, error) {
-	cleanup, err := c.dial()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cleanup()
-	}()
-
 	resp, err := c.client.GetInterfaceNeighbor(ctx, &pb.GetInterfaceNeighborRequest{
 		InterfaceName: iface.GetName(),
 	})
@@ -242,10 +231,14 @@ func (c *defaultSwitchAgentClient) GetInterfaceNeighbor(ctx context.Context, ifa
 		return nil, err
 	}
 
-	if resp.GetStatus().Code != 0 {
-		return &agent.InterfaceNeighbor{
-			Status: agent.ProtoStatusToStatus(resp.GetStatus()),
-		}, fmt.Errorf("failed to get interface neighbor: %s", resp.GetStatus().GetMessage())
+	if resp.GetStatus() != nil && resp.GetStatus().GetCode() == agenterrors.NOT_FOUND {
+		return &agent.InterfaceNeighbor{Status: agent.ProtoStatusToStatus(resp.GetStatus())}, nil
+	}
+	if err := responseError("GetInterfaceNeighbor", resp.GetStatus()); err != nil {
+		return nil, err
+	}
+	if resp.GetNeighbor() == nil {
+		return nil, fmt.Errorf("GetInterfaceNeighbor: missing neighbor in agent response")
 	}
 
 	return &agent.InterfaceNeighbor{
@@ -261,16 +254,11 @@ func (c *defaultSwitchAgentClient) GetInterfaceNeighbor(ctx context.Context, ifa
 }
 
 func (c *defaultSwitchAgentClient) ListPorts(ctx context.Context) (*agent.PortList, error) {
-	cleanup, err := c.dial()
+	resp, err := c.client.ListPorts(ctx, &pb.ListPortsRequest{})
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = cleanup()
-	}()
-
-	resp, err := c.client.ListPorts(ctx, &pb.ListPortsRequest{})
-	if err != nil {
+	if err := responseError("ListPorts", resp.GetStatus()); err != nil {
 		return nil, err
 	}
 
@@ -297,14 +285,6 @@ func (c *defaultSwitchAgentClient) ListPorts(ctx context.Context) (*agent.PortLi
 }
 
 func (c *defaultSwitchAgentClient) SetInterfaceAliasName(ctx context.Context, iface *agent.Interface) (*agent.Interface, error) {
-	cleanup, err := c.dial()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cleanup()
-	}()
-
 	resp, err := c.client.SetInterfaceAliasName(ctx, &pb.SetInterfaceAliasNameRequest{
 		InterfaceName: iface.GetName(),
 		AliasName:     iface.AliasName,
@@ -329,14 +309,6 @@ func (c *defaultSwitchAgentClient) SetInterfaceAliasName(ctx context.Context, if
 }
 
 func (c *defaultSwitchAgentClient) SaveConfig(ctx context.Context) error {
-	cleanup, err := c.dial()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = cleanup()
-	}()
-
 	resp, err := c.client.SaveConfig(ctx, &pb.SaveConfigRequest{})
 	if err != nil {
 		return err
