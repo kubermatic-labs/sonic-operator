@@ -92,9 +92,9 @@ spec:
                   description: SwitchVLANMember declares a Layer-2 membership.
                   properties:
                     interfaceName:
-                      description: InterfaceName is the canonical SONiC Ethernet name,
-                        not an alias or handle.
-                      pattern: ^Ethernet(0|[1-9][0-9]*)$
+                      description: InterfaceName is the canonical SONiC Ethernet or
+                        PortChannel name, not an alias.
+                      pattern: ^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3}))$
                       type: string
                     taggingMode:
                       description: TaggingMode can replace an existing mode only under
@@ -227,7 +227,7 @@ spec:
                 items:
                   description: |-
                     SwitchVLANObservedMember includes unmanaged members, which may use interface
-                    names outside the Ethernet-only scope allowed in spec (for example a LAG).
+                    names outside the Ethernet/PortChannel scope allowed in spec.
                   properties:
                     interfaceName:
                       type: string

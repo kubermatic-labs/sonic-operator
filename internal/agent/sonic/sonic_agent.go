@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,17 @@ type SonicAgent struct {
 	journalSync func(*os.File) error // Optional directory fsync implementation.
 
 	verifyVLANRuntime func(context.Context, uint32, vlanChangeDB) error // Optional single APPL_DB observation, for tests.
+
+	breakoutJournalDir     string
+	resolveBreakout        func(context.Context, string, map[string]string) (*breakoutPlatform, error)
+	runBreakout            func(context.Context, *exec.Cmd) ([]byte, error)
+	validateBreakoutConfig func(context.Context) error
+	breakoutSnapshot       func(context.Context) (vlanChangeDB, string, error)
+	breakoutCAS            func(context.Context, string, vlanChangeDB, vlanChangeDB) (bool, error)
+	verifyBreakoutRuntime  func(context.Context, *breakoutPlatform, vlanChangeDB) error
+
+	networkJournalDir string
+	planNetwork       func(vlanChangeDB, *agent.NetworkRequest) (*networkPlan, error)
 }
 
 func getRedisDBIDByName(name string) int {

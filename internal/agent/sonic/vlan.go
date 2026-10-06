@@ -46,8 +46,8 @@ func (m *SonicAgent) vlan(ctx context.Context, desired *agent.VLAN, ensure bool)
 		args[1] = "1"
 		seen := make(map[string]bool, len(desired.Members))
 		for _, member := range desired.Members {
-			if _, valid := ethernetNumber(member.InterfaceName); !valid {
-				return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, "VLAN members must use canonical Ethernet names")
+			if !vlanMemberNameValid(member.InterfaceName) {
+				return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, "VLAN members must use canonical Ethernet or PortChannel names")
 			}
 			if member.TaggingMode != "tagged" && member.TaggingMode != "untagged" {
 				return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, "VLAN tagging mode must be tagged or untagged")

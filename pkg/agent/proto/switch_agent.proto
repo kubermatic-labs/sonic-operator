@@ -176,6 +176,61 @@ message ReleaseVLANAuthorityResponse {
   Status status = 1;
 }
 
+message GetPortBreakoutRequest {
+  string port = 1;
+}
+
+message PortBreakoutRequest {
+  string port = 1;
+  string mode = 2;
+  string child_admin_state = 3;
+}
+
+message PortBreakoutChild {
+  string name = 1;
+  string lanes = 2;
+  string speed = 3;
+  string admin_state = 4;
+  string mtu = 5;
+}
+
+message PortBreakout {
+  string port = 1;
+  string mode = 2;
+  repeated string supported_modes = 3;
+  repeated PortBreakoutChild children = 4;
+  bool runtime_verified = 5;
+  bool persistence_verified = 6;
+  bool pending = 7;
+  string message = 8;
+  bool configuration_verified = 9;
+}
+
+message PortBreakoutResponse {
+  Status status = 1;
+  PortBreakout result = 2;
+}
+
+message NetworkRequest {
+  string kind = 1;
+  string owner_id = 2;
+  bytes spec_json = 3;
+}
+
+message NetworkResult {
+  bool exists = 1;
+  bool configuration_verified = 2;
+  bool runtime_verified = 3;
+  bool persistence_verified = 4;
+  bytes observed_json = 5;
+  string message = 6;
+}
+
+message NetworkResponse {
+  Status status = 1;
+  NetworkResult result = 2;
+}
+
 // The interface service definition.
 service SwitchAgentService {
 
@@ -198,5 +253,12 @@ service SwitchAgentService {
   rpc GetVLANAuthority(GetVLANAuthorityRequest) returns (VLANAuthorityResponse);
   rpc ReconcileVLANAuthority(VLANAuthorityRequest) returns (VLANAuthorityResponse);
   rpc ReleaseVLANAuthority(ReleaseVLANAuthorityRequest) returns (ReleaseVLANAuthorityResponse);
+
+  rpc GetPortBreakout(GetPortBreakoutRequest) returns (PortBreakoutResponse);
+  rpc ReconcilePortBreakout(PortBreakoutRequest) returns (PortBreakoutResponse);
+
+  rpc GetNetworkResource(NetworkRequest) returns (NetworkResponse);
+  rpc EnsureNetworkResource(NetworkRequest) returns (NetworkResponse);
+  rpc RecoverNetworkResource(NetworkRequest) returns (NetworkResponse);
 
 }

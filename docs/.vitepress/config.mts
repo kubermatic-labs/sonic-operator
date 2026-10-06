@@ -78,6 +78,11 @@ export default withMermaid({
           { text: 'Agent', link: '/usage/agent' },
           { text: 'Layer-2 VLANs', link: '/usage/vlans' },
           { text: 'Authoritative VLANs', link: '/usage/vlan-authoritative' },
+          { text: 'Port breakout', link: '/usage/breakout' },
+          { text: 'Network resources', link: '/usage/network-resources' },
+          { text: 'LAG and Layer 3', link: '/usage/lag-l3-mappings' },
+          { text: 'BGP and DHCP relay', link: '/usage/bgp-relay' },
+          { text: 'FRR mode migration', link: '/usage/frr-migration' },
         ]
       },
       {

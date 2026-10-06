@@ -1,0 +1,18 @@
+# Edit the EXISTING switch-a-unified CR to these spec fields; do not create a
+# second CR or delete/recreate the original. Preserve its UID, binding and finalizer.
+# Remove its old approvedDigest explicitly when editing; omission from an apply
+# may retain an approval set by another field manager.
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchFRRMigration
+metadata:
+  name: switch-a-unified
+spec:
+  switchRef:
+    name: switch-a
+  # Manage permits recovery of the ORIGINAL operation before the reverse preview.
+  # No new Ensure is permitted until a fresh Traditional digest is approved.
+  managementPolicy: Manage
+  mode: Traditional
+  # Review status.observed.mode/preflightEligible/adoptionDigest, then edit this
+  # SAME CR to add approvedDigest. Never reuse the forward approval.
+  # Target metadata is explicit false/separated, not removal of original fields.

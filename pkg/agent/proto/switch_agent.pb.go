@@ -1700,6 +1700,542 @@ func (x *ReleaseVLANAuthorityResponse) GetStatus() *Status {
 	return nil
 }
 
+type GetPortBreakoutRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          string                 `protobuf:"bytes,1,opt,name=port,proto3" json:"port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPortBreakoutRequest) Reset() {
+	*x = GetPortBreakoutRequest{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPortBreakoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPortBreakoutRequest) ProtoMessage() {}
+
+func (x *GetPortBreakoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPortBreakoutRequest.ProtoReflect.Descriptor instead.
+func (*GetPortBreakoutRequest) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *GetPortBreakoutRequest) GetPort() string {
+	if x != nil {
+		return x.Port
+	}
+	return ""
+}
+
+type PortBreakoutRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Port            string                 `protobuf:"bytes,1,opt,name=port,proto3" json:"port,omitempty"`
+	Mode            string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`
+	ChildAdminState string                 `protobuf:"bytes,3,opt,name=child_admin_state,json=childAdminState,proto3" json:"child_admin_state,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PortBreakoutRequest) Reset() {
+	*x = PortBreakoutRequest{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortBreakoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortBreakoutRequest) ProtoMessage() {}
+
+func (x *PortBreakoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortBreakoutRequest.ProtoReflect.Descriptor instead.
+func (*PortBreakoutRequest) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *PortBreakoutRequest) GetPort() string {
+	if x != nil {
+		return x.Port
+	}
+	return ""
+}
+
+func (x *PortBreakoutRequest) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *PortBreakoutRequest) GetChildAdminState() string {
+	if x != nil {
+		return x.ChildAdminState
+	}
+	return ""
+}
+
+type PortBreakoutChild struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Lanes         string                 `protobuf:"bytes,2,opt,name=lanes,proto3" json:"lanes,omitempty"`
+	Speed         string                 `protobuf:"bytes,3,opt,name=speed,proto3" json:"speed,omitempty"`
+	AdminState    string                 `protobuf:"bytes,4,opt,name=admin_state,json=adminState,proto3" json:"admin_state,omitempty"`
+	Mtu           string                 `protobuf:"bytes,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortBreakoutChild) Reset() {
+	*x = PortBreakoutChild{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortBreakoutChild) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortBreakoutChild) ProtoMessage() {}
+
+func (x *PortBreakoutChild) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortBreakoutChild.ProtoReflect.Descriptor instead.
+func (*PortBreakoutChild) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *PortBreakoutChild) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PortBreakoutChild) GetLanes() string {
+	if x != nil {
+		return x.Lanes
+	}
+	return ""
+}
+
+func (x *PortBreakoutChild) GetSpeed() string {
+	if x != nil {
+		return x.Speed
+	}
+	return ""
+}
+
+func (x *PortBreakoutChild) GetAdminState() string {
+	if x != nil {
+		return x.AdminState
+	}
+	return ""
+}
+
+func (x *PortBreakoutChild) GetMtu() string {
+	if x != nil {
+		return x.Mtu
+	}
+	return ""
+}
+
+type PortBreakout struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Port                  string                 `protobuf:"bytes,1,opt,name=port,proto3" json:"port,omitempty"`
+	Mode                  string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`
+	SupportedModes        []string               `protobuf:"bytes,3,rep,name=supported_modes,json=supportedModes,proto3" json:"supported_modes,omitempty"`
+	Children              []*PortBreakoutChild   `protobuf:"bytes,4,rep,name=children,proto3" json:"children,omitempty"`
+	RuntimeVerified       bool                   `protobuf:"varint,5,opt,name=runtime_verified,json=runtimeVerified,proto3" json:"runtime_verified,omitempty"`
+	PersistenceVerified   bool                   `protobuf:"varint,6,opt,name=persistence_verified,json=persistenceVerified,proto3" json:"persistence_verified,omitempty"`
+	Pending               bool                   `protobuf:"varint,7,opt,name=pending,proto3" json:"pending,omitempty"`
+	Message               string                 `protobuf:"bytes,8,opt,name=message,proto3" json:"message,omitempty"`
+	ConfigurationVerified bool                   `protobuf:"varint,9,opt,name=configuration_verified,json=configurationVerified,proto3" json:"configuration_verified,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PortBreakout) Reset() {
+	*x = PortBreakout{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortBreakout) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortBreakout) ProtoMessage() {}
+
+func (x *PortBreakout) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortBreakout.ProtoReflect.Descriptor instead.
+func (*PortBreakout) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *PortBreakout) GetPort() string {
+	if x != nil {
+		return x.Port
+	}
+	return ""
+}
+
+func (x *PortBreakout) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *PortBreakout) GetSupportedModes() []string {
+	if x != nil {
+		return x.SupportedModes
+	}
+	return nil
+}
+
+func (x *PortBreakout) GetChildren() []*PortBreakoutChild {
+	if x != nil {
+		return x.Children
+	}
+	return nil
+}
+
+func (x *PortBreakout) GetRuntimeVerified() bool {
+	if x != nil {
+		return x.RuntimeVerified
+	}
+	return false
+}
+
+func (x *PortBreakout) GetPersistenceVerified() bool {
+	if x != nil {
+		return x.PersistenceVerified
+	}
+	return false
+}
+
+func (x *PortBreakout) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
+func (x *PortBreakout) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PortBreakout) GetConfigurationVerified() bool {
+	if x != nil {
+		return x.ConfigurationVerified
+	}
+	return false
+}
+
+type PortBreakoutResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        *Status                `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Result        *PortBreakout          `protobuf:"bytes,2,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortBreakoutResponse) Reset() {
+	*x = PortBreakoutResponse{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortBreakoutResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortBreakoutResponse) ProtoMessage() {}
+
+func (x *PortBreakoutResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortBreakoutResponse.ProtoReflect.Descriptor instead.
+func (*PortBreakoutResponse) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *PortBreakoutResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *PortBreakoutResponse) GetResult() *PortBreakout {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type NetworkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,2,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	SpecJson      []byte                 `protobuf:"bytes,3,opt,name=spec_json,json=specJson,proto3" json:"spec_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkRequest) Reset() {
+	*x = NetworkRequest{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkRequest) ProtoMessage() {}
+
+func (x *NetworkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkRequest.ProtoReflect.Descriptor instead.
+func (*NetworkRequest) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *NetworkRequest) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *NetworkRequest) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+func (x *NetworkRequest) GetSpecJson() []byte {
+	if x != nil {
+		return x.SpecJson
+	}
+	return nil
+}
+
+type NetworkResult struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Exists                bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
+	ConfigurationVerified bool                   `protobuf:"varint,2,opt,name=configuration_verified,json=configurationVerified,proto3" json:"configuration_verified,omitempty"`
+	RuntimeVerified       bool                   `protobuf:"varint,3,opt,name=runtime_verified,json=runtimeVerified,proto3" json:"runtime_verified,omitempty"`
+	PersistenceVerified   bool                   `protobuf:"varint,4,opt,name=persistence_verified,json=persistenceVerified,proto3" json:"persistence_verified,omitempty"`
+	ObservedJson          []byte                 `protobuf:"bytes,5,opt,name=observed_json,json=observedJson,proto3" json:"observed_json,omitempty"`
+	Message               string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *NetworkResult) Reset() {
+	*x = NetworkResult{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkResult) ProtoMessage() {}
+
+func (x *NetworkResult) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkResult.ProtoReflect.Descriptor instead.
+func (*NetworkResult) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *NetworkResult) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
+func (x *NetworkResult) GetConfigurationVerified() bool {
+	if x != nil {
+		return x.ConfigurationVerified
+	}
+	return false
+}
+
+func (x *NetworkResult) GetRuntimeVerified() bool {
+	if x != nil {
+		return x.RuntimeVerified
+	}
+	return false
+}
+
+func (x *NetworkResult) GetPersistenceVerified() bool {
+	if x != nil {
+		return x.PersistenceVerified
+	}
+	return false
+}
+
+func (x *NetworkResult) GetObservedJson() []byte {
+	if x != nil {
+		return x.ObservedJson
+	}
+	return nil
+}
+
+func (x *NetworkResult) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type NetworkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        *Status                `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Result        *NetworkResult         `protobuf:"bytes,2,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkResponse) Reset() {
+	*x = NetworkResponse{}
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkResponse) ProtoMessage() {}
+
+func (x *NetworkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_agent_proto_switch_agent_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkResponse.ProtoReflect.Descriptor instead.
+func (*NetworkResponse) Descriptor() ([]byte, []int) {
+	return file_internal_agent_proto_switch_agent_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *NetworkResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *NetworkResponse) GetResult() *NetworkResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_internal_agent_proto_switch_agent_proto protoreflect.FileDescriptor
 
 const file_internal_agent_proto_switch_agent_proto_rawDesc = "" +
@@ -1810,8 +2346,47 @@ const file_internal_agent_proto_switch_agent_proto_rawDesc = "" +
 	"\avlan_id\x18\x01 \x01(\rR\x06vlanId\x12\x19\n" +
 	"\bowner_id\x18\x02 \x01(\tR\aownerId\"N\n" +
 	"\x1cReleaseVLANAuthorityResponse\x12.\n" +
-	"\x06status\x18\x01 \x01(\v2\x16.switchagent.v1.StatusR\x06status2\x99\n" +
-	"\n" +
+	"\x06status\x18\x01 \x01(\v2\x16.switchagent.v1.StatusR\x06status\",\n" +
+	"\x16GetPortBreakoutRequest\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\tR\x04port\"i\n" +
+	"\x13PortBreakoutRequest\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\tR\x04port\x12\x12\n" +
+	"\x04mode\x18\x02 \x01(\tR\x04mode\x12*\n" +
+	"\x11child_admin_state\x18\x03 \x01(\tR\x0fchildAdminState\"\x86\x01\n" +
+	"\x11PortBreakoutChild\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05lanes\x18\x02 \x01(\tR\x05lanes\x12\x14\n" +
+	"\x05speed\x18\x03 \x01(\tR\x05speed\x12\x1f\n" +
+	"\vadmin_state\x18\x04 \x01(\tR\n" +
+	"adminState\x12\x10\n" +
+	"\x03mtu\x18\x05 \x01(\tR\x03mtu\"\xe7\x02\n" +
+	"\fPortBreakout\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\tR\x04port\x12\x12\n" +
+	"\x04mode\x18\x02 \x01(\tR\x04mode\x12'\n" +
+	"\x0fsupported_modes\x18\x03 \x03(\tR\x0esupportedModes\x12=\n" +
+	"\bchildren\x18\x04 \x03(\v2!.switchagent.v1.PortBreakoutChildR\bchildren\x12)\n" +
+	"\x10runtime_verified\x18\x05 \x01(\bR\x0fruntimeVerified\x121\n" +
+	"\x14persistence_verified\x18\x06 \x01(\bR\x13persistenceVerified\x12\x18\n" +
+	"\apending\x18\a \x01(\bR\apending\x12\x18\n" +
+	"\amessage\x18\b \x01(\tR\amessage\x125\n" +
+	"\x16configuration_verified\x18\t \x01(\bR\x15configurationVerified\"|\n" +
+	"\x14PortBreakoutResponse\x12.\n" +
+	"\x06status\x18\x01 \x01(\v2\x16.switchagent.v1.StatusR\x06status\x124\n" +
+	"\x06result\x18\x02 \x01(\v2\x1c.switchagent.v1.PortBreakoutR\x06result\"\\\n" +
+	"\x0eNetworkRequest\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
+	"\bowner_id\x18\x02 \x01(\tR\aownerId\x12\x1b\n" +
+	"\tspec_json\x18\x03 \x01(\fR\bspecJson\"\xfb\x01\n" +
+	"\rNetworkResult\x12\x16\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists\x125\n" +
+	"\x16configuration_verified\x18\x02 \x01(\bR\x15configurationVerified\x12)\n" +
+	"\x10runtime_verified\x18\x03 \x01(\bR\x0fruntimeVerified\x121\n" +
+	"\x14persistence_verified\x18\x04 \x01(\bR\x13persistenceVerified\x12#\n" +
+	"\robserved_json\x18\x05 \x01(\fR\fobservedJson\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\"x\n" +
+	"\x0fNetworkResponse\x12.\n" +
+	"\x06status\x18\x01 \x01(\v2\x16.switchagent.v1.StatusR\x06status\x125\n" +
+	"\x06result\x18\x02 \x01(\v2\x1d.switchagent.v1.NetworkResultR\x06result2\xea\r\n" +
 	"\x12SwitchAgentService\x12\\\n" +
 	"\rGetDeviceInfo\x12$.switchagent.v1.GetDeviceInfoRequest\x1a%.switchagent.v1.GetDeviceInfoResponse\x12_\n" +
 	"\x0eListInterfaces\x12%.switchagent.v1.ListInterfacesRequest\x1a&.switchagent.v1.ListInterfacesResponse\x12z\n" +
@@ -1827,7 +2402,12 @@ const file_internal_agent_proto_switch_agent_proto_rawDesc = "" +
 	"EnsureVLAN\x12!.switchagent.v1.EnsureVLANRequest\x1a\".switchagent.v1.EnsureVLANResponse\x12b\n" +
 	"\x10GetVLANAuthority\x12'.switchagent.v1.GetVLANAuthorityRequest\x1a%.switchagent.v1.VLANAuthorityResponse\x12e\n" +
 	"\x16ReconcileVLANAuthority\x12$.switchagent.v1.VLANAuthorityRequest\x1a%.switchagent.v1.VLANAuthorityResponse\x12q\n" +
-	"\x14ReleaseVLANAuthority\x12+.switchagent.v1.ReleaseVLANAuthorityRequest\x1a,.switchagent.v1.ReleaseVLANAuthorityResponseB\x14Z\x12./switchagentprotob\x06proto3"
+	"\x14ReleaseVLANAuthority\x12+.switchagent.v1.ReleaseVLANAuthorityRequest\x1a,.switchagent.v1.ReleaseVLANAuthorityResponse\x12_\n" +
+	"\x0fGetPortBreakout\x12&.switchagent.v1.GetPortBreakoutRequest\x1a$.switchagent.v1.PortBreakoutResponse\x12b\n" +
+	"\x15ReconcilePortBreakout\x12#.switchagent.v1.PortBreakoutRequest\x1a$.switchagent.v1.PortBreakoutResponse\x12U\n" +
+	"\x12GetNetworkResource\x12\x1e.switchagent.v1.NetworkRequest\x1a\x1f.switchagent.v1.NetworkResponse\x12X\n" +
+	"\x15EnsureNetworkResource\x12\x1e.switchagent.v1.NetworkRequest\x1a\x1f.switchagent.v1.NetworkResponse\x12Y\n" +
+	"\x16RecoverNetworkResource\x12\x1e.switchagent.v1.NetworkRequest\x1a\x1f.switchagent.v1.NetworkResponseB\x14Z\x12./switchagentprotob\x06proto3"
 
 var (
 	file_internal_agent_proto_switch_agent_proto_rawDescOnce sync.Once
@@ -1841,7 +2421,7 @@ func file_internal_agent_proto_switch_agent_proto_rawDescGZIP() []byte {
 	return file_internal_agent_proto_switch_agent_proto_rawDescData
 }
 
-var file_internal_agent_proto_switch_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_internal_agent_proto_switch_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_internal_agent_proto_switch_agent_proto_goTypes = []any{
 	(*Status)(nil),                          // 0: switchagent.v1.Status
 	(*GetDeviceInfoRequest)(nil),            // 1: switchagent.v1.GetDeviceInfoRequest
@@ -1875,6 +2455,14 @@ var file_internal_agent_proto_switch_agent_proto_goTypes = []any{
 	(*VLANAuthorityResponse)(nil),           // 29: switchagent.v1.VLANAuthorityResponse
 	(*ReleaseVLANAuthorityRequest)(nil),     // 30: switchagent.v1.ReleaseVLANAuthorityRequest
 	(*ReleaseVLANAuthorityResponse)(nil),    // 31: switchagent.v1.ReleaseVLANAuthorityResponse
+	(*GetPortBreakoutRequest)(nil),          // 32: switchagent.v1.GetPortBreakoutRequest
+	(*PortBreakoutRequest)(nil),             // 33: switchagent.v1.PortBreakoutRequest
+	(*PortBreakoutChild)(nil),               // 34: switchagent.v1.PortBreakoutChild
+	(*PortBreakout)(nil),                    // 35: switchagent.v1.PortBreakout
+	(*PortBreakoutResponse)(nil),            // 36: switchagent.v1.PortBreakoutResponse
+	(*NetworkRequest)(nil),                  // 37: switchagent.v1.NetworkRequest
+	(*NetworkResult)(nil),                   // 38: switchagent.v1.NetworkResult
+	(*NetworkResponse)(nil),                 // 39: switchagent.v1.NetworkResponse
 }
 var file_internal_agent_proto_switch_agent_proto_depIdxs = []int32{
 	0,  // 0: switchagent.v1.GetDeviceInfoResponse.status:type_name -> switchagent.v1.Status
@@ -1902,37 +2490,52 @@ var file_internal_agent_proto_switch_agent_proto_depIdxs = []int32{
 	0,  // 22: switchagent.v1.VLANAuthorityResponse.status:type_name -> switchagent.v1.Status
 	27, // 23: switchagent.v1.VLANAuthorityResponse.result:type_name -> switchagent.v1.VLANAuthorityResult
 	0,  // 24: switchagent.v1.ReleaseVLANAuthorityResponse.status:type_name -> switchagent.v1.Status
-	1,  // 25: switchagent.v1.SwitchAgentService.GetDeviceInfo:input_type -> switchagent.v1.GetDeviceInfoRequest
-	4,  // 26: switchagent.v1.SwitchAgentService.ListInterfaces:input_type -> switchagent.v1.ListInterfacesRequest
-	6,  // 27: switchagent.v1.SwitchAgentService.SetInterfaceAdminStatus:input_type -> switchagent.v1.SetInterfaceAdminStatusRequest
-	16, // 28: switchagent.v1.SwitchAgentService.SetInterfaceAliasName:input_type -> switchagent.v1.SetInterfaceAliasNameRequest
-	14, // 29: switchagent.v1.SwitchAgentService.GetInterface:input_type -> switchagent.v1.GetInterfaceRequest
-	11, // 30: switchagent.v1.SwitchAgentService.GetInterfaceNeighbor:input_type -> switchagent.v1.GetInterfaceNeighborRequest
-	8,  // 31: switchagent.v1.SwitchAgentService.ListPorts:input_type -> switchagent.v1.ListPortsRequest
-	18, // 32: switchagent.v1.SwitchAgentService.SaveConfig:input_type -> switchagent.v1.SaveConfigRequest
-	22, // 33: switchagent.v1.SwitchAgentService.GetVLAN:input_type -> switchagent.v1.GetVLANRequest
-	24, // 34: switchagent.v1.SwitchAgentService.EnsureVLAN:input_type -> switchagent.v1.EnsureVLANRequest
-	28, // 35: switchagent.v1.SwitchAgentService.GetVLANAuthority:input_type -> switchagent.v1.GetVLANAuthorityRequest
-	26, // 36: switchagent.v1.SwitchAgentService.ReconcileVLANAuthority:input_type -> switchagent.v1.VLANAuthorityRequest
-	30, // 37: switchagent.v1.SwitchAgentService.ReleaseVLANAuthority:input_type -> switchagent.v1.ReleaseVLANAuthorityRequest
-	2,  // 38: switchagent.v1.SwitchAgentService.GetDeviceInfo:output_type -> switchagent.v1.GetDeviceInfoResponse
-	5,  // 39: switchagent.v1.SwitchAgentService.ListInterfaces:output_type -> switchagent.v1.ListInterfacesResponse
-	7,  // 40: switchagent.v1.SwitchAgentService.SetInterfaceAdminStatus:output_type -> switchagent.v1.SetInterfaceAdminStatusResponse
-	17, // 41: switchagent.v1.SwitchAgentService.SetInterfaceAliasName:output_type -> switchagent.v1.SetInterfaceAliasNameResponse
-	15, // 42: switchagent.v1.SwitchAgentService.GetInterface:output_type -> switchagent.v1.GetInterfaceResponse
-	13, // 43: switchagent.v1.SwitchAgentService.GetInterfaceNeighbor:output_type -> switchagent.v1.GetInterfaceNeighborResponse
-	9,  // 44: switchagent.v1.SwitchAgentService.ListPorts:output_type -> switchagent.v1.ListPortsResponse
-	19, // 45: switchagent.v1.SwitchAgentService.SaveConfig:output_type -> switchagent.v1.SaveConfigResponse
-	23, // 46: switchagent.v1.SwitchAgentService.GetVLAN:output_type -> switchagent.v1.GetVLANResponse
-	25, // 47: switchagent.v1.SwitchAgentService.EnsureVLAN:output_type -> switchagent.v1.EnsureVLANResponse
-	29, // 48: switchagent.v1.SwitchAgentService.GetVLANAuthority:output_type -> switchagent.v1.VLANAuthorityResponse
-	29, // 49: switchagent.v1.SwitchAgentService.ReconcileVLANAuthority:output_type -> switchagent.v1.VLANAuthorityResponse
-	31, // 50: switchagent.v1.SwitchAgentService.ReleaseVLANAuthority:output_type -> switchagent.v1.ReleaseVLANAuthorityResponse
-	38, // [38:51] is the sub-list for method output_type
-	25, // [25:38] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	34, // 25: switchagent.v1.PortBreakout.children:type_name -> switchagent.v1.PortBreakoutChild
+	0,  // 26: switchagent.v1.PortBreakoutResponse.status:type_name -> switchagent.v1.Status
+	35, // 27: switchagent.v1.PortBreakoutResponse.result:type_name -> switchagent.v1.PortBreakout
+	0,  // 28: switchagent.v1.NetworkResponse.status:type_name -> switchagent.v1.Status
+	38, // 29: switchagent.v1.NetworkResponse.result:type_name -> switchagent.v1.NetworkResult
+	1,  // 30: switchagent.v1.SwitchAgentService.GetDeviceInfo:input_type -> switchagent.v1.GetDeviceInfoRequest
+	4,  // 31: switchagent.v1.SwitchAgentService.ListInterfaces:input_type -> switchagent.v1.ListInterfacesRequest
+	6,  // 32: switchagent.v1.SwitchAgentService.SetInterfaceAdminStatus:input_type -> switchagent.v1.SetInterfaceAdminStatusRequest
+	16, // 33: switchagent.v1.SwitchAgentService.SetInterfaceAliasName:input_type -> switchagent.v1.SetInterfaceAliasNameRequest
+	14, // 34: switchagent.v1.SwitchAgentService.GetInterface:input_type -> switchagent.v1.GetInterfaceRequest
+	11, // 35: switchagent.v1.SwitchAgentService.GetInterfaceNeighbor:input_type -> switchagent.v1.GetInterfaceNeighborRequest
+	8,  // 36: switchagent.v1.SwitchAgentService.ListPorts:input_type -> switchagent.v1.ListPortsRequest
+	18, // 37: switchagent.v1.SwitchAgentService.SaveConfig:input_type -> switchagent.v1.SaveConfigRequest
+	22, // 38: switchagent.v1.SwitchAgentService.GetVLAN:input_type -> switchagent.v1.GetVLANRequest
+	24, // 39: switchagent.v1.SwitchAgentService.EnsureVLAN:input_type -> switchagent.v1.EnsureVLANRequest
+	28, // 40: switchagent.v1.SwitchAgentService.GetVLANAuthority:input_type -> switchagent.v1.GetVLANAuthorityRequest
+	26, // 41: switchagent.v1.SwitchAgentService.ReconcileVLANAuthority:input_type -> switchagent.v1.VLANAuthorityRequest
+	30, // 42: switchagent.v1.SwitchAgentService.ReleaseVLANAuthority:input_type -> switchagent.v1.ReleaseVLANAuthorityRequest
+	32, // 43: switchagent.v1.SwitchAgentService.GetPortBreakout:input_type -> switchagent.v1.GetPortBreakoutRequest
+	33, // 44: switchagent.v1.SwitchAgentService.ReconcilePortBreakout:input_type -> switchagent.v1.PortBreakoutRequest
+	37, // 45: switchagent.v1.SwitchAgentService.GetNetworkResource:input_type -> switchagent.v1.NetworkRequest
+	37, // 46: switchagent.v1.SwitchAgentService.EnsureNetworkResource:input_type -> switchagent.v1.NetworkRequest
+	37, // 47: switchagent.v1.SwitchAgentService.RecoverNetworkResource:input_type -> switchagent.v1.NetworkRequest
+	2,  // 48: switchagent.v1.SwitchAgentService.GetDeviceInfo:output_type -> switchagent.v1.GetDeviceInfoResponse
+	5,  // 49: switchagent.v1.SwitchAgentService.ListInterfaces:output_type -> switchagent.v1.ListInterfacesResponse
+	7,  // 50: switchagent.v1.SwitchAgentService.SetInterfaceAdminStatus:output_type -> switchagent.v1.SetInterfaceAdminStatusResponse
+	17, // 51: switchagent.v1.SwitchAgentService.SetInterfaceAliasName:output_type -> switchagent.v1.SetInterfaceAliasNameResponse
+	15, // 52: switchagent.v1.SwitchAgentService.GetInterface:output_type -> switchagent.v1.GetInterfaceResponse
+	13, // 53: switchagent.v1.SwitchAgentService.GetInterfaceNeighbor:output_type -> switchagent.v1.GetInterfaceNeighborResponse
+	9,  // 54: switchagent.v1.SwitchAgentService.ListPorts:output_type -> switchagent.v1.ListPortsResponse
+	19, // 55: switchagent.v1.SwitchAgentService.SaveConfig:output_type -> switchagent.v1.SaveConfigResponse
+	23, // 56: switchagent.v1.SwitchAgentService.GetVLAN:output_type -> switchagent.v1.GetVLANResponse
+	25, // 57: switchagent.v1.SwitchAgentService.EnsureVLAN:output_type -> switchagent.v1.EnsureVLANResponse
+	29, // 58: switchagent.v1.SwitchAgentService.GetVLANAuthority:output_type -> switchagent.v1.VLANAuthorityResponse
+	29, // 59: switchagent.v1.SwitchAgentService.ReconcileVLANAuthority:output_type -> switchagent.v1.VLANAuthorityResponse
+	31, // 60: switchagent.v1.SwitchAgentService.ReleaseVLANAuthority:output_type -> switchagent.v1.ReleaseVLANAuthorityResponse
+	36, // 61: switchagent.v1.SwitchAgentService.GetPortBreakout:output_type -> switchagent.v1.PortBreakoutResponse
+	36, // 62: switchagent.v1.SwitchAgentService.ReconcilePortBreakout:output_type -> switchagent.v1.PortBreakoutResponse
+	39, // 63: switchagent.v1.SwitchAgentService.GetNetworkResource:output_type -> switchagent.v1.NetworkResponse
+	39, // 64: switchagent.v1.SwitchAgentService.EnsureNetworkResource:output_type -> switchagent.v1.NetworkResponse
+	39, // 65: switchagent.v1.SwitchAgentService.RecoverNetworkResource:output_type -> switchagent.v1.NetworkResponse
+	48, // [48:66] is the sub-list for method output_type
+	30, // [30:48] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_internal_agent_proto_switch_agent_proto_init() }
@@ -1946,7 +2549,7 @@ func file_internal_agent_proto_switch_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_agent_proto_switch_agent_proto_rawDesc), len(file_internal_agent_proto_switch_agent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

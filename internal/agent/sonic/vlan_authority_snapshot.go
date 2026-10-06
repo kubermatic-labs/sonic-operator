@@ -51,8 +51,8 @@ func validateVLANAuthority(r *agent.VLANAuthorityRequest) error {
 	}
 	seen := map[string]bool{}
 	for _, member := range r.VLAN.Members {
-		if _, valid := ethernetNumber(member.InterfaceName); !valid {
-			return fmt.Errorf("member must use a canonical Ethernet name")
+		if !vlanMemberNameValid(member.InterfaceName) {
+			return fmt.Errorf("member must use a canonical Ethernet or PortChannel name")
 		}
 		if member.TaggingMode != "tagged" && member.TaggingMode != "untagged" {
 			return fmt.Errorf("tagging mode must be tagged or untagged")
@@ -182,8 +182,8 @@ func vlanAuthorityTargetSafe(target vlanChangeDB, id uint32) error {
 			continue
 		}
 		name := strings.TrimPrefix(k, fmt.Sprintf("VLAN_MEMBER|Vlan%d|", id))
-		if _, valid := ethernetNumber(name); !valid {
-			return fmt.Errorf("noncanonical or LAG VLAN member")
+		if !vlanMemberNameValid(name) {
+			return fmt.Errorf("noncanonical VLAN member")
 		}
 		if len(fields) != 1 || (fields["tagging_mode"] != "tagged" && fields["tagging_mode"] != "untagged") {
 			return fmt.Errorf("unknown member fields or invalid tagging mode")
@@ -213,8 +213,8 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 		}
 	}
 	for name := range ports {
-		if len(db["PORT|"+name]) == 0 {
-			return fmt.Errorf("desired or removed member PORT not found")
+		if err := vlanLAGMemberSafe(db, name); err != nil {
+			return err
 		}
 	}
 	for k, fields := range db {
@@ -297,7 +297,12 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 			}
 		}
 		for name, mode := range ports {
-			if k == "PORT|"+name {
+			if k == "PORT|"+name || k == "PORTCHANNEL|"+name {
+				continue
+			}
+			if lagL3PortChannelName.MatchString(name) && strings.HasPrefix(k, "PORTCHANNEL_MEMBER|"+name+"|") {
+				// vlanLAGMemberSafe already checked the exact member grammar and
+				// each physical member's VLAN, routed and other-LAG dependencies.
 				continue
 			}
 			if strings.HasPrefix(k, "VLAN_MEMBER|") && strings.HasSuffix(k, "|"+name) {

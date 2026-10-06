@@ -94,6 +94,11 @@ func (m *SonicAgent) ReconcileVLANAuthority(ctx context.Context, request *agent.
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
 	}
+	breakoutUnlock, err := m.guardBreakoutWrites(ctx)
+	if err != nil {
+		return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, err.Error())
+	}
+	defer breakoutUnlock()
 	db, raw, err := m.vlanChangeSnapshot(ctx)
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
@@ -365,7 +370,12 @@ func (m *SonicAgent) lockOrdinaryConfig(ctx context.Context, id uint32) (func(),
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
 	}
 	if m.journalDir == "" {
-		return m.configMutex.Unlock, nil
+		breakoutUnlock, err := m.guardBreakoutWrites(ctx)
+		if err != nil {
+			m.configMutex.Unlock()
+			return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, err.Error())
+		}
+		return func() { breakoutUnlock(); m.configMutex.Unlock() }, nil
 	}
 	j, err := m.lockVLANAuthorityJournal(ctx)
 	if err != nil {
@@ -388,5 +398,10 @@ func (m *SonicAgent) lockOrdinaryConfig(ctx context.Context, id uint32) (func(),
 			return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, "VLAN has authoritative ownership; release ownership before additive reconciliation")
 		}
 	}
-	return unlock, nil
+	breakoutUnlock, err := m.guardBreakoutWrites(ctx)
+	if err != nil {
+		unlock()
+		return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, err.Error())
+	}
+	return func() { breakoutUnlock(); unlock() }, nil
 }

@@ -35,6 +35,11 @@ var (
 	tlsClientCAFile         = flag.String("tls-client-ca-file", "", "Required PEM CA bundle trusted to issue client certificates")
 	allowAuthoritativeVLANs = flag.Bool("allow-authoritative-vlans", false, "Allow authoritative VLAN reconciliation and ownership release when read-only is disabled")
 	vlanAuthorityJournalDir = flag.String("vlan-authority-journal-dir", "", "Persistent root-only VLAN authority journal directory; required for authoritative writes")
+	allowBreakout           = flag.Bool("allow-breakout", false, "Allow port breakout reconciliation when read-only is disabled")
+	breakoutJournalDir      = flag.String("breakout-journal-dir", "", "Private persistent absolute breakout journal directory; required for breakout writes")
+	allowNetworkConfig      = flag.Bool("allow-network-config", false, "Allow network configuration when read-only is disabled")
+	allowFRRMigration       = flag.Bool("allow-frr-migration", false, "Allow FRR migration when network configuration is enabled and read-only is disabled")
+	networkJournalDir       = flag.String("network-journal-dir", "", "Private persistent absolute network journal directory; required for network writes and all cooperating writers after first use")
 )
 
 type proxyServer struct {
@@ -321,6 +326,8 @@ func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 		pb.SwitchAgentService_GetInterface_FullMethodName,
 		pb.SwitchAgentService_GetVLAN_FullMethodName,
 		pb.SwitchAgentService_GetVLANAuthority_FullMethodName,
+		pb.SwitchAgentService_GetPortBreakout_FullMethodName,
+		pb.SwitchAgentService_GetNetworkResource_FullMethodName,
 		pb.SwitchAgentService_GetInterfaceNeighbor_FullMethodName:
 		return handler(ctx, req)
 	default:
@@ -329,6 +336,19 @@ func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 }
 
 func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool, allowAuthoritative ...bool) (*grpc.Server, error) {
+	return newGRPCServerWithBreakout(certFile, keyFile, clientCAFile, readOnly, len(allowAuthoritative) == 1 && allowAuthoritative[0], false)
+}
+
+func newGRPCServerWithBreakout(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout bool) (*grpc.Server, error) {
+	return newGRPCServerWithNetwork(certFile, keyFile, clientCAFile, readOnly, allowAuthoritative, allowBreakout, false)
+}
+
+func newGRPCServerWithNetwork(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork bool) (*grpc.Server, error) {
+	return newGRPCServerWithFRRMigration(certFile, keyFile, clientCAFile, readOnly, allowAuthoritative, allowBreakout, allowNetwork, false)
+}
+
+// Migration always requires its own explicit opt-in, including for journal recovery.
+func newGRPCServerWithFRRMigration(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration bool) (*grpc.Server, error) {
 	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
 	if err != nil {
 		return nil, err
@@ -337,12 +357,29 @@ func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool, allowA
 	tlsConfig.RootCAs = nil
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig))}
-	allow := len(allowAuthoritative) == 1 && allowAuthoritative[0] && !readOnly
+	allow := allowAuthoritative && !readOnly
 	opts = append(opts, grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		switch info.FullMethod {
+		case pb.SwitchAgentService_EnsureNetworkResource_FullMethodName, pb.SwitchAgentService_RecoverNetworkResource_FullMethodName:
+			if !allowNetwork || readOnly {
+				return nil, grpcstatus.Error(codes.PermissionDenied, "network configuration requires --allow-network-config=true and --read-only=false")
+			}
+			// Gate the envelope kind before spec parsing. Noncanonical kinds are
+			// rejected by ValidateNetworkRequest before any backend dispatch.
+			r, ok := req.(*pb.NetworkRequest)
+			if !ok || r == nil {
+				return nil, grpcstatus.Error(codes.InvalidArgument, "network request required")
+			}
+			if r.GetKind() == "FRRMigration" && !allowMigration {
+				return nil, grpcstatus.Error(codes.PermissionDenied, "FRR migration requires --allow-frr-migration=true")
+			}
 		case pb.SwitchAgentService_ReconcileVLANAuthority_FullMethodName, pb.SwitchAgentService_ReleaseVLANAuthority_FullMethodName:
 			if !allow {
 				return nil, grpcstatus.Error(codes.PermissionDenied, "authoritative VLANs require --allow-authoritative-vlans=true and --read-only=false")
+			}
+		case pb.SwitchAgentService_ReconcilePortBreakout_FullMethodName:
+			if !allowBreakout || readOnly {
+				return nil, grpcstatus.Error(codes.PermissionDenied, "port breakout requires --allow-breakout=true and --read-only=false")
 			}
 		}
 		return handler(ctx, req)
@@ -365,13 +402,19 @@ func StartServer() {
 	flag.Parse()
 
 	// Validate security configuration before opening a listener or contacting the backend.
-	s, err := newGRPCServer(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs)
+	s, err := newGRPCServerWithFRRMigration(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration)
 	if err != nil {
 		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}
 	defer s.Stop()
 	if *allowAuthoritativeVLANs && !*readOnly && *vlanAuthorityJournalDir == "" {
 		log.Fatal("--vlan-authority-journal-dir is required when authoritative VLANs are enabled")
+	}
+	if *allowBreakout && !*readOnly && *breakoutJournalDir == "" {
+		log.Fatal("--breakout-journal-dir is required when breakout writes are enabled")
+	}
+	if *allowNetworkConfig && !*readOnly && *networkJournalDir == "" {
+		log.Fatal("--network-journal-dir is required when network writes are enabled")
 	}
 
 	swAgent, err := sonic.NewSonicRedisAgent(*redisAddr)
@@ -380,6 +423,12 @@ func StartServer() {
 	}
 	if err := configureVLANAuthorityJournal(swAgent, *vlanAuthorityJournalDir, *allowAuthoritativeVLANs, *readOnly); err != nil {
 		log.Fatalf("invalid VLAN authority journal configuration: %v", err)
+	}
+	if err := configureBreakoutJournal(swAgent, *breakoutJournalDir, *allowBreakout, *readOnly); err != nil {
+		log.Fatalf("invalid breakout journal configuration: %v", err)
+	}
+	if err := configureNetworkJournal(swAgent, *networkJournalDir, *allowNetworkConfig, *readOnly); err != nil {
+		log.Fatalf("invalid network journal configuration: %v", err)
 	}
 
 	pb.RegisterSwitchAgentServiceServer(s, NewProxyServer(swAgent))

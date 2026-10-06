@@ -57,6 +57,9 @@ func (m *SonicAgent) ConfigureVLANAuthorityJournal(dir string) error {
 		return fmt.Errorf("VLAN authority journal requires root")
 	}
 	dir = filepath.Clean(dir)
+	if dir == m.breakoutJournalDir || dir == m.networkJournalDir {
+		return fmt.Errorf("VLAN, breakout and network journals require separate directories")
+	}
 	if m.journalDir != "" && m.journalDir != dir {
 		return fmt.Errorf("journal directory already configured")
 	}
