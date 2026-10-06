@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,7 +41,11 @@ type SonicAgent struct {
 	saveConfig  func(context.Context) *agent.Status
 	versionInfo func() (map[string]string, error)
 	configMutex sync.Mutex
-	configDirty bool // A failed write/save may leave Redis and persisted config inconsistent.
+	configDirty bool                 // A failed write/save may leave Redis and persisted config inconsistent.
+	journalDir  string               // Explicit persistent root-only VLAN authority journal.
+	journalSync func(*os.File) error // Optional directory fsync implementation.
+
+	verifyVLANRuntime func(context.Context, uint32, vlanChangeDB) error // Optional single APPL_DB observation, for tests.
 }
 
 func getRedisDBIDByName(name string) int {
@@ -313,6 +318,26 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 }
 
 func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
+	unlock, status := m.lockOrdinaryConfig(ctx, 0)
+	if status != nil {
+		return status
+	}
+	defer unlock()
+	m.configDirty = true
+	if status := m.saveConfigLocked(ctx); status != nil && status.Code != 0 {
+		return status
+	}
+	m.configDirty = false
+	return nil
+}
+
+// saveConfigLocked is for callers already holding configMutex and, when
+// configured, the journal lock. Authority recovery intentionally bypasses the
+// ordinary pending guard while persisting its own recorded operation.
+func (m *SonicAgent) saveConfigLocked(ctx context.Context) *agent.Status {
+	if err := ctx.Err(); err != nil {
+		return errors.NewErrorStatus(errors.SERVER_ERROR, err.Error())
+	}
 	if m.saveConfig != nil {
 		return m.saveConfig(ctx)
 	}
@@ -329,10 +354,19 @@ func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
 	}()
 
 	obj := conn.Object("org.SONiC.HostService", "/org/SONiC/HostService/config")
-	call := obj.CallWithContext(ctx, "save", 0, "")
-	if call.Err != nil {
-		log.Printf("D-Bus call failed: %v", call.Err)
-		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: %v", call.Err))
+	return saveConfigViaDBus(ctx, obj.CallWithContext)
+}
+
+func saveConfigViaDBus(ctx context.Context, callWithContext func(context.Context, string, dbus.Flags, ...any) *dbus.Call) *agent.Status {
+	call := callWithContext(ctx, "org.SONiC.HostService.config.save", 0, "")
+	var exitCode int32
+	var output string
+	if err := call.Store(&exitCode, &output); err != nil {
+		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: %v", err))
+	}
+	// HostService output may contain sensitive config; report only the exit code.
+	if exitCode != 0 {
+		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: exit code %d", exitCode))
 	}
 
 	log.Printf("Config saved successfully via D-Bus")
@@ -662,8 +696,11 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	}
 	// SaveConfig persists the whole DB, so serialize setters and retain uncertain
 	// persistence across requests rather than treating matching Redis values as saved.
-	m.configMutex.Lock()
-	defer m.configMutex.Unlock()
+	unlock, status := m.lockOrdinaryConfig(ctx, 0)
+	if status != nil {
+		return nil, status
+	}
+	defer unlock()
 
 	configDB, err := m.Connect("CONFIG_DB")
 	if err != nil {
@@ -688,7 +725,7 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 		}
 	}
 	if m.configDirty {
-		if status := m.SaveConfig(ctx); status != nil {
+		if status := m.saveConfigLocked(ctx); status != nil {
 			if changed {
 				// Request cancellation must not prevent restoring the pre-write value.
 				rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RedisDefaultTimeout)

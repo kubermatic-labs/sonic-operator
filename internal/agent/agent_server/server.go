@@ -26,13 +26,15 @@ import (
 )
 
 var (
-	port            = flag.Int("port", 50051, "The server port")
-	redisAddr       = flag.String("redis-addr", "127.0.0.1:6379", "The Redis address")
-	bindAddress     = flag.String("bind-address", "127.0.0.1", "The server bind address")
-	readOnly        = flag.Bool("read-only", true, "Only allow explicitly approved read RPCs")
-	tlsCertFile     = flag.String("tls-cert-file", "", "Required PEM server certificate file")
-	tlsKeyFile      = flag.String("tls-key-file", "", "Required PEM server private key file")
-	tlsClientCAFile = flag.String("tls-client-ca-file", "", "Required PEM CA bundle trusted to issue client certificates")
+	port                    = flag.Int("port", 50051, "The server port")
+	redisAddr               = flag.String("redis-addr", "127.0.0.1:6379", "The Redis address")
+	bindAddress             = flag.String("bind-address", "127.0.0.1", "The server bind address")
+	readOnly                = flag.Bool("read-only", true, "Only allow explicitly approved read RPCs")
+	tlsCertFile             = flag.String("tls-cert-file", "", "Required PEM server certificate file")
+	tlsKeyFile              = flag.String("tls-key-file", "", "Required PEM server private key file")
+	tlsClientCAFile         = flag.String("tls-client-ca-file", "", "Required PEM CA bundle trusted to issue client certificates")
+	allowAuthoritativeVLANs = flag.Bool("allow-authoritative-vlans", false, "Allow authoritative VLAN reconciliation and ownership release when read-only is disabled")
+	vlanAuthorityJournalDir = flag.String("vlan-authority-journal-dir", "", "Persistent root-only VLAN authority journal directory; required for authoritative writes")
 )
 
 type proxyServer struct {
@@ -317,6 +319,8 @@ func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 		pb.SwitchAgentService_ListInterfaces_FullMethodName,
 		pb.SwitchAgentService_ListPorts_FullMethodName,
 		pb.SwitchAgentService_GetInterface_FullMethodName,
+		pb.SwitchAgentService_GetVLAN_FullMethodName,
+		pb.SwitchAgentService_GetVLANAuthority_FullMethodName,
 		pb.SwitchAgentService_GetInterfaceNeighbor_FullMethodName:
 		return handler(ctx, req)
 	default:
@@ -324,7 +328,7 @@ func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 	}
 }
 
-func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool) (*grpc.Server, error) {
+func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool, allowAuthoritative ...bool) (*grpc.Server, error) {
 	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
 	if err != nil {
 		return nil, err
@@ -333,8 +337,18 @@ func newGRPCServer(certFile, keyFile, clientCAFile string, readOnly bool) (*grpc
 	tlsConfig.RootCAs = nil
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig))}
+	allow := len(allowAuthoritative) == 1 && allowAuthoritative[0] && !readOnly
+	opts = append(opts, grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		switch info.FullMethod {
+		case pb.SwitchAgentService_ReconcileVLANAuthority_FullMethodName, pb.SwitchAgentService_ReleaseVLANAuthority_FullMethodName:
+			if !allow {
+				return nil, grpcstatus.Error(codes.PermissionDenied, "authoritative VLANs require --allow-authoritative-vlans=true and --read-only=false")
+			}
+		}
+		return handler(ctx, req)
+	}))
 	if readOnly {
-		opts = append(opts, grpc.UnaryInterceptor(readOnlyInterceptor),
+		opts = append(opts, grpc.ChainUnaryInterceptor(readOnlyInterceptor),
 			// No streaming RPCs are approved, including reflection and unknown methods.
 			grpc.StreamInterceptor(func(any, grpc.ServerStream, *grpc.StreamServerInfo, grpc.StreamHandler) error {
 				return grpcstatus.Error(codes.PermissionDenied, "agent is read-only: streaming RPCs are not allowed")
@@ -351,15 +365,21 @@ func StartServer() {
 	flag.Parse()
 
 	// Validate security configuration before opening a listener or contacting the backend.
-	s, err := newGRPCServer(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly)
+	s, err := newGRPCServer(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs)
 	if err != nil {
 		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}
 	defer s.Stop()
+	if *allowAuthoritativeVLANs && !*readOnly && *vlanAuthorityJournalDir == "" {
+		log.Fatal("--vlan-authority-journal-dir is required when authoritative VLANs are enabled")
+	}
 
 	swAgent, err := sonic.NewSonicRedisAgent(*redisAddr)
 	if err != nil {
 		log.Fatalf("failed to create SonicRedisAgent: %v", err)
+	}
+	if err := configureVLANAuthorityJournal(swAgent, *vlanAuthorityJournalDir, *allowAuthoritativeVLANs, *readOnly); err != nil {
+		log.Fatalf("invalid VLAN authority journal configuration: %v", err)
 	}
 
 	pb.RegisterSwitchAgentServiceServer(s, NewProxyServer(swAgent))

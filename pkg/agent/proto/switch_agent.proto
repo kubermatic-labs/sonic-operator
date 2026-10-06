@@ -111,6 +111,71 @@ message SaveConfigResponse {
   Status status = 1;
 }
 
+message VLANMember {
+  string interface_name = 1;
+  string tagging_mode = 2;
+}
+
+message VLAN {
+  uint32 id = 1;
+  repeated VLANMember members = 2;
+}
+
+message GetVLANRequest {
+  uint32 vlan_id = 1;
+}
+
+message GetVLANResponse {
+  Status status = 1;
+  VLAN vlan = 2;
+}
+
+message EnsureVLANRequest {
+  VLAN vlan = 1;
+}
+
+message EnsureVLANResponse {
+  Status status = 1;
+  VLAN vlan = 2;
+}
+
+message VLANAuthorityRequest {
+  string owner_id = 1;
+  VLAN vlan = 2;
+  string adoption_digest = 3;
+  bool delete = 4;
+}
+
+message VLANAuthorityResult {
+  // Absent VLANs still have a snapshot digest; absence is not NOT_FOUND.
+  VLAN vlan = 1;
+  string digest = 2;
+  string owner_id = 3;
+  // CONFIG_DB verification only, not ASIC or forwarding verification.
+  bool runtime_verified = 4;
+  bool persistence_verified = 5;
+  // An unconfigured journal cannot prove that an empty owner_id means unowned.
+  bool ownership_known = 6;
+}
+
+message GetVLANAuthorityRequest {
+  uint32 vlan_id = 1;
+}
+
+message VLANAuthorityResponse {
+  Status status = 1;
+  VLANAuthorityResult result = 2;
+}
+
+message ReleaseVLANAuthorityRequest {
+  uint32 vlan_id = 1;
+  string owner_id = 2;
+}
+
+message ReleaseVLANAuthorityResponse {
+  Status status = 1;
+}
+
 // The interface service definition.
 service SwitchAgentService {
 
@@ -127,5 +192,11 @@ service SwitchAgentService {
   // gNOI alternatives
   rpc SaveConfig (SaveConfigRequest) returns (SaveConfigResponse);
 
-}
+  rpc GetVLAN(GetVLANRequest) returns (GetVLANResponse);
+  rpc EnsureVLAN(EnsureVLANRequest) returns (EnsureVLANResponse);
 
+  rpc GetVLANAuthority(GetVLANAuthorityRequest) returns (VLANAuthorityResponse);
+  rpc ReconcileVLANAuthority(VLANAuthorityRequest) returns (VLANAuthorityResponse);
+  rpc ReleaseVLANAuthority(ReleaseVLANAuthorityRequest) returns (ReleaseVLANAuthorityResponse);
+
+}

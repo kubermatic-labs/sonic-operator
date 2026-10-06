@@ -134,6 +134,126 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchInterfaceState
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLAN
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANMember
+  map:
+    fields:
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: taggingMode
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANObservedMember
+  map:
+    fields:
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: taggingMode
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANSpec
+  map:
+    fields:
+    - name: adoptionDigest
+      type:
+        scalar: string
+    - name: deletionPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANDeletionPolicy
+      default: Orphan
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANManagementPolicy
+      default: Observe
+    - name: members
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANMember
+          elementRelationship: associative
+          keys:
+          - interfaceName
+    - name: reconcilePolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANReconcilePolicy
+      default: Additive
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANReference
+    - name: vlanID
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANStatus
+  map:
+    fields:
+    - name: adoptionDigest
+      type:
+        scalar: string
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: exists
+      type:
+        scalar: boolean
+    - name: members
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLANObservedMember
+          elementRelationship: associative
+          keys:
+          - interfaceName
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: ownerID
+      type:
+        scalar: string
+    - name: persistenceVerified
+      type:
+        scalar: boolean
+    - name: runtimeVerified
+      type:
+        scalar: boolean
+    - name: targetIdentity
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANDeletionPolicy
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANManagementPolicy
+  scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANReconcilePolicy
+  scalar: string
 - name: io.k8s.api.core.v1.LocalObjectReference
   map:
     fields:
