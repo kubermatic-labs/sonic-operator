@@ -20,6 +20,7 @@ func TestSecureFlagDefaults(t *testing.T) {
 	for _, tt := range []struct{ name, want string }{
 		{"bind-address", "127.0.0.1"}, {"port", "50051"}, {"read-only", "true"},
 		{"tls-cert-file", ""}, {"tls-key-file", ""}, {"tls-client-ca-file", ""},
+		{"allow-authoritative-vlans", "false"}, {"vlan-authority-journal-dir", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			f := flag.Lookup(tt.name)
@@ -95,6 +96,8 @@ func TestReadOnlyAllowlist(t *testing.T) {
 		pb.SwitchAgentService_ListPorts_FullMethodName:            true,
 		pb.SwitchAgentService_GetInterface_FullMethodName:         true,
 		pb.SwitchAgentService_GetInterfaceNeighbor_FullMethodName: true,
+		pb.SwitchAgentService_GetVLAN_FullMethodName:              true,
+		pb.SwitchAgentService_GetVLANAuthority_FullMethodName:     true,
 	}
 	methods := []string{"/switchagent.v1.SwitchAgentService/GetFutureRead", "/other.Service/GetDeviceInfo"}
 	for _, m := range pb.SwitchAgentService_ServiceDesc.Methods {

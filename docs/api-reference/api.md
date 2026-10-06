@@ -14,6 +14,7 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 - [Switch](#switch)
 - [SwitchCredentials](#switchcredentials)
 - [SwitchInterface](#switchinterface)
+- [SwitchVLAN](#switchvlan)
 
 
 
@@ -382,6 +383,177 @@ _Appears in:_
 | `firmwareVersion` _string_ | FirmwareVersion is the firmware version running on this switch. |  |  |
 | `sku` _string_ | SKU is the stock keeping unit of this switch. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | The status of each condition is one of True, False, or Unknown. |  |  |
+
+
+#### SwitchVLAN
+
+
+
+SwitchVLAN manages Layer-2 VLAN configuration. Additive is the safe default;
+authoritative ownership requires explicit gates and a cleanup finalizer.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchVLAN` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchVLANSpec](#switchvlanspec)_ |  |  |  |
+| `status` _[SwitchVLANStatus](#switchvlanstatus)_ |  |  |  |
+
+
+#### SwitchVLANMember
+
+
+
+SwitchVLANMember declares a Layer-2 membership.
+
+
+
+_Appears in:_
+- [SwitchVLANSpec](#switchvlanspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `interfaceName` _string_ | InterfaceName is the canonical SONiC Ethernet name, not an alias or handle. |  | Pattern: `^Ethernet(0\|[1-9][0-9]*)$` <br /> |
+| `taggingMode` _string_ | TaggingMode can replace an existing mode only under Authoritative policy. |  | Enum: [tagged untagged] <br /> |
+
+
+#### SwitchVLANObservedMember
+
+
+
+SwitchVLANObservedMember includes unmanaged members, which may use interface
+names outside the Ethernet-only scope allowed in spec (for example a LAG).
+
+
+
+_Appears in:_
+- [SwitchVLANStatus](#switchvlanstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `interfaceName` _string_ |  |  |  |
+| `taggingMode` _string_ |  |  |  |
+
+
+#### SwitchVLANReference
+
+
+
+SwitchVLANReference identifies the cluster-scoped Switch to configure.
+
+
+
+_Appears in:_
+- [SwitchVLANSpec](#switchvlanspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the name of an existing Switch. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+
+
+#### SwitchVLANSpec
+
+
+
+SwitchVLANSpec declares a VLAN and the members that must exist.
+
+
+
+_Appears in:_
+- [SwitchVLAN](#switchvlan)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[SwitchVLANReference](#switchvlanreference)_ | SwitchRef is immutable. Only one CR may claim a switch/VLAN pair. |  |  |
+| `vlanID` _integer_ | VLANID is immutable and excludes reserved VLAN IDs. |  | Maximum: 4094 <br />Minimum: 1 <br /> |
+| `managementPolicy` _[VLANManagementPolicy](#vlanmanagementpolicy)_ | ManagementPolicy defaults to observation. Manage also requires both the<br />controller's observe-only gate and the agent's read-only gate to be disabled. | Observe | Enum: [Observe Manage] <br /> |
+| `reconcilePolicy` _[VLANReconcilePolicy](#vlanreconcilepolicy)_ | ReconcilePolicy defaults to Additive. Authoritative owns the entire VLAN<br />membership, pruning omitted members and replacing tagging modes. | Additive | Enum: [Additive Authoritative] <br /> |
+| `deletionPolicy` _[VLANDeletionPolicy](#vlandeletionpolicy)_ | DeletionPolicy defaults to Orphan. Delete applies only to agent-confirmed<br />ownership by this CR UID, with all authoritative write gates enabled. | Orphan | Enum: [Orphan Delete] <br /> |
+| `adoptionDigest` _string_ | AdoptionDigest approves the exact agent snapshot for first takeover of an<br />existing VLAN. Review status.adoptionDigest; newly created VLANs need none. |  | Pattern: `^[a-f0-9]\{64\}$` <br /> |
+| `members` _[SwitchVLANMember](#switchvlanmember) array_ | Members are additive by default, or the complete set under Authoritative. |  |  |
+
+
+#### SwitchVLANStatus
+
+
+
+SwitchVLANStatus reports configuration, not dataplane or forwarding health.
+
+
+
+_Appears in:_
+- [SwitchVLAN](#switchvlan)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `observedGeneration` _integer_ | ObservedGeneration is the generation last attempted by the controller. |  |  |
+| `adoptionDigest` _string_ | AdoptionDigest is the latest agent snapshot digest for explicit review. |  |  |
+| `ownerID` _string_ | OwnerID is the last confirmed agent owner UID, never a grant of ownership. |  |  |
+| `targetIdentity` _string_ | TargetIdentity binds ownership to the Switch UID and explicit endpoint. |  |  |
+| `runtimeVerified` _boolean_ | RuntimeVerified confirms CONFIG_DB only, not ASIC state or forwarding. |  |  |
+| `persistenceVerified` _boolean_ | PersistenceVerified confirms the agent's durable configuration save. |  |  |
+| `exists` _boolean_ | Exists is unset when existence could not be determined in this attempt. |  |  |
+| `members` _[SwitchVLANObservedMember](#switchvlanobservedmember) array_ | Members is the latest successful observation, including unmanaged members. |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Ready and Synced are true only after confirming the requested configuration. |  |  |
+
+
+#### VLANDeletionPolicy
+
+_Underlying type:_ _string_
+
+VLANDeletionPolicy selects release-only or guarded deletion for owned VLANs.
+
+_Validation:_
+- Enum: [Orphan Delete]
+
+_Appears in:_
+- [SwitchVLANSpec](#switchvlanspec)
+
+| Field | Description |
+| --- | --- |
+| `Orphan` |  |
+| `Delete` |  |
+
+
+#### VLANManagementPolicy
+
+_Underlying type:_ _string_
+
+VLANManagementPolicy controls whether VLAN configuration may be changed.
+
+_Validation:_
+- Enum: [Observe Manage]
+
+_Appears in:_
+- [SwitchVLANSpec](#switchvlanspec)
+
+| Field | Description |
+| --- | --- |
+| `Observe` |  |
+| `Manage` |  |
+
+
+#### VLANReconcilePolicy
+
+_Underlying type:_ _string_
+
+VLANReconcilePolicy selects additive assertions or entire VLAN membership.
+
+_Validation:_
+- Enum: [Additive Authoritative]
+
+_Appears in:_
+- [SwitchVLANSpec](#switchvlanspec)
+
+| Field | Description |
+| --- | --- |
+| `Additive` |  |
+| `Authoritative` |  |
 
 
 #### Volume

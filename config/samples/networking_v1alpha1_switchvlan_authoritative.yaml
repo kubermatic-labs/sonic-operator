@@ -1,0 +1,17 @@
+# Preview only. This sample never enables writes or approves adoption.
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchVLAN
+metadata:
+  name: switch-sample-vlan200
+spec:
+  switchRef:
+    name: switch-sample
+  vlanID: 200
+  managementPolicy: Observe
+  reconcilePolicy: Authoritative
+  deletionPolicy: Orphan
+  # This is the ENTIRE desired membership; omitted members will be pruned
+  # only after explicit adoption and all controller/agent write gates allow it.
+  members:
+    - interfaceName: Ethernet0
+      taggingMode: tagged

@@ -76,6 +76,8 @@ export default withMermaid({
           { text: 'Getting started', link: '/usage/getting-started' },
           { text: 'Provisioning', link: '/usage/provisioning' },
           { text: 'Agent', link: '/usage/agent' },
+          { text: 'Layer-2 VLANs', link: '/usage/vlans' },
+          { text: 'Authoritative VLANs', link: '/usage/vlan-authoritative' },
         ]
       },
       {

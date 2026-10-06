@@ -1,0 +1,16 @@
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchVLAN
+metadata:
+  name: switch-sample-vlan100
+spec:
+  switchRef:
+    name: switch-sample
+  vlanID: 100
+  managementPolicy: Observe
+  reconcilePolicy: Additive
+  deletionPolicy: Orphan
+  members:
+    - interfaceName: Ethernet0
+      taggingMode: untagged
+    - interfaceName: Ethernet129
+      taggingMode: untagged

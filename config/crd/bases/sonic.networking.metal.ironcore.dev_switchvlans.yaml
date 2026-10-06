@@ -1,0 +1,272 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: switchvlans.sonic.networking.metal.ironcore.dev
+spec:
+  group: sonic.networking.metal.ironcore.dev
+  names:
+    kind: SwitchVLAN
+    listKind: SwitchVLANList
+    plural: switchvlans
+    singular: switchvlan
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.switchRef.name
+      name: Switch
+      type: string
+    - jsonPath: .spec.vlanID
+      name: VLAN
+      type: integer
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SwitchVLAN manages Layer-2 VLAN configuration. Additive is the safe default;
+          authoritative ownership requires explicit gates and a cleanup finalizer.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SwitchVLANSpec declares a VLAN and the members that must
+              exist.
+            properties:
+              adoptionDigest:
+                description: |-
+                  AdoptionDigest approves the exact agent snapshot for first takeover of an
+                  existing VLAN. Review status.adoptionDigest; newly created VLANs need none.
+                pattern: ^[a-f0-9]{64}$
+                type: string
+              deletionPolicy:
+                default: Orphan
+                description: |-
+                  DeletionPolicy defaults to Orphan. Delete applies only to agent-confirmed
+                  ownership by this CR UID, with all authoritative write gates enabled.
+                enum:
+                - Orphan
+                - Delete
+                type: string
+              managementPolicy:
+                default: Observe
+                description: |-
+                  ManagementPolicy defaults to observation. Manage also requires both the
+                  controller's observe-only gate and the agent's read-only gate to be disabled.
+                enum:
+                - Observe
+                - Manage
+                type: string
+              members:
+                description: Members are additive by default, or the complete set
+                  under Authoritative.
+                items:
+                  description: SwitchVLANMember declares a Layer-2 membership.
+                  properties:
+                    interfaceName:
+                      description: InterfaceName is the canonical SONiC Ethernet name,
+                        not an alias or handle.
+                      pattern: ^Ethernet(0|[1-9][0-9]*)$
+                      type: string
+                    taggingMode:
+                      description: TaggingMode can replace an existing mode only under
+                        Authoritative policy.
+                      enum:
+                      - tagged
+                      - untagged
+                      type: string
+                  required:
+                  - interfaceName
+                  - taggingMode
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - interfaceName
+                x-kubernetes-list-type: map
+              reconcilePolicy:
+                default: Additive
+                description: |-
+                  ReconcilePolicy defaults to Additive. Authoritative owns the entire VLAN
+                  membership, pruning omitted members and replacing tagging modes.
+                enum:
+                - Additive
+                - Authoritative
+                type: string
+              switchRef:
+                description: SwitchRef is immutable. Only one CR may claim a switch/VLAN
+                  pair.
+                properties:
+                  name:
+                    description: Name is the name of an existing Switch.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: switchRef is immutable
+                  rule: self == oldSelf
+              vlanID:
+                description: VLANID is immutable and excludes reserved VLAN IDs.
+                format: int32
+                maximum: 4094
+                minimum: 1
+                type: integer
+                x-kubernetes-validations:
+                - message: vlanID is immutable
+                  rule: self == oldSelf
+            required:
+            - switchRef
+            - vlanID
+            type: object
+          status:
+            description: SwitchVLANStatus reports configuration, not dataplane or
+              forwarding health.
+            properties:
+              adoptionDigest:
+                description: AdoptionDigest is the latest agent snapshot digest for
+                  explicit review.
+                type: string
+              conditions:
+                description: Ready and Synced are true only after confirming the requested
+                  configuration.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              exists:
+                description: Exists is unset when existence could not be determined
+                  in this attempt.
+                type: boolean
+              members:
+                description: Members is the latest successful observation, including
+                  unmanaged members.
+                items:
+                  description: |-
+                    SwitchVLANObservedMember includes unmanaged members, which may use interface
+                    names outside the Ethernet-only scope allowed in spec (for example a LAG).
+                  properties:
+                    interfaceName:
+                      type: string
+                    taggingMode:
+                      type: string
+                  required:
+                  - interfaceName
+                  - taggingMode
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - interfaceName
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: ObservedGeneration is the generation last attempted by
+                  the controller.
+                format: int64
+                type: integer
+              ownerID:
+                description: OwnerID is the last confirmed agent owner UID, never
+                  a grant of ownership.
+                type: string
+              persistenceVerified:
+                description: PersistenceVerified confirms the agent's durable configuration
+                  save.
+                type: boolean
+              runtimeVerified:
+                description: RuntimeVerified confirms CONFIG_DB only, not ASIC state
+                  or forwarding.
+                type: boolean
+              targetIdentity:
+                description: TargetIdentity binds ownership to the Switch UID and
+                  explicit endpoint.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

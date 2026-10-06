@@ -29,6 +29,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchInterfaceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchInterfaceStatus"):
 		return &apiv1alpha1.SwitchInterfaceStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLAN"):
+		return &apiv1alpha1.SwitchVLANApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANMember"):
+		return &apiv1alpha1.SwitchVLANMemberApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANObservedMember"):
+		return &apiv1alpha1.SwitchVLANObservedMemberApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANReference"):
+		return &apiv1alpha1.SwitchVLANReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANSpec"):
+		return &apiv1alpha1.SwitchVLANSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANStatus"):
+		return &apiv1alpha1.SwitchVLANStatusApplyConfiguration{}
 
 	}
 	return nil
