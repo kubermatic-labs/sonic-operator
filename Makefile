@@ -151,6 +151,9 @@ proto:
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		$(PROTO_DIR)/switch_agent.proto
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		internal/agent/hostproto/host.proto
 
 
 ##@ Build
@@ -164,6 +167,7 @@ docs: crd-ref-docs ## Generate API reference documentation.
 build-agent: fmt vet ## Build agent binary.
 	go build -o bin/agent_server cmd/agent/main.go
 	go build -o bin/agent_cli cmd/agent_cli/main.go
+	go build -o bin/sonic-operator-host-recovery ./cmd/host-recovery
 
 .PHONY: provisioning-server
 provisioning-server: fmt vet ## Build provisioning-server binary.

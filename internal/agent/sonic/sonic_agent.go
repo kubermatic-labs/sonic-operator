@@ -18,6 +18,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	errors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 
 	"github.com/redis/go-redis/v9"
@@ -59,8 +60,10 @@ type SonicAgent struct {
 	breakoutCAS            func(context.Context, string, vlanChangeDB, vlanChangeDB) (bool, error)
 	verifyBreakoutRuntime  func(context.Context, *breakoutPlatform, vlanChangeDB) error
 
-	networkJournalDir string
-	planNetwork       func(vlanChangeDB, *agent.NetworkRequest) (*networkPlan, error)
+	networkJournalDir    string
+	hostJournalDir       string
+	hostRecoverySnapshot func(context.Context) (host.Snapshot, error)
+	planNetwork          func(vlanChangeDB, *agent.NetworkRequest) (*networkPlan, error)
 }
 
 func getRedisDBIDByName(name string) int {

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
 
@@ -254,6 +255,9 @@ func (m *SonicAgent) guardNetworkWrites(ctx context.Context) (func(), error) {
 // check confirmed ownership too. The caller must hold the lock through save.
 func (m *SonicAgent) guardNetworkWriteState(ctx context.Context) (*networkJournalState, func(), error) {
 	if m.networkJournalDir == "" {
+		if err := host.CheckPending(m.hostJournalDir); err != nil {
+			return nil, nil, err
+		}
 		return nil, func() {}, nil
 	}
 	j, err := m.lockNetworkJournal(ctx)
@@ -270,6 +274,10 @@ func (m *SonicAgent) guardNetworkWriteState(ctx context.Context) (*networkJourna
 		}
 	}
 	if err != nil {
+		j.close()
+		return nil, nil, err
+	}
+	if err := host.CheckPending(m.hostJournalDir); err != nil {
 		j.close()
 		return nil, nil, err
 	}

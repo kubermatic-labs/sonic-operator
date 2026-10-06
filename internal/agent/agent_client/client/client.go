@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	hp "github.com/ironcore-dev/sonic-operator/internal/agent/hostproto"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
@@ -83,6 +84,12 @@ func NewDefaultSwitchAgentClient(address string, connectTimeout time.Duration) (
 func rpcTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		callTimeout := timeout
+		if method == hp.HostService_Ensure_FullMethodName {
+			callTimeout = 90 * time.Second
+		}
+		if method == hp.HostService_Get_FullMethodName || method == hp.HostService_Confirm_FullMethodName {
+			callTimeout = 15 * time.Second
+		}
 		if method == pb.SwitchAgentService_ReconcilePortBreakout_FullMethodName {
 			callTimeout = 180 * time.Second
 		}

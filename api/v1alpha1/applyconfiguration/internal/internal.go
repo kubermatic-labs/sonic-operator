@@ -59,8 +59,58 @@ var schemaYAML = typed.YAMLObject(`types:
   scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BreakoutManagementPolicy
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostResourceStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: configurationVerified
+      type:
+        scalar: boolean
+    - name: gatewayVerified
+      type:
+        scalar: boolean
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: persistenceVerified
+      type:
+        scalar: boolean
+    - name: recovery
+      type:
+        scalar: string
+    - name: runtimeVerified
+      type:
+        scalar: boolean
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostSecretKeyReference
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.MLAGPortChannel
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ManagementAddress
+  map:
+    fields:
+    - name: gateway
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP
+    - name: prefix
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkInterfaceAddress
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.Neighbor
   map:
     fields:
@@ -753,6 +803,53 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: switchRef
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchManagement
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchManagementSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchManagementSpec
+  map:
+    fields:
+    - name: addresses
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ManagementAddress
+          elementRelationship: associative
+          keys:
+          - prefix
+    - name: interface
+      type:
+        scalar: string
+      default: eth0
+    - name: mac
+      type:
+        scalar: string
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: rollbackSeconds
+      type:
+        scalar: numeric
+      default: 120
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchPortBreakout
   map:
     fields:
@@ -1115,6 +1212,40 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkVRFName
       default: default
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchSystem
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchSystemSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostResourceStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchSystemSpec
+  map:
+    fields:
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: ntp
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemNTP
+    - name: snmp
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemSNMP
+    - name: switchRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchVLAN
   map:
     fields:
@@ -1349,6 +1480,43 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: switchRef
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemNTP
+  map:
+    fields:
+    - name: adminState
+      type:
+        scalar: string
+      default: enabled
+    - name: dhcp
+      type:
+        scalar: string
+      default: enabled
+    - name: serverRole
+      type:
+        scalar: string
+      default: disabled
+    - name: servers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: sourceInterface
+      type:
+        scalar: string
+      default: eth0
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemSNMP
+  map:
+    fields:
+    - name: communitySecretRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostSecretKeyReference
+    - name: contact
+      type:
+        scalar: string
+    - name: location
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.TrafficPolicyName
   scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANDeletionPolicy
