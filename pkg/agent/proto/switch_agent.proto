@@ -32,6 +32,8 @@ message Interface {
   string operational_status = 4;
   string admin_status = 5;
   string mac_address = 6;
+  // Independent saved PORT evidence returned by the admin setter.
+  bool admin_persistence_verified = 20;
 }
 
 // The request message containing the parameters for the request.
@@ -184,6 +186,7 @@ message PortBreakoutRequest {
   string port = 1;
   string mode = 2;
   string child_admin_state = 3;
+  bool adopt_only = 4;
 }
 
 message PortBreakoutChild {
@@ -204,6 +207,7 @@ message PortBreakout {
   bool pending = 7;
   string message = 8;
   bool configuration_verified = 9;
+  bool adoption_supported = 10;
 }
 
 message PortBreakoutResponse {

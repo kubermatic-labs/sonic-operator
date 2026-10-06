@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"slices"
 	"strings"
 
 	api "github.com/ironcore-dev/sonic-operator/api/v1alpha1"
@@ -26,7 +27,7 @@ func breakoutTargetIdentity(b *api.SwitchPortBreakout, s *api.Switch) string {
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
-func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild) error {
+func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild, adoptOnly bool) error {
 	latest := &api.SwitchPortBreakout{}
 	if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(b), latest); err != nil {
 		return err
@@ -117,7 +118,7 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 			continue
 		}
 		for _, member := range vlan.Spec.Members {
-			if affected[member.InterfaceName] || !live[member.InterfaceName] {
+			if (!adoptOnly && affected[member.InterfaceName]) || !live[member.InterfaceName] {
 				return fmt.Errorf("SwitchVLAN %q references affected or unresolved interface %q", vlan.Name, member.InterfaceName)
 			}
 		}
@@ -133,11 +134,18 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 		if !affected[iface.Spec.NativeName] && live[iface.Spec.NativeName] {
 			continue
 		}
-		if _, managed := iface.Annotations[breakoutManageAdminAnnotation]; managed {
+		if breakoutHasTypedPortIntent(&iface) && (!adoptOnly || !live[iface.Spec.NativeName]) {
+			return fmt.Errorf("SwitchInterface %q has typed port intent or retained network recovery ownership", iface.Name)
+		}
+		if _, managed := iface.Annotations[breakoutManageAdminAnnotation]; managed && !adoptOnly {
 			return fmt.Errorf("SwitchInterface %q has an admin-management annotation", iface.Name)
 		}
 		if !breakoutGeneratedInterface(&iface, s) {
 			return fmt.Errorf("SwitchInterface %q is user-managed or has foreign ownership", iface.Name)
+		}
+		if adoptOnly && live[iface.Spec.NativeName] {
+			// Exact no-op adoption neither changes nor deletes referenced inventory.
+			continue
 		}
 		// References to an interface CR through ownerReferences represent another
 		// controller's intent, even if the interface itself is generated inventory.
@@ -173,13 +181,21 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 	return nil
 }
 
+// Typed intent is independent of admin opt-in and remains protected in Observe,
+// including when fields have been removed but recovery ownership is retained.
+func breakoutHasTypedPortIntent(i *api.SwitchInterface) bool {
+	_, bound := i.Annotations[networkTargetAnnotation]
+	_, recorded := i.Annotations[networkRequestAnnotation]
+	return i.Spec.Speed != nil || i.Spec.MTU != nil || i.Spec.FEC != "" || bound || recorded || slices.Contains(i.Finalizers, networkRecoveryFinalizer)
+}
+
 func breakoutGeneratedInterface(i *api.SwitchInterface, s *api.Switch) bool {
 	owner := metav1.GetControllerOf(i)
 	return s.UID != "" && owner != nil && owner.UID == s.UID && owner.Name == s.Name && owner.Kind == "Switch" && owner.APIVersion == api.GroupVersion.String() && len(i.OwnerReferences) == 1 &&
 		i.Spec.SwitchRef != nil && i.Spec.SwitchRef.Name == s.Name && i.Spec.Handle != "" && i.Name == strings.ToLower(s.Name+"-"+i.Spec.Handle)
 }
 
-func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild) error {
+func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild, adoptOnly bool) error {
 	list, err := a.ListInterfaces(ctx)
 	if err != nil {
 		return err
@@ -224,7 +240,7 @@ func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Co
 		if err != nil {
 			return err
 		}
-		if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous); err != nil {
+		if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous, adoptOnly); err != nil {
 			return err
 		}
 		i := &api.SwitchInterface{ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(s.Name + "-" + iface.Name), OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(s, api.GroupVersion.WithKind("Switch"))}}, Spec: api.SwitchInterfaceSpec{SwitchRef: &corev1.LocalObjectReference{Name: s.Name}, Handle: iface.Name, NativeName: child.Name, AdminState: admin}}
@@ -246,7 +262,10 @@ func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Co
 		if _, managed := i.Annotations[breakoutManageAdminAnnotation]; managed {
 			continue
 		}
-		if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous); err != nil {
+		if breakoutHasTypedPortIntent(&i) {
+			return fmt.Errorf("stale child %q retains typed port intent or network recovery ownership; refusing cleanup", i.Name)
+		}
+		if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous, adoptOnly); err != nil {
 			return err
 		}
 		latest := &api.SwitchInterface{}
@@ -261,6 +280,9 @@ func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Co
 		}
 		if _, managed := latest.Annotations[breakoutManageAdminAnnotation]; managed {
 			return fmt.Errorf("stale child opted into admin management before cleanup")
+		}
+		if breakoutHasTypedPortIntent(latest) {
+			return fmt.Errorf("stale child acquired typed port intent or network recovery ownership before cleanup")
 		}
 		// Both UID and resourceVersion fence a concurrent recreation or user edit.
 		if err := r.Delete(ctx, latest, client.Preconditions{UID: &latest.UID, ResourceVersion: &latest.ResourceVersion}); client.IgnoreNotFound(err) != nil {

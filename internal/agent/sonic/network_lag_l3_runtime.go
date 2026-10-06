@@ -59,6 +59,9 @@ func lagL3Run(ctx context.Context, args ...string) ([]byte, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.WaitDelay = time.Second
+	if run, ok := ctx.Value(routingCommandRunnerKey{}).(routingCommandRunner); ok {
+		return run(cmd)
+	}
 	var out lagL3BoundedOutput
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -131,6 +134,13 @@ func lagL3InterfaceRuntime(ctx context.Context, name, vrf string, addresses []st
 		}
 		valid = valid && fields["family"] == family && fields["scope"] == "global"
 		observed[address] = fields
+	}
+	if lagL3LoopbackManaged(name) {
+		kernel, err := loopbackKernelAddresses(ctx, name, addresses, lagL3Run)
+		if err != nil {
+			return false, nil, err
+		}
+		valid = valid && l.Type() == "dummy" && l.Attrs().Index > 0 && kernel
 	}
 	raw, _ := json.Marshal(map[string]any{"name": name, "vrf": vrf, "appl": observed})
 	return valid, raw, ctx.Err()

@@ -279,6 +279,7 @@ _Appears in:_
 - [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 - [SwitchEVPNSpec](#switchevpnspec)
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
+- [SwitchInterfaceSpec](#switchinterfacespec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchMLAGSpec](#switchmlagspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
@@ -363,6 +364,7 @@ _Appears in:_
 - [SwitchEVPN](#switchevpn)
 - [SwitchEVPNPeer](#switchevpnpeer)
 - [SwitchFRRMigration](#switchfrrmigration)
+- [SwitchInterfaceStatus](#switchinterfacestatus)
 - [SwitchL3Interface](#switchl3interface)
 - [SwitchMLAG](#switchmlag)
 - [SwitchPortChannel](#switchportchannel)
@@ -802,6 +804,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
 | `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `mode` _string_ | Mode selects the existing native backend; it never changes FRR mode.<br />Traditional supports the qualified peerless LeafRouter Loopback0 /32 contract. | Unified | Enum: [Unified Traditional] <br /> |
 | `vrf` _[NetworkVRFName](#networkvrfname)_ |  | default | MaxLength: 15 <br />Pattern: `^(default\|Vrf[A-Za-z0-9_-]\{1,12\})$` <br /> |
 | `localASN` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 1 <br /> |
 | `routerID` _string_ |  |  | MaxLength: 15 <br /> |
@@ -1028,6 +1031,10 @@ _Appears in:_
 | `nativeName` _string_ | NativeName is the native name of the interface on the switch (e.g., "Ethernet0"). |  |  |
 | `switchRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | SwitchRef is a reference to the Switch this interface is connected to. |  |  |
 | `adminState` _[AdminState](#adminstate)_ | AdminState represents the desired administrative state of the interface. |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ | ManagementPolicy controls only speed, MTU and FEC ownership. AdminState<br />retains its separate opt-in management annotation. | Observe | Enum: [Observe Manage] <br /> |
+| `speed` _integer_ | Speed is the existing configured port speed in Mbit/s. Omission is unowned.<br />Adoption and repair are supported; changing an adopted value is not. |  | Enum: [1000 10000 25000 100000] <br /> |
+| `mtu` _integer_ | MTU is the existing configured L3 MTU. Omission preserves native defaults. |  | Maximum: 9216 <br />Minimum: 1280 <br /> |
+| `fec` _string_ | FEC is an existing native FEC setting. Omission does not install a default. |  | Enum: [none rs fc] <br /> |
 
 
 #### SwitchInterfaceState
@@ -1062,9 +1069,13 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `portConfiguration` _[NetworkResourceStatus](#networkresourcestatus)_ | PortConfiguration reports speed/MTU/FEC independently of carrier and admin state. |  |  |
 | `adminState` _[AdminState](#adminstate)_ | AdminState represents the desired administrative state of the interface. |  |  |
 | `operationalState` _[OperationState](#operationstate)_ | OperationalState represents the actual operational state of the interface. |  |  |
 | `state` _[SwitchInterfaceState](#switchinterfacestate)_ | State represents the high-level state of the SwitchInterface. |  |  |
+| `adminStateManaged` _boolean_ | AdminStateManaged reports whether the explicit admin opt-in and the manager<br />write gate were enabled for this reconciliation. It does not prove success;<br />require AdminPersistenceReady=True for the current request and generation.<br />False or absent means observed/read-only, not managed ownership. |  |  |
+| `adminStateRequest` _string_ | AdminStateRequest is the observed admin-state-request annotation. Use a new<br />unique token for each annotation-only adoption and wait for this exact echo<br />together with AdminPersistenceReady=True. The echo alone is not success. |  |  |
+| `adminStateDigest` _string_ | AdminStateDigest is the SHA-256 fingerprint of the reconciled admin intent,<br />including CR UID, generation, target, desired state, request and write gates.<br />It is not a digest of the complete native configuration or forwarding state. |  |  |
 | `neighbor` _[Neighbor](#neighbor)_ | Neighbor is a reference to the connected neighbor device, if any. |  |  |
 | `macAddress` _string_ | MacAddress is the MAC address assigned to this interface. |  |  |
 | `aliasName` _string_ | AliasName is the alias name of the interface. |  |  |
@@ -1105,7 +1116,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
 | `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
-| `name` _string_ |  |  | MaxLength: 32 <br />Pattern: `^(Ethernet(0\|[1-9][0-9]*)\|PortChannel(0\|[1-9][0-9]\{0,3\})\|Vlan[1-9][0-9]\{0,3\})$` <br /> |
+| `name` _string_ |  |  | MaxLength: 32 <br />Pattern: `^(Ethernet(0\|[1-9][0-9]*)\|PortChannel(0\|[1-9][0-9]\{0,3\})\|Vlan[1-9][0-9]\{0,3\}\|Loopback(0\|[1-9][0-9]\{0,3\}))$` <br /> |
 | `vrf` _[NetworkVRFName](#networkvrfname)_ |  | default | MaxLength: 15 <br />Pattern: `^(default\|Vrf[A-Za-z0-9_-]\{1,12\})$` <br /> |
 | `addresses` _[NetworkInterfaceAddress](#networkinterfaceaddress) array_ | Addresses retain host bits; removals are not supported. |  | MaxItems: 64 <br />MaxLength: 49 <br />MinItems: 1 <br /> |
 

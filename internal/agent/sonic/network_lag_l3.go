@@ -27,6 +27,12 @@ var (
 	lagL3VRFName         = regexp.MustCompile(`^Vrf[a-zA-Z0-9_-]+$`)
 )
 
+// Deliberately bounded canonical subset of SONiC's interface_name grammar.
+func lagL3LoopbackManaged(name string) bool {
+	n, err := strconv.ParseUint(strings.TrimPrefix(name, "Loopback"), 10, 16)
+	return err == nil && n <= 4095 && name == "Loopback"+strconv.FormatUint(n, 10)
+}
+
 type lagL3Selectors struct {
 	SwitchRef struct {
 		Name string `json:"name"`
@@ -139,6 +145,9 @@ func vlanMemberNameValid(name string) bool {
 }
 
 func lagL3InterfaceTable(name string) string {
+	if lagL3LoopbackManaged(name) {
+		return "LOOPBACK_INTERFACE"
+	}
 	if _, ok := ethernetNumber(name); ok {
 		return "INTERFACE"
 	}
@@ -235,7 +244,7 @@ func lagL3DependencyGrammar(key string, fields map[string]string) error {
 		if _, ok := ethernetNumber(parts[2]); !ok || len(fields) != 1 || fields["NULL"] != "NULL" {
 			return fmt.Errorf("invalid LAG member dependency")
 		}
-	case "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE":
+	case "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE", "LOOPBACK_INTERFACE":
 		if lagL3InterfaceTable(name) != table || (len(parts) != 2 && len(parts) != 3) {
 			return fmt.Errorf("invalid L3 dependency identity")
 		}
@@ -319,7 +328,7 @@ func lagL3PortFree(db vlanChangeDB, name, ownLAG string) error {
 			if table == "PREFIX_SET" || table == "PREFIX" {
 				continue
 			}
-		case "PORTCHANNEL", "PORTCHANNEL_MEMBER", "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE", "VRF":
+		case "PORTCHANNEL", "PORTCHANNEL_MEMBER", "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE", "LOOPBACK_INTERFACE", "VRF":
 			if err := lagL3DependencyGrammar(key, fields); err != nil {
 				return err
 			}
@@ -363,7 +372,7 @@ func lagL3PortFree(db vlanChangeDB, name, ownLAG string) error {
 			}
 		}
 		switch table {
-		case "PORT", "PORTCHANNEL", "PORTCHANNEL_MEMBER", "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE", "VLAN", "VLAN_MEMBER", "VRF", "STATIC_ROUTE", "DHCPV4_RELAY", "DHCP_RELAY", "CONFIG_DB_INITIALIZED", "DEVICE_METADATA", "AUTO_TECHSUPPORT", "AUTO_TECHSUPPORT_FEATURE", "BANNER_MESSAGE", "BGP_DEVICE_GLOBAL", "BGP_NEIGHBOR", "BGP_GLOBALS", "BGP_GLOBALS_AF", "BGP_GLOBALS_AF_NETWORK", "BGP_NEIGHBOR_AF", "CRM", "FEATURE", "FLEX_COUNTER_TABLE", "KDUMP", "LOGGER", "MGMT_INTERFACE", "MGMT_PORT", "MGMT_VRF_CONFIG", "NTP", "NTP_SERVER", "PASSW_HARDENING", "SNMP", "SNMP_COMMUNITY", "SNMP_LOCATION", "SNMP_CONTACT", "SYSLOG_CONFIG", "SYSLOG_CONFIG_FEATURE", "SYSLOG_SERVER", "SYSTEM_DEFAULTS", "VERSIONS", "TACPLUS", "TACPLUS_SERVER", "AAA", "DNS_NAMESERVER":
+		case "PORT", "PORTCHANNEL", "PORTCHANNEL_MEMBER", "INTERFACE", "PORTCHANNEL_INTERFACE", "VLAN_INTERFACE", "LOOPBACK_INTERFACE", "VLAN", "VLAN_MEMBER", "VRF", "STATIC_ROUTE", "DHCPV4_RELAY", "DHCP_RELAY", "CONFIG_DB_INITIALIZED", "DEVICE_METADATA", "AUTO_TECHSUPPORT", "AUTO_TECHSUPPORT_FEATURE", "BANNER_MESSAGE", "BGP_DEVICE_GLOBAL", "BGP_NEIGHBOR", "BGP_GLOBALS", "BGP_GLOBALS_AF", "BGP_GLOBALS_AF_NETWORK", "BGP_NEIGHBOR_AF", "CRM", "FEATURE", "FLEX_COUNTER_TABLE", "KDUMP", "LOGGER", "MGMT_INTERFACE", "MGMT_PORT", "MGMT_VRF_CONFIG", "NTP", "NTP_SERVER", "PASSW_HARDENING", "SNMP", "SNMP_COMMUNITY", "SNMP_LOCATION", "SNMP_CONTACT", "SYSLOG_CONFIG", "SYSLOG_CONFIG_FEATURE", "SYSLOG_SERVER", "SYSTEM_DEFAULTS", "VERSIONS", "TACPLUS", "TACPLUS_SERVER", "AAA", "DNS_NAMESERVER":
 		default:
 			return fmt.Errorf("unsupported dependency table %s; inspect before assigning %s", table, name)
 		}
@@ -500,8 +509,10 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 	if err := lagL3Decode(r, "L3Interface", &spec); err != nil {
 		return nil, err
 	}
-	if err := lagL3InterfaceExists(db, spec.Name); err != nil {
-		return nil, err
+	if !lagL3LoopbackManaged(spec.Name) {
+		if err := lagL3InterfaceExists(db, spec.Name); err != nil {
+			return nil, err
+		}
 	}
 	vrf, err := lagL3VRF(db, spec.VRF)
 	if err != nil {
@@ -544,7 +555,7 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 			view[k] = f
 		}
 	}
-	if table != "VLAN_INTERFACE" {
+	if table != "VLAN_INTERFACE" && table != "LOOPBACK_INTERFACE" {
 		if table == "PORTCHANNEL_INTERFACE" {
 			members, err := lagL3Members(db, spec.Name)
 			if err != nil {
@@ -573,6 +584,9 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 		if err != nil || !p.Addr().IsGlobalUnicast() || p.Addr().Is4In6() || seen[p.Addr()] {
 			return nil, fmt.Errorf("unique unicast interface CIDRs required")
 		}
+		if table == "LOOPBACK_INTERFACE" && p.String() != address {
+			return nil, fmt.Errorf("canonical loopback CIDRs required")
+		}
 		seen[p.Addr()] = true
 		// Prefix.String retains host bits; Masked is only for route networks.
 		address = p.String()
@@ -596,9 +610,13 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 		desired[key+"|"+address] = map[string]string{"NULL": "NULL"}
 		addresses = append(addresses, address)
 	}
-	return &networkPlan{Identity: "L3Interface|" + spec.Name, Desired: desired, Runtime: func(ctx context.Context, m *SonicAgent) (bool, json.RawMessage, error) {
+	plan := &networkPlan{Identity: "L3Interface|" + spec.Name, Desired: desired, Runtime: func(ctx context.Context, m *SonicAgent) (bool, json.RawMessage, error) {
 		return lagL3InterfaceRuntime(ctx, spec.Name, vrf, addresses, m.lagL3ReadApp, m.getLinkByName)
-	}}, nil
+	}}
+	if table == "LOOPBACK_INTERFACE" {
+		plan.Persisted = networkFieldPersistence(desired)
+	}
+	return plan, nil
 }
 
 func planNetworkStaticRoute(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {

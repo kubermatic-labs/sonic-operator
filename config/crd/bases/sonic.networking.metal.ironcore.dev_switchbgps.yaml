@@ -60,6 +60,18 @@ spec:
                 - Observe
                 - Manage
                 type: string
+              mode:
+                default: Unified
+                description: |-
+                  Mode selects the existing native backend; it never changes FRR mode.
+                  Traditional supports the qualified peerless LeafRouter Loopback0 /32 contract.
+                enum:
+                - Unified
+                - Traditional
+                type: string
+                x-kubernetes-validations:
+                - message: backend mode is immutable
+                  rule: self == oldSelf
               prefixes:
                 default: []
                 description: Prefixes is an explicit allowlist; empty means no advertisements.
@@ -108,6 +120,11 @@ spec:
             - routerID
             - switchRef
             type: object
+            x-kubernetes-validations:
+            - message: Traditional requires default VRF and the router-ID /32 prefix
+              rule: '!has(self.mode) || self.mode != ''Traditional'' || ((!has(self.vrf)
+                || self.vrf == ''default'') && has(self.prefixes) && size(self.prefixes)
+                == 1 && self.prefixes[0] == self.routerID + ''/32'')'
           status:
             description: NetworkResourceStatus reports independent proof, not inferred
               forwarding health.

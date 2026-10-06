@@ -41,6 +41,8 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		return fmt.Errorf("invalid recorded request: %w", err)
 	}
+	// SwitchInterface projects the common selectors from its existing spec.
+	_, _, savedCommon = networkFields(saved)
 	request, target, err := networkDesired(r.Kind, saved)
 	if err != nil {
 		return fmt.Errorf("invalid recorded request: %w", err)
@@ -80,7 +82,7 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	}
 	// FRR mode is mutable intent, not a target selector. Always recover the
 	// saved mode and approval before considering a transition in either direction.
-	for _, field := range []string{"switchRef", "name", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "domainID", "peerSwitchRef", "tunnel"} {
+	for _, field := range []string{"switchRef", "name", "nativeName", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "domainID", "peerSwitchRef", "tunnel"} {
 		current, previous := currentFields[field], savedFields[field]
 		if field == "address" && r.Kind == "EVPNPeer" {
 			canonical := func(value any) any {

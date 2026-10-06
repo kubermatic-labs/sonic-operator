@@ -245,7 +245,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SwitchPortBreakout")
 		os.Exit(1)
 	}
-	for _, kind := range []string{"PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer", "EVPN"} {
+	for _, kind := range []string{"Port", "PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer", "EVPN"} {
 		if err := (&controller.NetworkReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Kind: kind,
 			ObserveOnly: observeOnly, AllowNetworkConfig: allowNetworkConfig,

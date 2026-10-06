@@ -143,11 +143,12 @@ func (s *proxyServer) SetInterfaceAdminStatus(ctx context.Context, request *pb.S
 			Message: "Success",
 		},
 		Interface: &pb.Interface{
-			Name:              iface.Name,
-			NativeName:        iface.NativeName,
-			MacAddress:        "",
-			OperationalStatus: string(iface.OperationStatus),
-			AdminStatus:       string(iface.AdminStatus),
+			Name:                     iface.Name,
+			NativeName:               iface.NativeName,
+			MacAddress:               "",
+			OperationalStatus:        string(iface.OperationStatus),
+			AdminStatus:              string(iface.AdminStatus),
+			AdminPersistenceVerified: iface.AdminPersistenceVerified,
 		},
 	}, nil
 }

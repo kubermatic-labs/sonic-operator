@@ -785,6 +785,21 @@ func TestVLANAuthorityGuardsOrdinaryWriters(t *testing.T) {
 			ordinary, saves := authorityAgent(t, db, m.journalDir)
 			ordinary.clientPool["APPL_DB"] = db
 			ordinary.configDirty = true
+			if writer == "admin" {
+				// An unblocked admin ensure now requires independent saved evidence,
+				// not just the save stub's successful return.
+				var saved []byte
+				ordinary.readSavedPortConfig = func() ([]byte, error) { return saved, nil }
+				ordinary.saveConfig = func(ctx context.Context) *agent.Status {
+					saves.Add(1)
+					fields, err := db.HGetAll(ctx, "PORT|Ethernet0").Result()
+					if err != nil {
+						t.Fatal(err)
+					}
+					saved = portConfigJSON(t, vlanChangeDB{"PORT|Ethernet0": fields})
+					return nil
+				}
+			}
 			write := func() *agent.Status {
 				switch writer {
 				case "other VLAN":

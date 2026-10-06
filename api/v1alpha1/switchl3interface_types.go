@@ -9,8 +9,9 @@ type SwitchL3InterfaceSpec struct {
 	NetworkResourceSpec `json:",inline"`
 	// +required
 	// +kubebuilder:validation:MaxLength=32
-	// +kubebuilder:validation:Pattern=`^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3})|Vlan[1-9][0-9]{0,3})$`
+	// +kubebuilder:validation:Pattern=`^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3})|Vlan[1-9][0-9]{0,3}|Loopback(0|[1-9][0-9]{0,3}))$`
 	// +kubebuilder:validation:XValidation:rule="!self.startsWith('Vlan') || int(self.substring(4)) <= 4094",message="VLAN interface ID must be 1..4094"
+	// +kubebuilder:validation:XValidation:rule="!self.startsWith('Loopback') || int(self.substring(8)) <= 4095",message="Loopback interface ID must be 0..4095"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 	// +optional

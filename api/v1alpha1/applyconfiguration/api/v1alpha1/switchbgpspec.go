@@ -13,9 +13,12 @@ import (
 // with apply.
 type SwitchBGPSpecApplyConfiguration struct {
 	NetworkResourceSpecApplyConfiguration `json:",inline"`
-	VRF                                   *apiv1alpha1.NetworkVRFName `json:"vrf,omitempty"`
-	LocalASN                              *uint32                     `json:"localASN,omitempty"`
-	RouterID                              *string                     `json:"routerID,omitempty"`
+	// Mode selects the existing native backend; it never changes FRR mode.
+	// Traditional supports the qualified peerless LeafRouter Loopback0 /32 contract.
+	Mode     *string                     `json:"mode,omitempty"`
+	VRF      *apiv1alpha1.NetworkVRFName `json:"vrf,omitempty"`
+	LocalASN *uint32                     `json:"localASN,omitempty"`
+	RouterID *string                     `json:"routerID,omitempty"`
 	// Prefixes is an explicit allowlist; empty means no advertisements.
 	Prefixes []apiv1alpha1.NetworkPrefix `json:"prefixes,omitempty"`
 }
@@ -39,6 +42,14 @@ func (b *SwitchBGPSpecApplyConfiguration) WithSwitchRef(value *NetworkSwitchRefe
 // If called multiple times, the ManagementPolicy field is set to the value of the last call.
 func (b *SwitchBGPSpecApplyConfiguration) WithManagementPolicy(value apiv1alpha1.NetworkManagementPolicy) *SwitchBGPSpecApplyConfiguration {
 	b.NetworkResourceSpecApplyConfiguration.ManagementPolicy = &value
+	return b
+}
+
+// WithMode sets the Mode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mode field is set to the value of the last call.
+func (b *SwitchBGPSpecApplyConfiguration) WithMode(value string) *SwitchBGPSpecApplyConfiguration {
+	b.Mode = &value
 	return b
 }
 

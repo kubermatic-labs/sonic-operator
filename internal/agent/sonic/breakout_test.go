@@ -51,6 +51,7 @@ func breakoutFixture(t *testing.T) (*SonicAgent, *vlanChangeDB, *int, *int) {
 	m.resolveBreakout = func(context.Context, string, map[string]string) (*breakoutPlatform, error) { return cap, nil }
 	m.validateBreakoutConfig = func(context.Context) error { return nil }
 	m.breakoutSnapshot = func(context.Context) (vlanChangeDB, string, error) { return cloneBreakoutDB(db), "snapshot", nil }
+	m.readSavedPortConfig = func() ([]byte, error) { return portConfigJSON(t, db), nil }
 	m.breakoutCAS = func(_ context.Context, _ string, before, after vlanChangeDB) (bool, error) {
 		for k, v := range before {
 			if !reflect.DeepEqual(db[k], v) {

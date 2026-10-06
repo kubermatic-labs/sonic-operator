@@ -20,6 +20,8 @@ import (
 // Explicit dispatch keeps the shared safety loop restricted to known APIs.
 func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 	switch kind {
+	case "Port":
+		return &api.SwitchInterface{}, &api.SwitchInterfaceList{}, nil
 	case "EVPN":
 		return &api.SwitchEVPN{}, &api.SwitchEVPNList{}, nil
 	case "MLAG":
@@ -63,6 +65,12 @@ func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 
 func networkFields(obj client.Object) (any, *api.NetworkResourceStatus, *api.NetworkResourceSpec) {
 	switch o := obj.(type) {
+	case *api.SwitchInterface:
+		common := &api.NetworkResourceSpec{ManagementPolicy: o.Spec.ManagementPolicy}
+		if o.Spec.SwitchRef != nil {
+			common.SwitchRef.Name = o.Spec.SwitchRef.Name
+		}
+		return &o.Spec, &o.Status.PortConfiguration, common
 	case *api.SwitchEVPN:
 		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchMLAG:
@@ -108,6 +116,7 @@ var (
 	networkPortChannel = regexp.MustCompile(`^PortChannel(0|[1-9][0-9]{0,3})$`)
 	networkEthernet    = regexp.MustCompile(`^Ethernet(0|[1-9][0-9]*)$`)
 	networkInterface   = regexp.MustCompile(`^(Ethernet|PortChannel|Vlan)(0|[1-9][0-9]*)$`)
+	networkLoopback    = regexp.MustCompile(`^Loopback(0|[1-9][0-9]{0,3})$`)
 	networkVRF         = regexp.MustCompile(`^Vrf[A-Za-z0-9_-]{1,12}$`)
 	networkDigest      = regexp.MustCompile(`^[a-f0-9]{64}$`)
 )
@@ -164,6 +173,21 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 	}
 	target := ""
 	switch s := spec.(type) {
+	case *api.SwitchInterfaceSpec:
+		if len(s.NativeName) > 32 || !networkEthernet.MatchString(s.NativeName) || (s.Speed == nil && s.MTU == nil && s.FEC == "") {
+			return nil, "", fmt.Errorf("port configuration requires canonical Ethernet name and at least one field")
+		}
+		if s.Speed != nil && *s.Speed != 1000 && *s.Speed != 10000 && *s.Speed != 25000 && *s.Speed != 100000 {
+			return nil, "", fmt.Errorf("unsupported port speed")
+		}
+		if s.MTU != nil && (*s.MTU < 1280 || *s.MTU > 9216) {
+			return nil, "", fmt.Errorf("invalid port MTU")
+		}
+		if s.FEC != "" && s.FEC != "none" && s.FEC != "rs" && s.FEC != "fc" {
+			return nil, "", fmt.Errorf("unsupported port FEC")
+		}
+		s.ManagementPolicy = common.ManagementPolicy
+		target = s.NativeName
 	case *api.SwitchEVPNSpec:
 		if !redundancyName.MatchString(string(s.Tunnel)) || len(s.MappingRefs) > 64 {
 			return nil, "", fmt.Errorf("invalid EVPN tunnel or mapping references")
@@ -252,7 +276,12 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 		if err := vrf(&s.VRF); err != nil {
 			return nil, "", err
 		}
-		if !validInterface(s.Name) || len(s.Addresses) == 0 || len(s.Addresses) > 64 {
+		loopback := false
+		if networkLoopback.MatchString(s.Name) {
+			id, err := strconv.Atoi(s.Name[8:])
+			loopback = err == nil && id <= 4095
+		}
+		if (!validInterface(s.Name) && !loopback) || len(s.Addresses) == 0 || len(s.Addresses) > 64 {
 			return nil, "", fmt.Errorf("invalid L3 interface or addresses")
 		}
 		seen := map[netip.Prefix]bool{}
@@ -299,6 +328,12 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 		}
 		target = string(s.VRF) + "/" + string(s.Prefix)
 	case *api.SwitchBGPSpec:
+		if s.Mode == "" {
+			s.Mode = "Unified"
+		}
+		if s.Mode != "Unified" && s.Mode != "Traditional" {
+			return nil, "", fmt.Errorf("invalid BGP backend mode")
+		}
 		if err := vrf(&s.VRF); err != nil {
 			return nil, "", err
 		}
@@ -322,6 +357,14 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 		}
 		if s.Prefixes == nil {
 			s.Prefixes = []api.NetworkPrefix{}
+		}
+		if s.Mode == "Traditional" && (s.VRF != "default" || len(s.Prefixes) != 1 || string(s.Prefixes[0]) != s.RouterID+"/32") {
+			return nil, "", fmt.Errorf("traditional BGP requires default VRF and the router-ID /32 prefix")
+		}
+		// Legacy agents reject unknown JSON fields. The default backend retains
+		// its original wire shape; only the opt-in backend sends a discriminator.
+		if s.Mode == "Unified" {
+			s.Mode = ""
 		}
 		target = string(s.VRF)
 	case *api.SwitchBGPPeerSpec:

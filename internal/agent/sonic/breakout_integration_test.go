@@ -19,11 +19,16 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// Explicit opt-in only. Execute the literal resolver on the approved switch;
+// Explicit opt-in only. Execute the literal resolver on SONIC_BREAKOUT_READONLY_TARGET
+// (an ssh destination such as admin@leaf-01);
 // its ConfigMgmt object has no DB connection and computes only an in-memory diff.
 func TestBreakoutInstalledResolverReadOnly(t *testing.T) {
 	if os.Getenv("SONIC_BREAKOUT_READONLY_RESOLVER") != "1" {
 		t.Skip("requires explicit read-only switch inspection opt-in")
+	}
+	target := os.Getenv("SONIC_BREAKOUT_READONLY_TARGET")
+	if target == "" {
+		t.Fatal("SONIC_BREAKOUT_READONLY_TARGET required")
 	}
 	m := &SonicAgent{}
 	m.runBreakout = func(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
@@ -34,7 +39,7 @@ func TestBreakoutInstalledResolverReadOnly(t *testing.T) {
 		for i, arg := range cmd.Args {
 			argv[i] = "'" + strings.ReplaceAll(arg, "'", "'\"'\"'") + "'"
 		}
-		return exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "admin@192.0.2.10", strings.Join(argv, " ")).Output()
+		return exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", target, strings.Join(argv, " ")).Output()
 	}
 	start := time.Now()
 	p, err := m.nativeBreakoutPlatform(t.Context(), "Ethernet0", map[string]string{"platform": "x86_64-dell_z9100_c2538-r0", "hwsku": "Force10-Z9100"})
@@ -50,7 +55,9 @@ func TestBreakoutRedisRecovery(t *testing.T) {
 	rdb := newVLANRedis(t)
 	m, initial, _, _ := breakoutFixture(t)
 	p, _ := m.resolveBreakout(t.Context(), "Ethernet0", nil)
-	appl := redis.NewClient(&redis.Options{Addr: rdb.Options().Addr, DB: 0, MaxRetries: -1, ContextTimeoutEnabled: true})
+	applOptions := *rdb.Options()
+	applOptions.DB = 0
+	appl := redis.NewClient(&applOptions)
 	t.Cleanup(func() { _ = appl.Close() })
 	m.clientPool = map[string]*redis.Client{"CONFIG_DB": rdb, "APPL_DB": appl}
 	m.breakoutSnapshot, m.breakoutCAS, m.verifyBreakoutRuntime = nil, nil, nil
@@ -100,12 +107,21 @@ func TestBreakoutRedisRecovery(t *testing.T) {
 		t.Fatalf("save failure: %+v %+v", got, status)
 	}
 	// A new backend object must recover from the durable journal alone.
+	var saved []byte
 	restarted := &SonicAgent{clientPool: m.clientPool, breakoutJournalDir: m.breakoutJournalDir, resolveBreakout: m.resolveBreakout, linkByName: m.linkByName,
 		runBreakout: func(context.Context, *exec.Cmd) ([]byte, error) {
 			t.Fatal("native replay after restart")
 			return nil, nil
 		},
-		saveConfig: func(context.Context) *agent.Status { return nil },
+		saveConfig: func(ctx context.Context) *agent.Status {
+			db, _, err := m.readBreakoutDB(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			saved = portConfigJSON(t, db)
+			return nil
+		},
+		readSavedPortConfig: func() ([]byte, error) { return saved, nil },
 	}
 	got, status = restarted.ReconcilePortBreakout(t.Context(), splitRequest())
 	if status != nil || !got.PersistenceVerified || got.Pending || nativeCalls != 1 {
@@ -138,6 +154,54 @@ func TestBreakoutRedisRecovery(t *testing.T) {
 	applied, err := restarted.restoreBreakoutAttributes(t.Context(), raw, target, after)
 	if err != nil || applied {
 		t.Fatalf("stale CAS: %v %v", applied, err)
+	}
+}
+
+func TestBreakoutRedisPopulatedAdoption(t *testing.T) {
+	rdb := newVLANRedis(t)
+	m, initial, calls, _ := populatedBreakoutFixture(t)
+	applOptions := *rdb.Options()
+	applOptions.DB = 0
+	appl := redis.NewClient(&applOptions)
+	t.Cleanup(func() { _ = appl.Close() })
+	m.clientPool = map[string]*redis.Client{"CONFIG_DB": rdb, "APPL_DB": appl}
+	m.breakoutSnapshot, m.breakoutCAS, m.verifyBreakoutRuntime = nil, nil, nil
+	for key, fields := range *initial {
+		if err := rdb.HSet(t.Context(), key, fields).Err(); err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasPrefix(key, "PORT|") {
+			if err := appl.HSet(t.Context(), "PORT_TABLE:"+strings.TrimPrefix(key, "PORT|"), fields).Err(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	m.linkByName = func(name string) (netlink.Link, error) {
+		if (*initial)["PORT|"+name] == nil {
+			return nil, netlink.LinkNotFoundError{}
+		}
+		return &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: name}}, nil
+	}
+	before, _, err := m.readBreakoutDB(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved []byte
+	m.saveConfig = func(ctx context.Context) *agent.Status {
+		db, _, err := m.readBreakoutDB(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		saved = portConfigJSON(t, db)
+		return nil
+	}
+	m.readSavedPortConfig = func() ([]byte, error) { return saved, nil }
+	r := splitRequest()
+	r.AdoptOnly = true
+	got, status := m.ReconcilePortBreakout(t.Context(), r)
+	after, _, err := m.readBreakoutDB(t.Context())
+	if status != nil || err != nil || !got.PersistenceVerified || *calls != 0 || !reflect.DeepEqual(before, after) {
+		t.Fatalf("populated Redis adoption: %+v %+v %v calls=%d", got, status, err, *calls)
 	}
 }
 

@@ -75,6 +75,9 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if err := r.APIReader.Get(ctx, req.NamespacedName, obj); err != nil {
 		return result, client.IgnoreNotFound(err)
 	}
+	if port, ok := obj.(*api.SwitchInterface); ok && port.Spec.Speed == nil && port.Spec.MTU == nil && port.Spec.FEC == "" && !controllerutil.ContainsFinalizer(obj, networkRecoveryFinalizer) {
+		return result, nil
+	}
 	if !obj.GetDeletionTimestamp().IsZero() {
 		if !controllerutil.ContainsFinalizer(obj, networkRecoveryFinalizer) {
 			return result, nil
@@ -213,8 +216,14 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return result, nil
 	}
 	// A matching running config without durable save proof still needs Ensure.
-	// Runtime failure alone must not cause repeated configuration writes.
-	if current.Exists && current.ConfigurationVerified && current.PersistenceVerified {
+	// Traditional BGP owns native regeneration; its agent journals dispatch and
+	// never blindly repeats an uncertain restart. Other backends retain no-op
+	// behavior when only operational runtime has not converged.
+	runtimeManaged := false
+	if bgp, ok := obj.(*api.SwitchBGP); ok {
+		runtimeManaged = bgp.Spec.Mode == "Traditional"
+	}
+	if current.Exists && current.ConfigurationVerified && current.PersistenceVerified && (!runtimeManaged || current.RuntimeVerified) {
 		return result, nil
 	}
 	if evpn, ok := obj.(*api.SwitchEVPNPeer); ok {

@@ -114,6 +114,9 @@ func (r *NetworkReconciler) checkNetworkClaims(ctx context.Context, obj client.O
 		if other.GetUID() == obj.GetUID() {
 			return nil
 		}
+		if port, ok := other.(*api.SwitchInterface); ok && port.Spec.Speed == nil && port.Spec.MTU == nil && port.Spec.FEC == "" && !controllerutil.ContainsFinalizer(port, networkRecoveryFinalizer) {
+			return nil // inventory alone does not claim speed/MTU/FEC
+		}
 		_, _, common := networkFields(other)
 		if !aliases[common.SwitchRef.Name] {
 			return nil
