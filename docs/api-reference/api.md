@@ -10,6 +10,8 @@ Package v1alpha1 contains API Schema definitions for the settings.gardener.cloud
 
 Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API group.
 
+SPDX-License-Identifier: Apache-2.0
+
 ### Resource Types
 - [Switch](#switch)
 - [SwitchACLBinding](#switchaclbinding)
@@ -24,12 +26,14 @@ Package v1alpha1 contains API Schema definitions for the networking v1alpha1 API
 - [SwitchInterface](#switchinterface)
 - [SwitchL3Interface](#switchl3interface)
 - [SwitchMLAG](#switchmlag)
+- [SwitchManagement](#switchmanagement)
 - [SwitchPortBreakout](#switchportbreakout)
 - [SwitchPortChannel](#switchportchannel)
 - [SwitchQoSBinding](#switchqosbinding)
 - [SwitchQoSMap](#switchqosmap)
 - [SwitchScheduler](#switchscheduler)
 - [SwitchStaticRoute](#switchstaticroute)
+- [SwitchSystem](#switchsystem)
 - [SwitchVLAN](#switchvlan)
 - [SwitchVLANVNI](#switchvlanvni)
 - [SwitchVRF](#switchvrf)
@@ -179,6 +183,47 @@ _Appears in:_
 | `type` _[HostPathType](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#hostpathtype-v1-core)_ | Type describes the expected host-path type, following the Kubernetes Pod<br />hostPath API. Generated ZTP does not create missing paths. |  |  |
 
 
+#### HostResourceStatus
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchManagement](#switchmanagement)
+- [SwitchSystem](#switchsystem)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `observedGeneration` _integer_ |  |  |  |
+| `configurationVerified` _boolean_ |  |  |  |
+| `runtimeVerified` _boolean_ |  |  |  |
+| `persistenceVerified` _boolean_ |  |  |  |
+| `gatewayVerified` _boolean_ |  |  |  |
+| `recovery` _string_ |  |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ |  |  |  |
+
+
+#### HostSecretKeyReference
+
+
+
+
+
+
+
+_Appears in:_
+- [SystemSNMP](#systemsnmp)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `namespace` _string_ |  |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `name` _string_ |  |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+| `key` _string_ |  |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+
+
 #### MLAGPortChannel
 
 _Underlying type:_ _string_
@@ -212,6 +257,23 @@ _Appears in:_
 | `credentials` _[ObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectreference-v1-core)_ |  |  |  |
 
 
+#### ManagementAddress
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchManagementSpec](#switchmanagementspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `prefix` _[NetworkInterfaceAddress](#networkinterfaceaddress)_ |  |  | MaxLength: 49 <br /> |
+| `gateway` _[NetworkIP](#networkip)_ | Gateway is on-link and of the same address family as Prefix. |  | MaxLength: 45 <br /> |
+
+
 #### Neighbor
 
 
@@ -240,6 +302,7 @@ _Validation:_
 - MaxLength: 45
 
 _Appears in:_
+- [ManagementAddress](#managementaddress)
 - [StaticRouteNextHop](#staticroutenexthop)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchEVPNPeerSpec](#switchevpnpeerspec)
@@ -256,6 +319,7 @@ _Validation:_
 - MaxLength: 49
 
 _Appears in:_
+- [ManagementAddress](#managementaddress)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 
 
@@ -282,11 +346,13 @@ _Appears in:_
 - [SwitchInterfaceSpec](#switchinterfacespec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchMLAGSpec](#switchmlagspec)
+- [SwitchManagementSpec](#switchmanagementspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchSystemSpec](#switchsystemspec)
 - [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
 - [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
@@ -332,11 +398,13 @@ _Appears in:_
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchMLAGSpec](#switchmlagspec)
+- [SwitchManagementSpec](#switchmanagementspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchSystemSpec](#switchsystemspec)
 - [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
 - [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
@@ -407,11 +475,13 @@ _Appears in:_
 - [SwitchFRRMigrationSpec](#switchfrrmigrationspec)
 - [SwitchL3InterfaceSpec](#switchl3interfacespec)
 - [SwitchMLAGSpec](#switchmlagspec)
+- [SwitchManagementSpec](#switchmanagementspec)
 - [SwitchPortChannelSpec](#switchportchannelspec)
 - [SwitchQoSBindingSpec](#switchqosbindingspec)
 - [SwitchQoSMapSpec](#switchqosmapspec)
 - [SwitchSchedulerSpec](#switchschedulerspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
+- [SwitchSystemSpec](#switchsystemspec)
 - [SwitchVLANVNISpec](#switchvlanvnispec)
 - [SwitchVRFSpec](#switchvrfspec)
 - [SwitchVXLANTunnelSpec](#switchvxlantunnelspec)
@@ -1165,6 +1235,46 @@ _Appears in:_
 | `sessionTimeout` _integer_ | SessionTimeout is in seconds. | 30 | Maximum: 3600 <br />Minimum: 2 <br /> |
 
 
+#### SwitchManagement
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchManagement` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchManagementSpec](#switchmanagementspec)_ |  |  |  |
+| `status` _[HostResourceStatus](#hostresourcestatus)_ |  |  |  |
+
+
+#### SwitchManagementSpec
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchManagement](#switchmanagement)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `interface` _string_ |  | eth0 | Enum: [eth0] <br /> |
+| `addresses` _[ManagementAddress](#managementaddress) array_ |  |  | MaxItems: 8 <br />MinItems: 1 <br /> |
+| `mac` _string_ | MAC overrides only eth0; device/base/front-panel MACs are never changed.<br />Omission leaves the active and boot MAC configuration unowned. |  | Pattern: `^([0-9a-f]\{2\}:)\{5\}[0-9a-f]\{2\}$` <br /> |
+| `rollbackSeconds` _integer_ |  | 120 | Maximum: 600 <br />Minimum: 30 <br /> |
+
+
 #### SwitchPortBreakout
 
 
@@ -1538,6 +1648,44 @@ _Appears in:_
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | The status of each condition is one of True, False, or Unknown. |  |  |
 
 
+#### SwitchSystem
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchSystem` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchSystemSpec](#switchsystemspec)_ |  |  |  |
+| `status` _[HostResourceStatus](#hostresourcestatus)_ |  |  |  |
+
+
+#### SwitchSystemSpec
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchSystem](#switchsystem)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `ntp` _[SystemNTP](#systemntp)_ |  |  |  |
+| `snmp` _[SystemSNMP](#systemsnmp)_ |  |  |  |
+
+
 #### SwitchVLAN
 
 
@@ -1771,6 +1919,44 @@ _Appears in:_
 | `name` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
 | `sourceAddress` _[RedundancyIPv4](#redundancyipv4)_ |  |  | MaxLength: 15 <br /> |
 | `evpnNVO` _[RedundancyName](#redundancyname)_ |  |  | MaxLength: 32 <br />MinLength: 1 <br />Pattern: `^[A-Za-z][A-Za-z0-9_-]*$` <br /> |
+
+
+#### SystemNTP
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchSystemSpec](#switchsystemspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `adminState` _string_ |  | enabled | Enum: [enabled disabled] <br /> |
+| `dhcp` _string_ |  | enabled | Enum: [enabled disabled] <br /> |
+| `serverRole` _string_ |  | disabled | Enum: [enabled disabled] <br /> |
+| `sourceInterface` _string_ |  | eth0 | Enum: [eth0] <br /> |
+| `servers` _string array_ | Servers owns the configured NTP_SERVER membership. Empty removes all<br />configured servers; DHCP/vendor-generated sources remain separately checked. |  | MaxItems: 16 <br /> |
+
+
+#### SystemSNMP
+
+
+
+
+
+
+
+_Appears in:_
+- [SwitchSystemSpec](#switchsystemspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `location` _string_ |  |  | MaxLength: 256 <br /> |
+| `contact` _string_ | Empty Contact leaves the native contact input unowned. |  | MaxLength: 256 <br /> |
+| `communitySecretRef` _[HostSecretKeyReference](#hostsecretkeyreference)_ | CommunitySecretRef supplies the sole read-only community. Omission declares<br />no communities. Plaintext is never allowed in this resource. |  |  |
 
 
 #### TrafficPolicyName

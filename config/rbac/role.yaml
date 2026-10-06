@@ -13,6 +13,12 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
   - interfaces
@@ -39,12 +45,14 @@ rules:
   - switchevpns
   - switchfrrmigrations
   - switchl3interfaces
+  - switchmanagements
   - switchmlags
   - switchportchannels
   - switchqosbindings
   - switchqosmaps
   - switchschedulers
   - switchstaticroutes
+  - switchsystems
   - switchvlanvnis
   - switchvrfs
   - switchvxlantunnels
@@ -92,6 +100,7 @@ rules:
   - switchfrrmigrations/status
   - switchinterfaces/status
   - switchl3interfaces/status
+  - switchmanagements/status
   - switchmlags/status
   - switchportbreakouts/status
   - switchportchannels/status
@@ -99,6 +108,7 @@ rules:
   - switchqosmaps/status
   - switchschedulers/status
   - switchstaticroutes/status
+  - switchsystems/status
   - switchvlans/status
   - switchvlanvnis/status
   - switchvrfs/status

@@ -1,0 +1,11 @@
+[Unit]
+Description=Independent SONiC management rollback watchdog
+
+[Timer]
+OnBootSec=1s
+OnUnitActiveSec=5s
+AccuracySec=1s
+Unit=sonic-operator-host-recovery.service
+
+[Install]
+WantedBy=timers.target

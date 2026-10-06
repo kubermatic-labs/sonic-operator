@@ -1,0 +1,219 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: switchsystems.sonic.networking.metal.ironcore.dev
+spec:
+  group: sonic.networking.metal.ironcore.dev
+  names:
+    kind: SwitchSystem
+    listKind: SwitchSystemList
+    plural: switchsystems
+    singular: switchsystem
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              managementPolicy:
+                default: Observe
+                description: NetworkManagementPolicy permits writes only with the
+                  manager and agent gates.
+                enum:
+                - Observe
+                - Manage
+                type: string
+              ntp:
+                properties:
+                  adminState:
+                    default: enabled
+                    enum:
+                    - enabled
+                    - disabled
+                    type: string
+                  dhcp:
+                    default: enabled
+                    enum:
+                    - enabled
+                    - disabled
+                    type: string
+                  serverRole:
+                    default: disabled
+                    enum:
+                    - enabled
+                    - disabled
+                    type: string
+                  servers:
+                    description: |-
+                      Servers owns the configured NTP_SERVER membership. Empty removes all
+                      configured servers; DHCP/vendor-generated sources remain separately checked.
+                    items:
+                      type: string
+                    maxItems: 16
+                    type: array
+                    x-kubernetes-list-type: set
+                  sourceInterface:
+                    default: eth0
+                    enum:
+                    - eth0
+                    type: string
+                required:
+                - servers
+                type: object
+              snmp:
+                properties:
+                  communitySecretRef:
+                    description: |-
+                      CommunitySecretRef supplies the sole read-only community. Omission declares
+                      no communities. Plaintext is never allowed in this resource.
+                    properties:
+                      key:
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                      name:
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                      namespace:
+                        maxLength: 63
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  contact:
+                    description: Empty Contact leaves the native contact input unowned.
+                    maxLength: 256
+                    type: string
+                  location:
+                    maxLength: 256
+                    type: string
+                required:
+                - location
+                type: object
+              switchRef:
+                properties:
+                  name:
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$
+                    type: string
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: switchRef is immutable
+                  rule: self == oldSelf
+            required:
+            - switchRef
+            type: object
+            x-kubernetes-validations:
+            - message: at least one system setting is required
+              rule: has(self.ntp) || has(self.snmp)
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              configurationVerified:
+                type: boolean
+              gatewayVerified:
+                type: boolean
+              observedGeneration:
+                format: int64
+                type: integer
+              persistenceVerified:
+                type: boolean
+              recovery:
+                type: string
+              runtimeVerified:
+                type: boolean
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

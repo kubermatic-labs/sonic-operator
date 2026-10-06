@@ -58,6 +58,7 @@ func main() {
 	var allowAuthoritativeVLANs bool
 	var allowBreakout bool
 	var allowNetworkConfig bool
+	var allowHostConfig bool
 	var allowFRRMigration bool
 	var allowTrafficPolicy bool
 	var allowRedundancy bool
@@ -89,6 +90,7 @@ func main() {
 		"Allow guarded port breakout. Requires observe-only=false, managementPolicy=Manage and agent breakout/write gates. Deletion never reverses hardware layout.")
 	flag.BoolVar(&allowNetworkConfig, "allow-network-config", false,
 		"Allow additive network configuration. Requires observe-only=false, individual managementPolicy=Manage and agent network/write gates. Resource deletion leaves device configuration intact.")
+	flag.BoolVar(&allowHostConfig, "allow-host-config", false, "Allow typed management and system configuration with switch-local management rollback; requires observe-only=false and per-resource Manage policy.")
 	flag.BoolVar(&allowFRRMigration, "allow-frr-migration", false,
 		"Allow approved empty-routing FRR migration. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage, a matching approvedDigest and agent migration/write gates.")
 	flag.BoolVar(&allowTrafficPolicy, "allow-traffic-policy", false,
@@ -254,6 +256,12 @@ func main() {
 			AllowRedundancy:    allowRedundancy,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create network controller", "controller", "Switch"+kind)
+			os.Exit(1)
+		}
+	}
+	for _, kind := range []string{"Management", "System"} {
+		if err := (&controller.HostReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Kind: kind, ObserveOnly: observeOnly, AllowHostConfig: allowHostConfig}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create host controller", "controller", "Switch"+kind)
 			os.Exit(1)
 		}
 	}

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -340,6 +341,11 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 }
 
 func (m *SonicAgent) casVLANChange(ctx context.Context, raw string, from, to vlanChangeDB) (bool, error) {
+	if bypass, _ := ctx.Value(hostCASKey{}).(bool); !bypass {
+		if err := host.CheckPending(m.hostJournalDir); err != nil {
+			return false, err
+		}
+	}
 	type delta struct {
 		Key    string            `json:"key"`
 		Remove []string          `json:"remove"`

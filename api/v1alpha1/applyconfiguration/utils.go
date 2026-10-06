@@ -21,6 +21,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=sonic.networking.metal.ironcore.dev, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("ACLRule"):
 		return &apiv1alpha1.ACLRuleApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HostResourceStatus"):
+		return &apiv1alpha1.HostResourceStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HostSecretKeyReference"):
+		return &apiv1alpha1.HostSecretKeyReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ManagementAddress"):
+		return &apiv1alpha1.ManagementAddressApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Neighbor"):
 		return &apiv1alpha1.NeighborApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkResourceSpec"):
@@ -79,6 +85,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchL3InterfaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchL3InterfaceSpec"):
 		return &apiv1alpha1.SwitchL3InterfaceSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchManagement"):
+		return &apiv1alpha1.SwitchManagementApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchManagementSpec"):
+		return &apiv1alpha1.SwitchManagementSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchMLAG"):
 		return &apiv1alpha1.SwitchMLAGApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchMLAGSpec"):
@@ -113,6 +123,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchStaticRouteApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchStaticRouteSpec"):
 		return &apiv1alpha1.SwitchStaticRouteSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchSystem"):
+		return &apiv1alpha1.SwitchSystemApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchSystemSpec"):
+		return &apiv1alpha1.SwitchSystemSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLAN"):
 		return &apiv1alpha1.SwitchVLANApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVLANMember"):
@@ -137,6 +151,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchVXLANTunnelApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchVXLANTunnelSpec"):
 		return &apiv1alpha1.SwitchVXLANTunnelSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SystemNTP"):
+		return &apiv1alpha1.SystemNTPApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SystemSNMP"):
+		return &apiv1alpha1.SystemSNMPApplyConfiguration{}
 
 	}
 	return nil

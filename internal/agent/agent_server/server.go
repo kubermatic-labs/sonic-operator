@@ -12,6 +12,7 @@ import (
 	"net"
 	"strconv"
 
+	hp "github.com/ironcore-dev/sonic-operator/internal/agent/hostproto"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
@@ -323,7 +324,8 @@ func NewProxyServer(switchAgentImpl switchAgent.SwitchAgent) pb.SwitchAgentServi
 
 func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	switch info.FullMethod {
-	case pb.SwitchAgentService_GetDeviceInfo_FullMethodName,
+	case hp.HostService_Get_FullMethodName,
+		pb.SwitchAgentService_GetDeviceInfo_FullMethodName,
 		pb.SwitchAgentService_ListInterfaces_FullMethodName,
 		pb.SwitchAgentService_ListPorts_FullMethodName,
 		pb.SwitchAgentService_GetInterface_FullMethodName,
@@ -369,7 +371,7 @@ func newGRPCServerWithRedundancy(certFile, keyFile, clientCAFile string, readOnl
 	tlsConfig.ClientCAs = tlsConfig.RootCAs
 	tlsConfig.RootCAs = nil
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig))}
+	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig)), grpc.StatsHandler(hostConnectionStats{})}
 	allow := allowAuthoritative && !readOnly
 	opts = append(opts, grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		switch info.FullMethod {
@@ -455,6 +457,9 @@ func StartServer() {
 	}
 
 	pb.RegisterSwitchAgentServiceServer(s, NewProxyServer(swAgent))
+	if err := registerHost(s, swAgent); err != nil {
+		log.Fatal("host recovery initialization failed")
+	}
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(*bindAddress, strconv.Itoa(*port)))
 	if err != nil {

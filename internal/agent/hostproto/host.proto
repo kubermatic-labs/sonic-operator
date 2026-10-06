@@ -1,0 +1,23 @@
+syntax = "proto3";
+package switchagent.host.v1;
+option go_package = "github.com/ironcore-dev/sonic-operator/internal/agent/hostproto";
+
+// Closed typed JSON is decoded with duplicate/unknown-field rejection. It is
+// private mTLS input only; responses never contain desired/observed credentials.
+message HostRequest { bytes configuration_json = 1; }
+message HostConfirmation { string owner = 1; string target = 2; string transaction = 3; string challenge = 4; }
+message HostResult {
+  bool configuration_verified = 1;
+  bool runtime_verified = 2;
+  bool persistence_verified = 3;
+  bool gateway_verified = 4;
+  string recovery = 5;
+  string transaction = 6;
+  string challenge = 7;
+  string owner = 8;
+}
+service HostService {
+  rpc Get(HostRequest) returns (HostResult);
+  rpc Ensure(HostRequest) returns (HostResult);
+  rpc Confirm(HostConfirmation) returns (HostResult);
+}

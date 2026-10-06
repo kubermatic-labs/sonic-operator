@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
 
@@ -547,26 +549,38 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 	if err != nil {
 		return failure(err)
 	}
+	if write {
+		if guardErr := host.CheckPending(m.hostJournalDir); guardErr != nil {
+			if !errors.Is(guardErr, host.ErrConflict) || operation != "recover" || record == nil || record.Pending == nil || !reflect.DeepEqual(r.Spec, record.Pending.Request.Spec) {
+				return failure(guardErr)
+			}
+			hash := vlanAuthorityHash(db)
+			if hash != record.Pending.PreHash && hash != record.Pending.PostHash {
+				return failure(host.ErrConflict)
+			}
+			snapshot := m.hostRecoverySnapshot
+			if snapshot == nil {
+				snapshot = m.NewHostNative().Snapshot
+			}
+			current, e := snapshot(ctx)
+			if e != nil {
+				return failure(e)
+			}
+			unlock, e := host.DeferForRecordedRecovery(ctx, m.hostJournalDir, current)
+			if e != nil {
+				return failure(e)
+			}
+			defer unlock()
+			ctx = context.WithValue(ctx, hostCASKey{}, true)
+		}
+	}
 	planner := m.planNetwork
 	if planner == nil {
 		planner = planNetworkResource
 	}
 	if write && record != nil && record.Pending != nil {
 		pending := record.Pending
-		original, err := planner(db, &pending.Request)
-		if err != nil {
-			return failure(fmt.Errorf("pending request cannot be planned safely: %w", err))
-		}
-		if original == nil || original.Identity != identity || !reflect.DeepEqual(original.Desired, pending.After) {
-			return failure(fmt.Errorf("pending planner output changed; manual inspection required"))
-		}
-		if err := validateNetworkActivationPreflight(r.Kind, original); err != nil {
-			return failure(err)
-		}
-		if (original.Activate != nil) != (pending.Activation != "") {
-			return failure(fmt.Errorf("pending activation contract changed; manual inspection required"))
-		}
-		out, st := m.finishNetwork(ctx, journal, state, record, original, db, raw)
+		out, st := m.finishRecordedNetwork(ctx, journal, state, identity, record, db, raw)
 		if st == nil && operation == "ensure" {
 			// Do not execute the caller's new desired state in the recovery call.
 			var previous, current any
@@ -740,6 +754,31 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		return fail("pending network journal durability uncertain: " + err.Error())
 	}
 	return m.finishNetwork(ctx, journal, state, record, p, db, raw)
+}
+
+func (m *SonicAgent) finishRecordedNetwork(ctx context.Context, j *vlanAuthorityJournal, state *networkJournalState, identity string, r *networkRecord, db vlanChangeDB, raw string) (*agent.NetworkResult, *agent.Status) {
+	fail := func(e error) (*agent.NetworkResult, *agent.Status) {
+		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, e.Error())
+	}
+	planner := m.planNetwork
+	if planner == nil {
+		planner = planNetworkResource
+	}
+	pending := r.Pending
+	original, e := planner(db, &pending.Request)
+	if e != nil {
+		return fail(fmt.Errorf("pending request cannot be planned safely: %w", e))
+	}
+	if original == nil || original.Identity != identity || !reflect.DeepEqual(original.Desired, pending.After) {
+		return fail(fmt.Errorf("pending planner output changed; manual inspection required"))
+	}
+	if e = validateNetworkActivationPreflight(r.Kind, original); e != nil {
+		return fail(e)
+	}
+	if (original.Activate != nil) != (pending.Activation != "") {
+		return fail(fmt.Errorf("pending activation contract changed; manual inspection required"))
+	}
+	return m.finishNetwork(ctx, j, state, r, original, db, raw)
 }
 
 func (m *SonicAgent) observeNetwork(ctx context.Context, db vlanChangeDB, p *networkPlan, r *networkRecord) (*agent.NetworkResult, *agent.Status) {
