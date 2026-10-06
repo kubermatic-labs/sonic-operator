@@ -120,7 +120,7 @@ go run ./hack/host-artifact-release \
 ```
 
 - Build flags: Linux amd64, `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=true`, `-ldflags='-s -w'`.
-- The generator reads the actual ELF/Go build provenance and compiled capability declaration, rejects dirty or mismatched builds, and checks that each build commit exists in the repository and descends from every commit in `releasebundle.Floors` (empty by default; set it to fixes that releases must never fall below).
+- The generator reads the actual ELF/Go build provenance and compiled capability declaration, rejects dirty or mismatched builds, and checks that each build commit exists in the repository and descends from every commit in `releasebundle.Floors` (empty by default; set it to fixes that releases must never fall below). Builds that declare the `host-imported-mac-unit-v1` capability must also descend from `releasebundle.ImportedMACFloors`, and the release records exactly the floors that apply to its agent build.
 - Binary inspection and chunk publication use the same retained, bounded byte buffer, so replacing a build output file afterwards cannot substitute different bytes.
 - Output: `config/agent/releases/<json-sha256>.json` (git-ignored; publish it with your release, not in source). Schema: `config/agent/releases/host-artifact-v1.schema.json`.
 - Generated release JSON always contains `reviewRequired: true`. It describes the build; it does not authorize deployment.
@@ -171,6 +171,7 @@ Without `--switch-input`, the output is an **unqualified base-profile source set
 
 - `switch`: the target switch.
 - `agent`: typed agent options.
+- `importedMACEnvironment` (optional): set to `sonic-dpu-none-v1` on images whose systemd generator adds a non-DPU `environment.conf` drop-in to `interfaces-config.service`. The tool then qualifies that generated drop-in and the native unit fragment exactly, and remeasures them after regeneration, bootstrap repair and boot. It does not take ownership of the generated file.
 - `hooks`: imported legacy management-MAC hooks. Each hook supplies:
   - `declaration`: a `LegacyMACHook` with `kind`, observed base/active MAC and address tuple. For `kind: management-mac-python`, `hostname` is **required** (the Python helper selects its MAC by hostname) and must be a lowercase DNS label such as `leaf-01`. For `management-mac-shell`, `hostname` must be omitted.
   - `interpreterSHA256`: the measured interpreter hash.
