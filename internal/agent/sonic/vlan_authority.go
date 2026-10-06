@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
+
 	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 )
@@ -93,6 +95,9 @@ func (m *SonicAgent) ReconcileVLANAuthority(ctx context.Context, request *agent.
 	record, err := j.load(id)
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
+	}
+	if record != nil && record.Pending != nil {
+		ctx = context.WithValue(ctx, artifactRecoveryKey{}, true)
 	}
 	breakoutUnlock, err := m.guardBreakoutWrites(ctx)
 	if err != nil {
@@ -328,6 +333,9 @@ func (m *SonicAgent) ReleaseVLANAuthority(ctx context.Context, id uint32, owner 
 }
 
 func (j *vlanAuthorityJournal) checkPending(id uint32) error {
+	return j.checkPendingMode(id, false)
+}
+func (j *vlanAuthorityJournal) checkPendingMode(id uint32, allowRecovery bool) error {
 	d, err := j.root.Open(".")
 	if err != nil {
 		return err
@@ -352,8 +360,8 @@ func (j *vlanAuthorityJournal) checkPending(id uint32) error {
 		if r == nil {
 			return fmt.Errorf("journal changed while locked")
 		}
-		if r.Pending != nil {
-			return fmt.Errorf("Vlan%d has pending persistence; reconcile its owner first", n)
+		if r.Pending != nil && !allowRecovery {
+			return fmt.Errorf("%w: Vlan%d has pending persistence; reconcile its owner first", artifactstate.ErrForeignPending, n)
 		}
 	}
 	return nil

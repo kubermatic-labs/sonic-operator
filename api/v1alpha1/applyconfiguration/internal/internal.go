@@ -57,6 +57,155 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: numeric
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
   scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactAgentOptions
+  map:
+    fields:
+    - name: artifacts
+      type:
+        scalar: boolean
+    - name: bindAddress
+      type:
+        scalar: string
+    - name: breakout
+      type:
+        scalar: boolean
+    - name: frrMigration
+      type:
+        scalar: boolean
+    - name: hostConfig
+      type:
+        scalar: boolean
+    - name: hostGuard
+      type:
+        scalar: boolean
+    - name: network
+      type:
+        scalar: boolean
+    - name: port
+      type:
+        scalar: numeric
+    - name: readOnly
+      type:
+        scalar: boolean
+    - name: redundancy
+      type:
+        scalar: boolean
+    - name: trafficPolicy
+      type:
+        scalar: boolean
+    - name: vlanAuthority
+      type:
+        scalar: boolean
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactBootstrapSpec
+  map:
+    fields:
+    - name: hostRecovery
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactHostRecoverySpec
+    - name: policyRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+    - name: policySHA256
+      type:
+        scalar: string
+    - name: supervisorChunks
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+          elementRelationship: atomic
+    - name: supervisorSHA256
+      type:
+        scalar: string
+    - name: unitSHA256
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: uid
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactFile
+  map:
+    fields:
+    - name: chunks
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+          elementRelationship: atomic
+    - name: sha256
+      type:
+        scalar: string
+    - name: slot
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactHostRecoverySpec
+  map:
+    fields:
+    - name: binaryChunks
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+          elementRelationship: atomic
+    - name: binarySHA256
+      type:
+        scalar: string
+    - name: configSHA256
+      type:
+        scalar: string
+    - name: journalLayout
+      type:
+        scalar: string
+    - name: macHooks
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactMACHookSpec
+          elementRelationship: associative
+          keys:
+          - kind
+    - name: profileRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+    - name: profileSHA256
+      type:
+        scalar: string
+    - name: serviceSHA256
+      type:
+        scalar: string
+    - name: timerSHA256
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactMACHookSpec
+  map:
+    fields:
+    - name: helperRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+    - name: helperSHA256
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: sourceHookRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactContentRef
+    - name: sourceHookSHA256
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.BreakoutManagementPolicy
   scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostResourceStatus
@@ -291,6 +440,93 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: switchRef
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkSwitchReference
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchArtifact
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchArtifactSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchArtifactStatus
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchArtifactSpec
+  map:
+    fields:
+    - name: activation
+      type:
+        scalar: string
+      default: AgentRestart
+    - name: agent
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactAgentOptions
+    - name: baseline
+      type:
+        scalar: string
+    - name: bootstrap
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactBootstrapSpec
+    - name: files
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactFile
+          elementRelationship: associative
+          keys:
+          - slot
+    - name: managementPolicy
+      type:
+        scalar: string
+      default: Observe
+    - name: retireLegacyHook
+      type:
+        scalar: boolean
+    - name: switchName
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchArtifactStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: configurationVerified
+      type:
+        scalar: boolean
+    - name: identity
+      type:
+        scalar: string
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: persistenceVerified
+      type:
+        scalar: boolean
+    - name: recoveryPhase
+      type:
+        scalar: string
+    - name: recoveryReason
+      type:
+        scalar: string
+    - name: runtimeVerified
+      type:
+        scalar: boolean
+    - name: target
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchBGP
   map:
     fields:

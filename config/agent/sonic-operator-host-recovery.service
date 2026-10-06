@@ -1,6 +1,7 @@
 [Unit]
 Description=Recover expired SONiC operator management transactions locally
 After=database.service
+RequiresMountsFor=/host
 
 [Service]
 Type=oneshot

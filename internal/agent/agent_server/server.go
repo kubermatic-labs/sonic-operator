@@ -15,6 +15,7 @@ import (
 	hp "github.com/ironcore-dev/sonic-operator/internal/agent/hostproto"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
+	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 
 	switchAgent "github.com/ironcore-dev/sonic-operator/internal/agent/interface"
@@ -23,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/stats"
 	grpcstatus "google.golang.org/grpc/status"
 )
 
@@ -326,6 +328,8 @@ func readOnlyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 	switch info.FullMethod {
 	case hp.HostService_Get_FullMethodName,
 		pb.SwitchAgentService_GetDeviceInfo_FullMethodName,
+		pb.ArtifactService_Observe_FullMethodName,
+		pb.ArtifactService_GetCapabilities_FullMethodName,
 		pb.SwitchAgentService_ListInterfaces_FullMethodName,
 		pb.SwitchAgentService_ListPorts_FullMethodName,
 		pb.SwitchAgentService_GetInterface_FullMethodName,
@@ -364,14 +368,19 @@ func newGRPCServerWithTrafficPolicy(certFile, keyFile, clientCAFile string, read
 
 // Redundancy requires an independent opt-in for both Ensure and Recover.
 func newGRPCServerWithRedundancy(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic, allowRedundancy bool) (*grpc.Server, error) {
-	tlsConfig, err := transport.LoadTLSConfig(certFile, keyFile, clientCAFile)
+	server, _, err := newGRPCServerWithTLSProof(certFile, keyFile, clientCAFile, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic, allowRedundancy)
+	return server, err
+}
+func newGRPCServerWithTLSProof(certFile, keyFile, clientCAFile string, readOnly, allowAuthoritative, allowBreakout, allowNetwork, allowMigration, allowTraffic, allowRedundancy bool) (*grpc.Server, *transport.LoadedTLS, error) {
+	tlsConfig, proof, err := transport.LoadTLSConfigWithEvidence(certFile, keyFile, clientCAFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tlsConfig.ClientCAs = tlsConfig.RootCAs
 	tlsConfig.RootCAs = nil
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig)), grpc.StatsHandler(hostConnectionStats{})}
+	admission := newArtifactAdmission()
+	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig)), grpc.MaxRecvMsgSize(4 << 20), grpc.InTapHandle(admission.tap), grpc.StatsHandler(combinedStats{handlers: []stats.Handler{hostConnectionStats{}, admission}})}
 	allow := allowAuthoritative && !readOnly
 	opts = append(opts, grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		switch info.FullMethod {
@@ -420,18 +429,24 @@ func newGRPCServerWithRedundancy(certFile, keyFile, clientCAFile string, readOnl
 			}),
 		)
 	}
-	return grpc.NewServer(opts...), nil
+	return grpc.NewServer(opts...), proof, nil
 }
 
 func StartServer() {
 	flag.Parse()
+	if *allowArtifacts && (!*artifactReservationV1 || *vlanAuthorityJournalDir == "" || *breakoutJournalDir == "" || *networkJournalDir == "") {
+		log.Fatal("artifact writes require reservation-v1 and all cooperating journals")
+	}
 
 	// Validate security configuration before opening a listener or contacting the backend.
-	s, err := newGRPCServerWithRedundancy(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration, *allowTrafficPolicy, *allowRedundancy)
+	s, proof, err := newGRPCServerWithTLSProof(*tlsCertFile, *tlsKeyFile, *tlsClientCAFile, *readOnly, *allowAuthoritativeVLANs, *allowBreakout, *allowNetworkConfig, *allowFRRMigration, *allowTrafficPolicy, *allowRedundancy)
 	if err != nil {
 		log.Fatalf("invalid agent TLS configuration: %v", err)
 	}
 	defer s.Stop()
+	if err := transport.PublishLoadedTLS(transport.LoadedTLSPath, proof); err != nil {
+		log.Fatal("cannot publish process-bound TLS load evidence")
+	}
 	if *allowAuthoritativeVLANs && !*readOnly && *vlanAuthorityJournalDir == "" {
 		log.Fatal("--vlan-authority-journal-dir is required when authoritative VLANs are enabled")
 	}
@@ -460,6 +475,7 @@ func StartServer() {
 	if err := registerHost(s, swAgent); err != nil {
 		log.Fatal("host recovery initialization failed")
 	}
+	pb.RegisterArtifactServiceServer(s, &artifactServer{allow: *allowArtifacts && !*readOnly, execute: artifact.SupervisorRequest})
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(*bindAddress, strconv.Itoa(*port)))
 	if err != nil {

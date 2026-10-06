@@ -37,3 +37,16 @@ func TestHostPendingBlocksOrdinaryConfigSaves(t *testing.T) {
 		t.Fatal("ordinary writer can strand management rollback behind new network work")
 	}
 }
+
+func TestHostJournalRejectsNestedDependencyOrArtifactRoots(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "host")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []*SonicAgent{{networkJournalDir: root}, {artifactStateDir: root}, {breakoutJournalDir: filepath.Join(dir, "child")}} {
+		if err := m.ConfigureHostJournal(dir); err == nil {
+			t.Fatal("nested state ownership accepted")
+		}
+	}
+}

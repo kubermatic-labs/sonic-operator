@@ -173,6 +173,7 @@ func TestMTLSReadOnlyServer(t *testing.T) {
 	}
 	backend := &securityBackend{}
 	pb.RegisterSwitchAgentServiceServer(s, NewProxyServer(backend))
+	pb.RegisterArtifactServiceServer(s, &artifactServer{allow: false})
 	for name := range s.GetServiceInfo() {
 		if strings.Contains(name, "reflection") {
 			t.Fatalf("reflection enabled: %s", name)
@@ -233,6 +234,10 @@ func TestMTLSReadOnlyServer(t *testing.T) {
 			}
 			if err != nil || resp.GetHwsku() != "test-switch" {
 				t.Fatalf("authenticated read: %v, %v", resp, err)
+			}
+			caps, err := pb.NewArtifactServiceClient(conn).GetCapabilities(ctx, &pb.ArtifactCapabilitiesRequest{})
+			if err != nil || len(caps.GetCapabilities()) != 8 {
+				t.Fatalf("read-only mTLS capabilities: %v", err)
 			}
 			for _, method := range []string{
 				pb.SwitchAgentService_SaveConfig_FullMethodName,

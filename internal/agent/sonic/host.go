@@ -10,10 +10,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 )
 
 func (m *SonicAgent) ConfigureHostJournal(dir string) error {
+	artifactDir := m.artifactStateDir
+	if artifactDir == "" {
+		artifactDir = artifactstate.DefaultDir
+	}
+	if err := host.ValidateJournalPaths(dir, m.journalDir, m.breakoutJournalDir, m.networkJournalDir, artifactDir); err != nil {
+		return err
+	}
 	if !filepath.IsAbs(dir) {
 		return host.ErrStorage
 	}
@@ -81,6 +89,13 @@ func hostChanges(before, after host.Database) (vlanChangeDB, vlanChangeDB, error
 // while the host protocol itself exposes only typed management/system settings.
 func (m *SonicAgent) NewHostNative() *host.Native {
 	return &host.Native{
+		BaseMAC: func(ctx context.Context) (string, error) {
+			db, _, err := m.vlanChangeSnapshot(ctx)
+			if err != nil {
+				return "", host.ErrNative
+			}
+			return db["DEVICE_METADATA|localhost"]["mac"], nil
+		},
 		Load: func(ctx context.Context) (host.Database, error) {
 			db, _, e := m.vlanChangeSnapshot(ctx)
 			if e != nil {
@@ -112,39 +127,65 @@ func (m *SonicAgent) NewHostNative() *host.Native {
 			}
 			return nil
 		},
-		WithMutation:   m.withHostMutation,
-		BeforeRecovery: m.recoverHostDependencies,
+		WithMutation:      m.withHostMutation,
+		WithRecovery:      m.withHostRecordedRecovery,
+		BeforePublication: func(context.Context) error { return artifactstate.CheckPending(m.artifactStateDir) },
+		BeforeRecovery:    m.recoverHostDependencies,
 	}
 }
 func (m *SonicAgent) withHostMutation(ctx context.Context, fn func() error) error {
 	return m.withHostWriterLocks(ctx, func(locks hostWriterLocks) error {
-		if locks.vlan != nil {
-			if err := locks.vlan.checkPending(0); err != nil {
-				return host.ErrConflict
-			}
+		if err := checkHostDependencies(locks); err != nil {
+			return err
 		}
-		if locks.breakout != nil {
-			r, e := loadBreakoutRecord(locks.breakout)
-			if e != nil {
-				return host.ErrStorage
-			}
-			if r != nil && r.Pending {
-				return host.ErrConflict
-			}
-		}
-		if locks.network != nil {
-			r, e := loadNetworkJournal(locks.network)
-			if e != nil {
-				return host.ErrStorage
-			}
-			for _, record := range r.Records {
-				if record.Pending != nil {
-					return host.ErrConflict
-				}
-			}
+		if err := m.artifactAdmission(ctx); err != nil {
+			return err
 		}
 		return fn()
 	})
+}
+
+// Only Engine.RecoverExpired enters here; its persisted expired transaction and
+// Native Before/Candidate checks remain the replay authority.
+func (m *SonicAgent) withHostRecordedRecovery(ctx context.Context, fn func(context.Context) error) error {
+	return m.withHostWriterLocks(ctx, func(locks hostWriterLocks) error {
+		if err := checkHostDependencies(locks); err != nil {
+			return err
+		}
+		if err := artifactstate.CheckRecovery(m.artifactStateDir); err != nil {
+			return err
+		}
+		return fn(context.WithValue(ctx, artifactRecoveryKey{}, true))
+	})
+}
+
+func checkHostDependencies(locks hostWriterLocks) error {
+	if locks.vlan != nil {
+		if err := locks.vlan.checkPending(0); err != nil {
+			return host.ErrConflict
+		}
+	}
+	if locks.breakout != nil {
+		r, e := loadBreakoutRecord(locks.breakout)
+		if e != nil {
+			return host.ErrStorage
+		}
+		if r != nil && r.Pending {
+			return host.ErrConflict
+		}
+	}
+	if locks.network != nil {
+		r, e := loadNetworkJournal(locks.network)
+		if e != nil {
+			return host.ErrStorage
+		}
+		for _, record := range r.Records {
+			if record.Pending != nil {
+				return host.ErrConflict
+			}
+		}
+	}
+	return nil
 }
 
 type hostWriterLocks struct{ vlan, breakout, network *vlanAuthorityJournal }

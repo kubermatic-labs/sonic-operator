@@ -37,16 +37,19 @@ const (
 )
 
 type SonicAgent struct {
-	redisAddr   string
-	clientPool  map[string]*redis.Client
-	poolMutex   sync.RWMutex
-	linkByName  func(string) (netlink.Link, error)
-	saveConfig  func(context.Context) *agent.Status
-	versionInfo func() (map[string]string, error)
-	configMutex sync.Mutex
-	configDirty bool                 // A failed write/save may leave Redis and persisted config inconsistent.
-	journalDir  string               // Explicit persistent root-only VLAN authority journal.
-	journalSync func(*os.File) error // Optional directory fsync implementation.
+	// Set only on a private request-scoped backend, never on the shared agent.
+	redisContext     context.Context
+	artifactStateDir string // empty selects the fixed production reservation directory
+	redisAddr        string
+	clientPool       map[string]*redis.Client
+	poolMutex        sync.RWMutex
+	linkByName       func(string) (netlink.Link, error)
+	saveConfig       func(context.Context) *agent.Status
+	versionInfo      func() (map[string]string, error)
+	configMutex      sync.Mutex
+	configDirty      bool                 // A failed write/save may leave Redis and persisted config inconsistent.
+	journalDir       string               // Explicit persistent root-only VLAN authority journal.
+	journalSync      func(*os.File) error // Optional directory fsync implementation.
 
 	readSavedPortConfig func() ([]byte, error) // Optional local saved-file reader for tests.
 
@@ -134,13 +137,23 @@ func NewSonicRedisAgent(redisAddr string) (*SonicAgent, error) {
 }
 
 func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
+	return m.ConnectContext(context.Background(), dbName)
+}
+
+func (m *SonicAgent) ConnectContext(ctx context.Context, dbName string) (*redis.Client, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	m.poolMutex.RLock()
 	if client, exists := m.clientPool[dbName]; exists {
 		m.poolMutex.RUnlock()
 
 		// Test if connection is still alive
-		if err := client.Ping(context.Background()).Err(); err == nil {
+		if err := client.Ping(ctx).Err(); err == nil {
 			return client, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 	} else {
 		m.poolMutex.RUnlock()
@@ -152,8 +165,11 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 
 	// Double-check in case another goroutine created it
 	if client, exists := m.clientPool[dbName]; exists {
-		if err := client.Ping(context.Background()).Err(); err == nil {
+		if err := client.Ping(ctx).Err(); err == nil {
 			return client, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		// Close the dead connection
 		if err := client.Close(); err != nil {
@@ -168,7 +184,7 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 		return nil, fmt.Errorf("unknown database name: %s", dbName)
 	}
 
-	client := redis.NewClient(&redis.Options{
+	options := &redis.Options{
 		Addr:                  m.redisAddr,
 		DB:                    dbID,
 		DialTimeout:           RedisDialTimeout,
@@ -188,10 +204,16 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 		ConnMaxLifetime: 1 * time.Hour,
 
 		DisableIndentity: true, // Disable identity/protocol checks to avoid warnings
-	})
+	}
+	if m.redisContext != nil {
+		options.MaxRetries = -1
+		options.MinIdleConns = 0
+		options.Dialer = requestRedisDialer(m.redisContext)
+	}
+	client := redis.NewClient(options)
 
 	// Test the new connection
-	if err := client.Ping(context.Background()).Err(); err != nil {
+	if err := client.Ping(ctx).Err(); err != nil {
 		if err := client.Close(); err != nil {
 			return nil, fmt.Errorf("failed to close Redis client: %w", err)
 		}

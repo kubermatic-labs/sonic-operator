@@ -28,6 +28,10 @@ func (f *fakeBackend) Exclusive(ctx context.Context, fn func(context.Context) er
 	return fn(ctx)
 }
 func (f *fakeBackend) RecoverDependencies(context.Context) error { return nil }
+func (f *fakeBackend) CheckPublication(context.Context) error    { return nil }
+func (f *fakeBackend) ExclusiveRecovery(ctx context.Context, fn func(context.Context) error) error {
+	return f.Exclusive(ctx, fn)
+}
 
 func (f *fakeBackend) Observe(_ context.Context, r Request) (Result, error) {
 	match := r.Management == nil || managementEqual(f.state, *r.Management)

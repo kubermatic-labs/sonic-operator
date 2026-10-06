@@ -49,9 +49,7 @@ func (n *Native) Snapshot(ctx context.Context) (Snapshot, error) {
 	if json.Unmarshal(b, &links) != nil || len(links) != 1 {
 		return Snapshot{}, ErrNative
 	}
-	active := m
-	active.MAC = links[0].MAC
-	if active.MAC == "" || ValidateManagement(active) != nil {
+	if validateActiveMAC(links[0].MAC) != nil {
 		return Snapshot{}, ErrNative
 	}
 	return Snapshot{Management: m, ActiveMAC: links[0].MAC}, nil
@@ -115,18 +113,9 @@ func (n *Native) ApplyManagement(ctx context.Context, before Snapshot, m Managem
 }
 func (n *Native) RestoreManagement(ctx context.Context, scope RecoveryScope) error {
 	before := scope.Before
-	if ValidateManagement(before.Management) != nil || ValidateManagement(scope.Candidate) != nil {
+	owned := scope.MACOwned == nil || *scope.MACOwned
+	if validateRecoveryScope(scope) != nil {
 		return ErrInvalid
-	}
-	for _, mac := range []string{before.ActiveMAC, scope.ObservedActiveMAC} {
-		if mac == "" {
-			continue
-		}
-		m := before.Management
-		m.MAC = mac
-		if ValidateManagement(m) != nil {
-			return ErrInvalid
-		}
 	}
 	return n.mutate(ctx, func() error {
 		current, e := n.Snapshot(ctx)
@@ -152,15 +141,20 @@ func (n *Native) RestoreManagement(ctx context.Context, scope RecoveryScope) err
 				return ErrConflict
 			}
 		}
-		if current.ActiveMAC != before.ActiveMAC && current.ActiveMAC != scope.Candidate.MAC && (scope.ObservedActiveMAC == "" || current.ActiveMAC != scope.ObservedActiveMAC) {
+		if owned && current.ActiveMAC != before.ActiveMAC && current.ActiveMAC != scope.Candidate.MAC && (scope.ObservedActiveMAC == "" || current.ActiveMAC != scope.ObservedActiveMAC) {
 			return ErrConflict
 		}
 		current.Management.Addresses = cleanup
-		if e = n.applyManagement(ctx, current, before.Management, before.ActiveMAC, true); e != nil {
+		active := before.ActiveMAC
+		if !owned {
+			active = ""
+			before.Management.MAC = current.Management.MAC
+		}
+		if e = n.applyManagement(ctx, current, before.Management, active, owned); e != nil {
 			return e
 		}
 		restored, e := n.Snapshot(ctx)
-		if e != nil || restored.ActiveMAC != before.ActiveMAC || !managementEqual(restored.Management, before.Management) {
+		if e != nil || (owned && restored.ActiveMAC != before.ActiveMAC) || !managementEqual(restored.Management, before.Management) {
 			return ErrNative
 		}
 		return n.verifyRestoredScope(ctx, scope)

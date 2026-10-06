@@ -12,7 +12,12 @@ func (e *Engine) restore(ctx context.Context, r *record) error {
 		return nil
 	}
 	q := Request{Kind: "Management", Owner: p.Claim.Owner, Target: p.Claim.Target, Revision: p.Claim.Revision, Management: &p.Before.Management, RollbackSeconds: 60}
-	if e.backend.RestoreManagement(ctx, RecoveryScope{Before: p.Before, Candidate: p.Candidate, ObservedActiveMAC: p.ObservedActiveMAC}) != nil {
+	if p.MACOwned != nil && !*p.MACOwned {
+		before := p.Before.Management
+		before.MAC = ""
+		q.Management = &before
+	}
+	if e.backend.RestoreManagement(ctx, RecoveryScope{MACOwned: p.MACOwned, Before: p.Before, Candidate: p.Candidate, ObservedActiveMAC: p.ObservedActiveMAC}) != nil {
 		return ErrNative
 	}
 	v, err := e.backend.Observe(ctx, q)
@@ -36,7 +41,7 @@ func (e *Engine) RecoverExpired(ctx context.Context) error {
 	if err := e.backend.RecoverDependencies(ctx); err != nil {
 		return err
 	}
-	return e.backend.Exclusive(ctx, func(locked context.Context) error {
+	return e.backend.ExclusiveRecovery(ctx, func(locked context.Context) error {
 		return e.withRecord(locked, func(r *record) error {
 			if r.Pending == nil || !e.expired(r.Pending) {
 				return nil

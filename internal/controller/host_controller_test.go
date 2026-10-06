@@ -3,7 +3,9 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -48,7 +50,7 @@ func TestHostSecretResolutionUsesReferencesOnly(t *testing.T) {
 }
 
 func TestHostSecretChangesBetweenObservationAndWriteBlockEnsure(t *testing.T) {
-	for _, operation := range []string{"rotate", "delete"} {
+	for _, operation := range []string{"rotate", "delete", "recreate", "metadata"} {
 		t.Run(operation, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			_ = api.AddToScheme(scheme)
@@ -61,10 +63,19 @@ func TestHostSecretChangesBetweenObservationAndWriteBlockEnsure(t *testing.T) {
 			r := HostReconciler{Client: kube, APIReader: kube, Kind: "System", AllowHostConfig: true, NewAgentClient: func(ctx context.Context, _ client.Reader, _ *corev1.LocalObjectReference, _ string) (agentclient.SwitchAgentClient, error) {
 				return &hostControllerFake{get: func(int, host.Request) (host.Result, error) {
 					var err error
-					if operation == "delete" {
+					if operation == "delete" || operation == "recreate" {
 						err = kube.Delete(ctx, secret)
+						if err == nil && operation == "recreate" {
+							secret.UID = "replacement"
+							secret.ResourceVersion = ""
+							err = kube.Create(ctx, secret)
+						}
 					} else {
-						secret.Data["community"] = []byte("rotated-fixture-secret")
+						if operation == "metadata" {
+							secret.Labels = map[string]string{"revision": "new"}
+						} else {
+							secret.Data["community"] = []byte("rotated-fixture-secret")
+						}
 						err = kube.Update(ctx, secret)
 					}
 					if err != nil {
@@ -81,10 +92,116 @@ func TestHostSecretChangesBetweenObservationAndWriteBlockEnsure(t *testing.T) {
 			}
 			_ = kube.Get(t.Context(), client.ObjectKey{Name: "system"}, obj)
 			public, _ := json.Marshal(obj)
-			if strings.Contains(string(public), "fixture-secret") {
-				t.Fatal("credential leaked into public resource")
+			for _, credential := range []string{"old-fixture-secret", "rotated-fixture-secret"} {
+				if strings.Contains(string(public), credential) || strings.Contains(string(public), fmt.Sprintf("%x", sha256.Sum256([]byte(credential)))) {
+					t.Fatal("credential or credential hash leaked into public resource")
+				}
 			}
 		})
+	}
+}
+
+func TestHostDispatchFreshness(t *testing.T) {
+	for _, boundary := range []string{"ensure", "confirm"} {
+		for _, change := range []string{"object-delete", "object-recreate", "generation", "endpoint", "base-mac", "credential-ref", "switch-delete", "switch-recreate", "competing-owner", "credential-rotate", "credential-delete", "credential-recreate"} {
+			t.Run(boundary+"/"+change, func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				_ = api.AddToScheme(scheme)
+				_ = corev1.AddToScheme(scheme)
+				secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "fleet", Name: "credentials", UID: "secret-uid"}, Data: map[string][]byte{"password": []byte("private-credential-fixture")}}
+				sw := &api.Switch{ObjectMeta: metav1.ObjectMeta{Name: "sw", UID: "switch-uid"}, Spec: api.SwitchSpec{MacAddress: "00:11:22:33:44:55", Management: api.Management{Host: "10.0.0.11", Port: "50051", Credentials: corev1.ObjectReference{Namespace: secret.Namespace, Name: secret.Name}}}}
+				obj := &api.SwitchManagement{ObjectMeta: metav1.ObjectMeta{Name: "mgmt", UID: "owner", Generation: 1, Annotations: map[string]string{hostBindingAnnotation: encodeHostBinding(bindingForHost(sw))}}, Spec: api.SwitchManagementSpec{NetworkResourceSpec: api.NetworkResourceSpec{SwitchRef: api.NetworkSwitchReference{Name: "sw"}, ManagementPolicy: api.NetworkManagementPolicyManage}, Addresses: []api.ManagementAddress{{Prefix: "10.0.0.11/24", Gateway: "10.0.0.1"}}}}
+				kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(obj, sw).WithObjects(obj, sw, secret).Build()
+				update := func(o client.Object) {
+					t.Helper()
+					if err := kube.Update(t.Context(), o); err != nil {
+						t.Fatal(err)
+					}
+				}
+				remove := func(o client.Object) {
+					t.Helper()
+					if err := kube.Delete(t.Context(), o); err != nil {
+						t.Fatal(err)
+					}
+				}
+				create := func(o client.Object) {
+					t.Helper()
+					o.SetResourceVersion("")
+					if err := kube.Create(t.Context(), o); err != nil {
+						t.Fatal(err)
+					}
+				}
+				mutate := func() {
+					switch change {
+					case "object-delete":
+						remove(obj)
+					case "object-recreate":
+						remove(obj)
+						obj.UID = "replacement"
+						create(obj)
+					case "generation":
+						obj.Generation++
+						update(obj)
+					case "endpoint":
+						sw.Spec.Management.Host = "10.0.0.99"
+						update(sw)
+					case "base-mac":
+						sw.Spec.MacAddress = "00:11:22:33:44:66"
+						update(sw)
+					case "credential-ref":
+						sw.Spec.Management.Credentials.Name = "replacement"
+						update(sw)
+					case "switch-delete":
+						remove(sw)
+					case "switch-recreate":
+						remove(sw)
+						sw.UID = "replacement"
+						create(sw)
+					case "competing-owner":
+						other := obj.DeepCopy()
+						other.Name = "competitor"
+						other.UID = "competitor"
+						create(other)
+					case "credential-rotate":
+						if err := kube.Get(t.Context(), client.ObjectKeyFromObject(secret), secret); err != nil {
+							t.Fatal(err)
+						}
+						secret.Data["password"] = []byte("private-rotated-fixture")
+						update(secret)
+					case "credential-delete":
+						remove(secret)
+					case "credential-recreate":
+						remove(secret)
+						secret.UID = "replacement"
+						create(secret)
+					}
+				}
+				connections, ensures, confirms := 0, 0, 0
+				r := &HostReconciler{Client: kube, APIReader: kube, Kind: "Management", AllowHostConfig: true, NewAgentClient: func(ctx context.Context, reader client.Reader, _ *corev1.LocalObjectReference, _ string) (agentclient.SwitchAgentClient, error) {
+					credentials := &corev1.Secret{}
+					if err := reader.Get(ctx, client.ObjectKeyFromObject(secret), credentials); err != nil {
+						return nil, err
+					}
+					connections++
+					return &hostControllerFake{connection: connections, get: func(connection int, q host.Request) (host.Result, error) {
+						if (boundary == "ensure" && connection == 1) || (boundary == "confirm" && connection == 2) {
+							mutate()
+						}
+						return host.Result{Recovery: "Pending", Transaction: "tx", Challenge: "challenge", Owner: q.Owner}, nil
+					}, ensure: func(int, host.Request) (host.Result, error) { ensures++; return host.Result{Recovery: "Pending"}, nil }, confirm: func(int, host.Confirmation) (host.Result, error) { confirms++; return host.Result{}, nil }}, nil
+				}}
+				_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(obj)})
+				if err == nil || confirms != 0 || (boundary == "ensure" && ensures != 0) {
+					t.Fatalf("stale dispatch: ensure=%d confirm=%d err=%v", ensures, confirms, err)
+				}
+				current := &api.SwitchManagement{}
+				_ = kube.Get(t.Context(), client.ObjectKeyFromObject(obj), current)
+				public, _ := json.Marshal(current.Status)
+				if strings.Contains(string(public)+err.Error(), "private-") {
+					t.Fatal("credential leaked")
+				}
+			})
+		}
 	}
 }
 

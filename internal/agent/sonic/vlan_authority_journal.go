@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/artifactstate"
+
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	"golang.org/x/sys/unix"
 )
@@ -126,9 +128,10 @@ func vlanAuthoritySecure(info os.FileInfo, directory bool) error {
 }
 
 type vlanAuthorityJournal struct {
-	root    *os.Root
-	lock    *os.File
-	syncDir func(*os.File) error
+	artifactDir string
+	root        *os.Root
+	lock        *os.File
+	syncDir     func(*os.File) error
 }
 
 func (j *vlanAuthorityJournal) close() {
@@ -158,7 +161,7 @@ func (m *SonicAgent) lockVLANAuthorityJournal(ctx context.Context) (*vlanAuthori
 		_ = root.Close()
 		return nil, err
 	}
-	j := &vlanAuthorityJournal{root: root, lock: f, syncDir: m.journalSync}
+	j := &vlanAuthorityJournal{root: root, lock: f, syncDir: m.journalSync, artifactDir: m.artifactStateDir}
 	info, err = f.Stat()
 	if err == nil {
 		err = vlanAuthoritySecure(info, false)
@@ -265,6 +268,16 @@ func (j *vlanAuthorityJournal) load(id uint32) (*vlanAuthorityRecord, error) {
 }
 
 func (j *vlanAuthorityJournal) store(r *vlanAuthorityRecord) error {
+	old, err := j.load(r.VLANID)
+	if err != nil {
+		return err
+	}
+	if err := j.artifactPublication(old != nil && old.Pending != nil); err != nil {
+		return err
+	}
+	if artifactstate.CheckPending(j.artifactDir) != nil && r.Pending != nil && (old == nil || old.Pending == nil || !reflect.DeepEqual(r.Pending.Request, old.Pending.Request)) {
+		return artifactstate.ErrReserved
+	}
 	// Detect damaged/partially edited records, including ownership identity. This
 	// is an integrity check, not authentication against a privileged local writer.
 	copy := *r

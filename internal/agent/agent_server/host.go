@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
@@ -26,7 +28,9 @@ type hostConnectionStats struct{}
 
 func (hostConnectionStats) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand unavailable")
+	}
 	return context.WithValue(ctx, hostConnectionKey{}, hex.EncodeToString(b))
 }
 func (hostConnectionStats) HandleConn(context.Context, stats.ConnStats) {}
@@ -41,8 +45,35 @@ func hostConnection(ctx context.Context) string {
 
 type hostServer struct {
 	hp.UnimplementedHostServiceServer
-	engine *host.Engine
-	writes bool
+	engine     *host.Engine
+	writes     bool
+	engineMu   sync.Mutex
+	loadEngine func(context.Context) (*host.Engine, error)
+}
+
+func (s *hostServer) hostEngine(ctx context.Context) (*host.Engine, error) {
+	for !s.engineMu.TryLock() {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	defer s.engineMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if s.engine == nil && s.loadEngine != nil {
+		e, err := s.loadEngine(ctx)
+		if err != nil {
+			return nil, err
+		}
+		s.engine = e
+	}
+	if s.engine == nil {
+		return nil, host.ErrStorage
+	}
+	return s.engine, nil
 }
 
 func hostResponse(r host.Result) *hp.HostResult {
@@ -66,12 +97,13 @@ func (s *hostServer) Get(ctx context.Context, q *hp.HostRequest) (*hp.HostResult
 	if e != nil {
 		return nil, hostError(e)
 	}
-	if s.engine == nil {
-		return nil, status.Error(codes.Unimplemented, "host recovery storage is not configured")
-	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	out, e := s.engine.Get(ctx, r, hostConnection(ctx))
+	engine, err := s.hostEngine(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Unimplemented, "host recovery storage is not configured")
+	}
+	out, e := engine.Get(ctx, r, hostConnection(ctx))
 	if e != nil {
 		return nil, hostError(e)
 	}
@@ -85,12 +117,13 @@ func (s *hostServer) Ensure(ctx context.Context, q *hp.HostRequest) (*hp.HostRes
 	if e != nil {
 		return nil, hostError(e)
 	}
-	if s.engine == nil {
-		return nil, status.Error(codes.FailedPrecondition, "host recovery storage is required")
-	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	out, e := s.engine.Ensure(ctx, r, hostConnection(ctx))
+	engine, err := s.hostEngine(ctx)
+	if err != nil {
+		return nil, status.Error(codes.FailedPrecondition, "host recovery storage is required")
+	}
+	out, e := engine.Ensure(ctx, r, hostConnection(ctx))
 	if e != nil {
 		return nil, hostError(e)
 	}
@@ -100,15 +133,16 @@ func (s *hostServer) Confirm(ctx context.Context, q *hp.HostConfirmation) (*hp.H
 	if !s.writes {
 		return nil, status.Error(codes.PermissionDenied, "host writes require explicit host capability and read-only=false")
 	}
-	if s.engine == nil {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	engine, err := s.hostEngine(ctx)
+	if err != nil {
 		return nil, status.Error(codes.FailedPrecondition, "host recovery storage is required")
 	}
 	if len(q.GetOwner()) > 256 || len(q.GetTarget()) > 256 || len(q.GetTransaction()) != 64 || len(q.GetChallenge()) != 64 {
 		return nil, hostError(host.ErrInvalid)
 	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	out, e := s.engine.Confirm(ctx, host.Confirmation{Owner: q.GetOwner(), Target: q.GetTarget(), Transaction: q.GetTransaction(), Challenge: q.GetChallenge()}, hostConnection(ctx))
+	out, e := engine.Confirm(ctx, host.Confirmation{Owner: q.GetOwner(), Target: q.GetTarget(), Transaction: q.GetTransaction(), Challenge: q.GetChallenge()}, hostConnection(ctx))
 	if e != nil {
 		return nil, hostError(e)
 	}
@@ -116,17 +150,63 @@ func (s *hostServer) Confirm(ctx context.Context, q *hp.HostConfirmation) (*hp.H
 }
 func registerHost(s *grpc.Server, backend *sonic.SonicAgent) error {
 	server := &hostServer{writes: *allowHostConfig && !*readOnly}
-	if server.writes {
-		cfg, err := host.ReadRecoveryConfig()
-		if err != nil || cfg != (host.RecoveryConfig{JournalDir: *hostJournalDir, RedisAddress: *redisAddr, VLANJournalDir: *vlanAuthorityJournalDir, BreakoutJournalDir: *breakoutJournalDir, NetworkJournalDir: *networkJournalDir}) {
+	if _, err := os.Lstat(host.RecoveryBootstrapDir); err == nil {
+		if *hostJournalDir != host.FleetRecoveryConfig().JournalDir {
 			return host.ErrStorage
 		}
-	}
-	if *hostJournalDir != "" {
+		// Retain the host publication fence even when the suite needs repair. The
+		// independent Bootstrap RPC must remain reachable across process restart.
 		if err := backend.ConfigureHostJournal(*hostJournalDir); err != nil {
 			return err
 		}
-		e, err := host.NewEngine(*hostJournalDir, backend.NewHostNative())
+		server.loadEngine = func(ctx context.Context) (*host.Engine, error) {
+			cfg, err := host.ReadRecoveryConfig()
+			if err != nil || cfg != host.FleetRecoveryConfig() || cfg != (host.RecoveryConfig{JournalDir: *hostJournalDir, RedisAddress: *redisAddr, VLANJournalDir: *vlanAuthorityJournalDir, BreakoutJournalDir: *breakoutJournalDir, NetworkJournalDir: *networkJournalDir}) {
+				return nil, host.ErrStorage
+			}
+			if _, err := (&host.Native{}).InstallationReceipt(true); err != nil {
+				return nil, err
+			}
+			e, err := host.NewRecoveryEngine(cfg, backend)
+			if err != nil {
+				return nil, err
+			}
+			ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+			defer cancel()
+			if err = e.RecoverExpired(ctx); err != nil {
+				return nil, err
+			}
+			return e, nil
+		}
+		// Failed installation readiness disables Host operations, while the same
+		// listener can repair its immutable suite. Lazy binding retries after repair.
+		_, _ = server.hostEngine(context.Background())
+		hp.RegisterHostServiceServer(s, server)
+		return nil
+	}
+	var cfg *host.RecoveryConfig
+	_, configErr := os.Lstat(host.RecoveryConfigFile)
+	if configErr != nil && !errors.Is(configErr, os.ErrNotExist) {
+		return host.ErrStorage
+	}
+	if server.writes || configErr == nil {
+		installed, err := host.ReadRecoveryConfig()
+		if err != nil || installed != (host.RecoveryConfig{JournalDir: *hostJournalDir, RedisAddress: *redisAddr, VLANJournalDir: *vlanAuthorityJournalDir, BreakoutJournalDir: *breakoutJournalDir, NetworkJournalDir: *networkJournalDir}) {
+			return host.ErrStorage
+		}
+		cfg = &installed
+	}
+	if *hostJournalDir != "" {
+		var e *host.Engine
+		var err error
+		if cfg != nil {
+			e, err = host.NewRecoveryEngine(*cfg, backend)
+		} else {
+			if err := backend.ConfigureHostJournal(*hostJournalDir); err != nil {
+				return err
+			}
+			e, err = host.NewEngine(*hostJournalDir, backend.NewHostNative())
+		}
 		if err != nil {
 			return err
 		}

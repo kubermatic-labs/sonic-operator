@@ -5,8 +5,12 @@ package main
 
 import (
 	server "github.com/ironcore-dev/sonic-operator/internal/agent/agent_server"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 )
 
 func main() {
+	if releaseinfo.PrintRequested() {
+		return
+	}
 	server.StartServer()
 }

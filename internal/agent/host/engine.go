@@ -23,6 +23,8 @@ var (
 
 type Backend interface {
 	Exclusive(context.Context, func(context.Context) error) error
+	ExclusiveRecovery(context.Context, func(context.Context) error) error
+	CheckPublication(context.Context) error
 	RecoverDependencies(context.Context) error
 	Observe(context.Context, Request) (Result, error)
 	Snapshot(context.Context) (Snapshot, error)
@@ -173,6 +175,9 @@ func (e *Engine) Ensure(ctx context.Context, q Request, conn string) (out Result
 				out, er = e.observe(ctx, q, r, conn)
 				return er
 			}
+			if er := e.backend.CheckPublication(ctx); er != nil {
+				return er
+			}
 			current, er := e.backend.Observe(ctx, q)
 			if er != nil {
 				return ErrNative
@@ -230,7 +235,12 @@ func (e *Engine) Ensure(ctx context.Context, q Request, conn string) (out Result
 			}
 			r.Management = requestClaim(q)
 			r.Pending = &transaction{ID: randomID(), Claim: *requestClaim(q), Before: recoveryBefore, Candidate: *q.Management, ObservedActiveMAC: before.ActiveMAC, Created: now, Deadline: now.Add(time.Duration(q.RollbackSeconds) * time.Second), Connection: conn}
+			owned := q.Management.MAC != ""
+			r.Pending.MACOwned = &owned
 			r.Pending.BootID, r.Pending.DeadlineUptime = clock.ID, clock.Seconds+float64(q.RollbackSeconds)
+			if er = e.backend.CheckPublication(ctx); er != nil {
+				return er
+			}
 			if er = e.save(r); er != nil {
 				return er
 			}

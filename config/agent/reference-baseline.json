@@ -1,0 +1,47 @@
+{
+  "baseline": "sonic-202511.1217682-4784cca11-dell-z9100",
+  "imageSHA256": "0cd0ea6266506346ed0b456976bfa6ce6a6cca01f0494edf051cbe1d31a47906",
+  "consumerSHA256": {
+    "pmon-interpreter": "6d972cf21be56fe3c947ab6ba257ff8d08c342dd2714442986791bd9a6dfabfe",
+    "pmon-xcvrd": "ecdabedda13313a0f5c43125a28aed1bf307fb68710edcca4bb90248533402e3",
+    "pmon-psud": "59b1b17d73b3eeb9c848057b4b4d8508f9d12940f7a2eb7bff848ed04be",
+    "pmon-syseepromd": "23109b875a2672f7b950b1543d91a85de5b2997cc9318879b605c6a4b6c1ffc1",
+    "pmon-stormond": "ef7933bb973405ec600954efc45db19a1d6ec9a8f90422fff05c7391a0ab5cac",
+    "pmon-launcher": "f3bc3582624c14ee312d302bc22d351bd9235603601b12268eeeee2c9c3c8c49",
+    "host-platform-installer": "5e8f32684ba23ad2f8e1a5ac38d093221119c3c6a58f9aa32086365a727a88fe",
+    "pmon-unit": "b7f5019ffae13944ce33086e99ec119ddaeee2d8a0f8c707279c8877fe6ff718",
+    "syncd-unit": "084993847eb733fcb330aa8aebd6c9e64544cc582d8d3f26239686c0ef4c9dc3",
+    "swss-unit": "f7ce822cb10073392e9fc3611318991cf9837788474a2b3e8bcb4ed7a9a44ad1",
+    "rc-local": "9fe2cff89d7ea5f11e94bffc36361075d7ba452d5dce27a38f3903949fe334a9",
+    "pmon-init": "24e37bbb8bede7a2d84f69af1ba50abbb1585fd29543e1e489894b390138b88a",
+    "pmon-supervisor-template": "abf23f3dd3cd7015f1ea72e6ea124247c3b364bf9458110cacc5bc363f465d80",
+    "sai-generator": "389eaa85e3147c546ff633af5673058925b64bbbe483f3af1b7b3932a1c39315",
+    "syncd-init": "fa92c263d53b1747a8a93b09c87cf3bfc31708a9419fa942212978cc48f9d0d4",
+    "syncd-launcher": "2eee40a2e3888f3a9e0714b85c2922f9638f8424c30d7841d18e9beb08501359"
+  },
+  "platform": {
+    "PlatformJSON": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/platform.json",
+    "PlatformWheel": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/sonic_platform-1.0-py3-none-any.whl",
+    "HWSKUJSON": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/Force10-Z9100-C32/hwsku.json",
+    "PortConfig": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/Force10-Z9100-C32/port_config.ini",
+    "SAIProfile": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/Force10-Z9100-C32/sai.profile",
+    "BroadcomConfig": "/usr/share/sonic/device/x86_64-dell_z9100_c2538-r0/Force10-Z9100-C32/dc-flex-with-sfp.config.bcm",
+    "PlatformFan": "/usr/local/lib/python3.13/dist-packages/sonic_platform/fan.py",
+    "PlatformInit": "/usr/local/lib/python3.13/dist-packages/sonic_platform/__init__.py",
+    "PlatformPSU": "/usr/local/lib/python3.13/dist-packages/sonic_platform/psu.py",
+    "PlatformComponent": "/usr/local/lib/python3.13/dist-packages/sonic_platform/component.py",
+    "PlatformSFP": "/usr/local/lib/python3.13/dist-packages/sonic_platform/sfp.py",
+    "PlatformThermal": "/usr/local/lib/python3.13/dist-packages/sonic_platform/thermal.py",
+    "PlatformAPI": "/usr/local/lib/python3.13/dist-packages/sonic_platform/platform.py",
+    "PlatformFanDrawer": "/usr/local/lib/python3.13/dist-packages/sonic_platform/fan_drawer.py",
+    "PlatformChassis": "/usr/local/lib/python3.13/dist-packages/sonic_platform/chassis.py",
+    "PlatformEEPROM": "/usr/local/lib/python3.13/dist-packages/sonic_platform/eeprom.py"
+  },
+  "runtime": {
+    "PlatformJSON": {"container": "pmon", "path": "/usr/share/sonic/platform/platform.json"},
+    "HWSKUJSON": {"container": "syncd", "path": "/usr/share/sonic/hwsku/hwsku.json"},
+    "PortConfig": {"container": "syncd", "path": "/usr/share/sonic/hwsku/port_config.ini"},
+    "SAIProfile": {"container": "syncd", "path": "/usr/share/sonic/hwsku/sai.profile"},
+    "BroadcomConfig": {"container": "syncd", "path": "/usr/share/sonic/hwsku/dc-flex-with-sfp.config.bcm"}
+  }
+}

@@ -158,8 +158,9 @@ func newSystemFixture(t *testing.T) *systemFixture {
 		p.ConsumerSHA256[c.key] = digestForTest(string(f.files[c.path]))
 	}
 	f.files[profileFile], _ = json.Marshal(p)
+	installFixtureSuite(f.files, p)
 	f.files["/etc/sonic/config_db.json"], _ = json.Marshal(f.db)
-	n := &Native{Load: func(context.Context) (Database, error) { return cloneDB(f.db), nil }, CAS: func(_ context.Context, _, after Database) error { f.db = cloneDB(after); return nil }, Save: func(context.Context) error { f.files["/etc/sonic/config_db.json"], _ = json.Marshal(f.db); return nil }, WithMutation: func(_ context.Context, fn func() error) error { return fn() }, Run: f.run, ReadFile: func(path string) ([]byte, error) {
+	n := &Native{BeforePublication: func(context.Context) error { return nil }, WithRecovery: func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) }, Load: func(context.Context) (Database, error) { return cloneDB(f.db), nil }, CAS: func(_ context.Context, _, after Database) error { f.db = cloneDB(after); return nil }, Save: func(context.Context) error { f.files["/etc/sonic/config_db.json"], _ = json.Marshal(f.db); return nil }, WithMutation: func(_ context.Context, fn func() error) error { return fn() }, Run: f.run, ReadFile: func(path string) ([]byte, error) {
 		b, ok := f.files[path]
 		if !ok {
 			return nil, os.ErrNotExist
@@ -172,6 +173,12 @@ func newSystemFixture(t *testing.T) *systemFixture {
 		f.files[path] = append([]byte(nil), data...)
 		return nil
 	}, bootNow: func() (bootClock, error) { return bootClock{ID: "test-boot", Seconds: f.clock}, nil }}
+	n.Run = func(ctx context.Context, args []string, input []byte) ([]byte, error) {
+		if b, ok := fixtureRecoveryUnit(args); ok {
+			return b, nil
+		}
+		return f.run(ctx, args, input)
+	}
 	n.SNMPExchange = func(_ context.Context, packet []byte) ([]byte, error) {
 		var req snmpMessage
 		if _, e := asn1.Unmarshal(packet, &req); e != nil {

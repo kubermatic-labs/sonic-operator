@@ -90,6 +90,7 @@ rules:
   resources:
   - switchaclbindings/status
   - switchaclpolicies/status
+  - switchartifacts/status
   - switchbgppeers/status
   - switchbgps/status
   - switchcredentials/status
@@ -117,6 +118,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchartifacts
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
