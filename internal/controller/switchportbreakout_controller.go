@@ -147,6 +147,17 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 		reason, message = "WritesDisabled", "Observation only; writes require managementPolicy=Manage, observe-only=false, allow-breakout=true and agent gates"
 		return result, nil
 	}
+	// Preparation records cleanup scope, not immutable admin/MTU intent. Only
+	// layout differences keep a previous operation on the transition path; an
+	// independent attribute update must not block exact populated adoption.
+	adoptOnly := current.ConfigurationVerified && current.Mode == b.Spec.Mode && (len(b.Status.PreviousChildren) == 0 || slices.EqualFunc(b.Status.PreviousChildren, b.Status.Children, func(before, after api.SwitchPortBreakoutChild) bool {
+		return before.Name == after.Name && before.Lanes == after.Lanes && before.Speed == after.Speed
+	}))
+	if adoptOnly && !current.AdoptionSupported {
+		return result, fmt.Errorf("agent does not advertise guarded no-op breakout adoption")
+	}
+	// Preserve the full fresh snapshot for post-RPC attribute preservation checks.
+	adoptedChildren := append([]api.SwitchPortBreakoutChild(nil), b.Status.Children...)
 	// Persist the pre-operation child set before issuing any command. A timeout,
 	// failed save or controller restart must not lose the only safe cleanup scope.
 	previous := append([]api.SwitchPortBreakoutChild(nil), b.Status.PreviousChildren...)
@@ -155,7 +166,7 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 			previous = append(previous, child)
 		}
 	}
-	if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous); err != nil {
+	if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous, adoptOnly); err != nil {
 		return result, err
 	}
 	if binding == "" {
@@ -186,7 +197,7 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 	b.Status.Mode, b.Status.Children = "", nil
 	b.Status.Message = ""
 	writeCtx, cancel := context.WithTimeout(ctx, 180*time.Second)
-	response, err := bc.ReconcilePortBreakout(writeCtx, &agent.PortBreakoutRequest{Port: b.Spec.Port, Mode: b.Spec.Mode, ChildAdminState: string(state)})
+	response, err := bc.ReconcilePortBreakout(writeCtx, &agent.PortBreakoutRequest{Port: b.Spec.Port, Mode: b.Spec.Mode, ChildAdminState: string(state), AdoptOnly: adoptOnly})
 	cancel()
 	if err != nil {
 		// Keep pending on an unknown outcome; the agent's durable journal decides
@@ -198,6 +209,10 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	if !b.Status.ConfigurationVerified || !b.Status.RuntimeVerified || !b.Status.PersistenceVerified || b.Status.Pending {
 		return result, fmt.Errorf("agent did not confirm desired configuration, runtime and persistence: %s", response.Message)
+	}
+	if adoptOnly && !reflect.DeepEqual(adoptedChildren, b.Status.Children) {
+		b.Status.ConfigurationVerified, b.Status.RuntimeVerified, b.Status.PersistenceVerified = false, false, false
+		return result, fmt.Errorf("no-op adoption changed the observed children or admin states")
 	}
 	beforeLanes, afterLanes := map[string]bool{}, map[string]bool{}
 	for _, child := range previous {
@@ -222,10 +237,10 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	// This check also fences inventory writes after a spec/endpoint change during
 	// the long-running device operation. It never uses the informer cache.
-	if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous); err != nil {
+	if err := r.checkBreakoutCurrent(ctx, b, s, a, bc, previous, adoptOnly); err != nil {
 		return result, err
 	}
-	if err := r.reconcileBreakoutInventory(ctx, b, s, a, bc, previous); err != nil {
+	if err := r.reconcileBreakoutInventory(ctx, b, s, a, bc, previous, adoptOnly); err != nil {
 		return result, err
 	}
 	b.Status.PreviousChildren = nil

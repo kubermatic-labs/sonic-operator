@@ -46,6 +46,28 @@ func breakoutNames(p *breakoutPlatform) map[string]bool {
 	return names
 }
 
+// Caller holds the network journal lock. Confirmed Port ownership survives API
+// deletion and must fence topology changes, including names absent from the
+// current mode that a transition would recreate. Equal-state adoption bypasses
+// this breakout-specific check; ordinary admin writes retain their own guard.
+func breakoutNetworkDependencies(p *breakoutPlatform, state *networkJournalState) error {
+	if state == nil {
+		return nil
+	}
+	names := breakoutNames(p)
+	for _, record := range state.Records {
+		if record.Kind != "Port" {
+			continue
+		}
+		for key := range record.Fields {
+			if names[strings.TrimPrefix(key, "PORT|")] {
+				return fmt.Errorf("affected port has durable typed ownership; destructive breakout forbidden")
+			}
+		}
+	}
+	return nil
+}
+
 func breakoutTarget(db vlanChangeDB, p *breakoutPlatform) vlanChangeDB {
 	target := vlanChangeDB{}
 	for name := range breakoutNames(p) {
@@ -242,7 +264,7 @@ func breakoutTargets(db vlanChangeDB, p *breakoutPlatform, r agent.PortBreakoutR
 }
 
 func breakoutResult(db vlanChangeDB, p *breakoutPlatform, r *breakoutRecord) *agent.PortBreakout {
-	out := &agent.PortBreakout{Port: p.Port, Mode: db["BREAKOUT_CFG|"+p.Port]["brkout_mode"]}
+	out := &agent.PortBreakout{Port: p.Port, Mode: db["BREAKOUT_CFG|"+p.Port]["brkout_mode"], AdoptionSupported: true}
 	for mode := range p.Modes {
 		out.SupportedModes = append(out.SupportedModes, mode)
 	}

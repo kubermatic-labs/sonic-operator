@@ -33,6 +33,27 @@ type SwitchInterfaceSpec struct {
 	// AdminState represents the desired administrative state of the interface.
 	// +optional
 	AdminState AdminState `json:"adminState,omitempty"`
+
+	// ManagementPolicy controls only speed, MTU and FEC ownership. AdminState
+	// retains its separate opt-in management annotation.
+	// +optional
+	// +kubebuilder:default=Observe
+	// +kubebuilder:validation:Enum=Observe;Manage
+	ManagementPolicy NetworkManagementPolicy `json:"managementPolicy,omitempty"`
+	// Speed is the existing configured port speed in Mbit/s. Omission is unowned.
+	// Adoption and repair are supported; changing an adopted value is not.
+	// +optional
+	// +kubebuilder:validation:Enum=1000;10000;25000;100000
+	Speed *uint32 `json:"speed,omitempty"`
+	// MTU is the existing configured L3 MTU. Omission preserves native defaults.
+	// +optional
+	// +kubebuilder:validation:Minimum=1280
+	// +kubebuilder:validation:Maximum=9216
+	MTU *uint32 `json:"mtu,omitempty"`
+	// FEC is an existing native FEC setting. Omission does not install a default.
+	// +optional
+	// +kubebuilder:validation:Enum=none;rs;fc
+	FEC string `json:"fec,omitempty"`
 }
 
 type OperationState string
@@ -66,6 +87,9 @@ type Neighbor struct {
 
 // SwitchInterfaceStatus defines the observed state of SwitchInterface.
 type SwitchInterfaceStatus struct {
+	// PortConfiguration reports speed/MTU/FEC independently of carrier and admin state.
+	// +optional
+	PortConfiguration NetworkResourceStatus `json:"portConfiguration,omitempty"`
 	// AdminState represents the desired administrative state of the interface.
 	// +optional
 	AdminState AdminState `json:"adminState,omitempty"`
@@ -77,6 +101,23 @@ type SwitchInterfaceStatus struct {
 	// State represents the high-level state of the SwitchInterface.
 	// +optional
 	State SwitchInterfaceState `json:"state,omitempty"`
+
+	// AdminStateManaged reports whether the explicit admin opt-in and the manager
+	// write gate were enabled for this reconciliation. It does not prove success;
+	// require AdminPersistenceReady=True for the current request and generation.
+	// False or absent means observed/read-only, not managed ownership.
+	// +optional
+	AdminStateManaged bool `json:"adminStateManaged,omitempty"`
+	// AdminStateRequest is the observed admin-state-request annotation. Use a new
+	// unique token for each annotation-only adoption and wait for this exact echo
+	// together with AdminPersistenceReady=True. The echo alone is not success.
+	// +optional
+	AdminStateRequest string `json:"adminStateRequest,omitempty"`
+	// AdminStateDigest is the SHA-256 fingerprint of the reconciled admin intent,
+	// including CR UID, generation, target, desired state, request and write gates.
+	// It is not a digest of the complete native configuration or forwarding state.
+	// +optional
+	AdminStateDigest string `json:"adminStateDigest,omitempty"`
 
 	// Neighbor is a reference to the connected neighbor device, if any.
 	// +optional

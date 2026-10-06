@@ -197,6 +197,7 @@ func (c *defaultSwitchAgentClient) SetInterfaceAdminStatus(ctx context.Context, 
 	iface.NativeName = resp.GetInterface().GetNativeName()
 	iface.MacAddress = resp.GetInterface().GetMacAddress()
 	iface.AdminStatus = agent.DeviceStatus(resp.GetInterface().GetAdminStatus())
+	iface.AdminPersistenceVerified = resp.GetInterface().GetAdminPersistenceVerified()
 	iface.OperationStatus = agent.DeviceStatus(resp.GetInterface().GetOperationalStatus())
 	iface.Status = agent.ProtoStatusToStatus(resp.GetStatus())
 

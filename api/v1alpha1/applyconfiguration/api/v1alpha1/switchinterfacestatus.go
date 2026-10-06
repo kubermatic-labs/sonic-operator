@@ -15,12 +15,27 @@ import (
 //
 // SwitchInterfaceStatus defines the observed state of SwitchInterface.
 type SwitchInterfaceStatusApplyConfiguration struct {
+	// PortConfiguration reports speed/MTU/FEC independently of carrier and admin state.
+	PortConfiguration *NetworkResourceStatusApplyConfiguration `json:"portConfiguration,omitempty"`
 	// AdminState represents the desired administrative state of the interface.
 	AdminState *apiv1alpha1.AdminState `json:"adminState,omitempty"`
 	// OperationalState represents the actual operational state of the interface.
 	OperationalState *apiv1alpha1.OperationState `json:"operationalState,omitempty"`
 	// State represents the high-level state of the SwitchInterface.
 	State *apiv1alpha1.SwitchInterfaceState `json:"state,omitempty"`
+	// AdminStateManaged reports whether the explicit admin opt-in and the manager
+	// write gate were enabled for this reconciliation. It does not prove success;
+	// require AdminPersistenceReady=True for the current request and generation.
+	// False or absent means observed/read-only, not managed ownership.
+	AdminStateManaged *bool `json:"adminStateManaged,omitempty"`
+	// AdminStateRequest is the observed admin-state-request annotation. Use a new
+	// unique token for each annotation-only adoption and wait for this exact echo
+	// together with AdminPersistenceReady=True. The echo alone is not success.
+	AdminStateRequest *string `json:"adminStateRequest,omitempty"`
+	// AdminStateDigest is the SHA-256 fingerprint of the reconciled admin intent,
+	// including CR UID, generation, target, desired state, request and write gates.
+	// It is not a digest of the complete native configuration or forwarding state.
+	AdminStateDigest *string `json:"adminStateDigest,omitempty"`
 	// Neighbor is a reference to the connected neighbor device, if any.
 	Neighbor *NeighborApplyConfiguration `json:"neighbor,omitempty"`
 	// MacAddress is the MAC address assigned to this interface.
@@ -35,6 +50,14 @@ type SwitchInterfaceStatusApplyConfiguration struct {
 // apply.
 func SwitchInterfaceStatus() *SwitchInterfaceStatusApplyConfiguration {
 	return &SwitchInterfaceStatusApplyConfiguration{}
+}
+
+// WithPortConfiguration sets the PortConfiguration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PortConfiguration field is set to the value of the last call.
+func (b *SwitchInterfaceStatusApplyConfiguration) WithPortConfiguration(value *NetworkResourceStatusApplyConfiguration) *SwitchInterfaceStatusApplyConfiguration {
+	b.PortConfiguration = value
+	return b
 }
 
 // WithAdminState sets the AdminState field in the declarative configuration to the given value
@@ -58,6 +81,30 @@ func (b *SwitchInterfaceStatusApplyConfiguration) WithOperationalState(value api
 // If called multiple times, the State field is set to the value of the last call.
 func (b *SwitchInterfaceStatusApplyConfiguration) WithState(value apiv1alpha1.SwitchInterfaceState) *SwitchInterfaceStatusApplyConfiguration {
 	b.State = &value
+	return b
+}
+
+// WithAdminStateManaged sets the AdminStateManaged field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AdminStateManaged field is set to the value of the last call.
+func (b *SwitchInterfaceStatusApplyConfiguration) WithAdminStateManaged(value bool) *SwitchInterfaceStatusApplyConfiguration {
+	b.AdminStateManaged = &value
+	return b
+}
+
+// WithAdminStateRequest sets the AdminStateRequest field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AdminStateRequest field is set to the value of the last call.
+func (b *SwitchInterfaceStatusApplyConfiguration) WithAdminStateRequest(value string) *SwitchInterfaceStatusApplyConfiguration {
+	b.AdminStateRequest = &value
+	return b
+}
+
+// WithAdminStateDigest sets the AdminStateDigest field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AdminStateDigest field is set to the value of the last call.
+func (b *SwitchInterfaceStatusApplyConfiguration) WithAdminStateDigest(value string) *SwitchInterfaceStatusApplyConfiguration {
+	b.AdminStateDigest = &value
 	return b
 }
 

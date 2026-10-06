@@ -56,13 +56,48 @@ spec:
                 description: AdminState represents the desired administrative state
                   of the interface.
                 type: string
+              fec:
+                description: FEC is an existing native FEC setting. Omission does
+                  not install a default.
+                enum:
+                - none
+                - rs
+                - fc
+                type: string
               handle:
                 description: Handle uniquely identifies this interface on the switch.
                 type: string
+              managementPolicy:
+                default: Observe
+                description: |-
+                  ManagementPolicy controls only speed, MTU and FEC ownership. AdminState
+                  retains its separate opt-in management annotation.
+                enum:
+                - Observe
+                - Manage
+                type: string
+              mtu:
+                description: MTU is the existing configured L3 MTU. Omission preserves
+                  native defaults.
+                format: int32
+                maximum: 9216
+                minimum: 1280
+                type: integer
               nativeName:
                 description: NativeName is the native name of the interface on the
                   switch (e.g., "Ethernet0").
                 type: string
+              speed:
+                description: |-
+                  Speed is the existing configured port speed in Mbit/s. Omission is unowned.
+                  Adoption and repair are supported; changing an adopted value is not.
+                enum:
+                - 1000
+                - 10000
+                - 25000
+                - 100000
+                format: int32
+                type: integer
               switchRef:
                 description: SwitchRef is a reference to the Switch this interface
                   is connected to.
@@ -88,6 +123,25 @@ spec:
               adminState:
                 description: AdminState represents the desired administrative state
                   of the interface.
+                type: string
+              adminStateDigest:
+                description: |-
+                  AdminStateDigest is the SHA-256 fingerprint of the reconciled admin intent,
+                  including CR UID, generation, target, desired state, request and write gates.
+                  It is not a digest of the complete native configuration or forwarding state.
+                type: string
+              adminStateManaged:
+                description: |-
+                  AdminStateManaged reports whether the explicit admin opt-in and the manager
+                  write gate were enabled for this reconciliation. It does not prove success;
+                  require AdminPersistenceReady=True for the current request and generation.
+                  False or absent means observed/read-only, not managed ownership.
+                type: boolean
+              adminStateRequest:
+                description: |-
+                  AdminStateRequest is the observed admin-state-request annotation. Use a new
+                  unique token for each annotation-only adoption and wait for this exact echo
+                  together with AdminPersistenceReady=True. The echo alone is not success.
                 type: string
               aliasName:
                 description: AliasName is the alias name of the interface.
@@ -175,6 +229,89 @@ spec:
                 description: OperationalState represents the actual operational state
                   of the interface.
                 type: string
+              portConfiguration:
+                description: PortConfiguration reports speed/MTU/FEC independently
+                  of carrier and admin state.
+                properties:
+                  conditions:
+                    description: Ready, Synced, ConfigurationReady, RuntimeReady and
+                      PersistenceReady are independent.
+                    items:
+                      description: Condition contains details for one aspect of the
+                        current state of this API Resource.
+                      properties:
+                        lastTransitionTime:
+                          description: |-
+                            lastTransitionTime is the last time the condition transitioned from one status to another.
+                            This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                          format: date-time
+                          type: string
+                        message:
+                          description: |-
+                            message is a human readable message indicating details about the transition.
+                            This may be an empty string.
+                          maxLength: 32768
+                          type: string
+                        observedGeneration:
+                          description: |-
+                            observedGeneration represents the .metadata.generation that the condition was set based upon.
+                            For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                            with respect to the current state of the instance.
+                          format: int64
+                          minimum: 0
+                          type: integer
+                        reason:
+                          description: |-
+                            reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                            Producers of specific condition types may define expected values and meanings for this field,
+                            and whether the values are considered a guaranteed API.
+                            The value should be a CamelCase string.
+                            This field may not be empty.
+                          maxLength: 1024
+                          minLength: 1
+                          pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                          type: string
+                        status:
+                          description: status of the condition, one of True, False,
+                            Unknown.
+                          enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                          type: string
+                        type:
+                          description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                          maxLength: 316
+                          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                          type: string
+                      required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - type
+                    x-kubernetes-list-type: map
+                  configurationVerified:
+                    type: boolean
+                  exists:
+                    type: boolean
+                  observed:
+                    description: Observed preserves the agent's structured observation
+                      without interpreting it.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  observedGeneration:
+                    format: int64
+                    type: integer
+                  persistenceVerified:
+                    type: boolean
+                  runtimeVerified:
+                    type: boolean
+                type: object
               state:
                 description: State represents the high-level state of the SwitchInterface.
                 type: string

@@ -89,6 +89,7 @@ func breakoutFixture(t *testing.T) (*api.SwitchPortBreakout, *api.Switch, *break
 			{Name: "Ethernet3", Lanes: "4", Speed: "25000", AdminState: "down", MTU: "9100"},
 		}}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(b).WithObjects(b, s).Build()
+	a.current.AdoptionSupported, a.response.AdoptionSupported = true, true
 	r := &SwitchPortBreakoutReconciler{Client: c, APIReader: c, AllowBreakout: true,
 		NewAgentClient: func(context.Context, client.Reader, *corev1.LocalObjectReference, string) (agentclient.SwitchAgentClient, error) {
 			return a, nil
@@ -492,7 +493,7 @@ func TestSwitchPortBreakoutCleanupScope(t *testing.T) {
 					return cli.Delete(ctx, obj, opts...)
 				}})
 			}
-			err := r.reconcileBreakoutInventory(t.Context(), b, s, a, a, previous)
+			err := r.reconcileBreakoutInventory(t.Context(), b, s, a, a, previous, false)
 			if name == "edited during delete" {
 				if err == nil {
 					t.Fatal("concurrent edit bypassed delete preconditions")

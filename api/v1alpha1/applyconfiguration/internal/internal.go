@@ -324,6 +324,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
       default: Observe
+    - name: mode
+      type:
+        scalar: string
+      default: Unified
     - name: prefixes
       type:
         list:
@@ -586,12 +590,25 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminState
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+    - name: fec
+      type:
+        scalar: string
     - name: handle
       type:
         scalar: string
+    - name: managementPolicy
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkManagementPolicy
+      default: Observe
+    - name: mtu
+      type:
+        scalar: numeric
     - name: nativeName
       type:
         scalar: string
+    - name: speed
+      type:
+        scalar: numeric
     - name: switchRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
@@ -603,6 +620,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminState
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
+    - name: adminStateDigest
+      type:
+        scalar: string
+    - name: adminStateManaged
+      type:
+        scalar: boolean
+    - name: adminStateRequest
+      type:
+        scalar: string
     - name: aliasName
       type:
         scalar: string
@@ -623,6 +649,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: operationalState
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.OperationState
+    - name: portConfiguration
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkResourceStatus
     - name: state
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SwitchInterfaceState

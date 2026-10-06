@@ -318,7 +318,16 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 			}
 			portRef := regexp.MustCompile(`(^|[^a-zA-Z0-9])` + name + `([^0-9]|$)`)
 			if portRef.MatchString(k) {
-				return fmt.Errorf("LAG, routed or unknown port dependency")
+				switch table {
+				case "BUFFER_PG", "BUFFER_QUEUE", "PORT_QOS_MAP":
+					if err := vlanAuthorityBufferDependency(db, k, fields); err != nil {
+						return err
+					}
+					// Exempt only this validated key's port reference. Keep the
+					// field scan below and every row in full-snapshot CAS/digests.
+				default:
+					return fmt.Errorf("LAG, routed or unknown port dependency")
+				}
 			}
 			for field, value := range fields {
 				if portRef.MatchString(field) || portRef.MatchString(value) {

@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -48,6 +49,9 @@ func (h *vlanRedisHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
 // not a Go reimplementation of Lua or WATCH semantics. Never use a host DB.
 func newVLANRedis(t *testing.T) *redis.Client {
 	t.Helper()
+	if server := os.Getenv("SONIC_TEST_REDIS_SERVER"); server != "" {
+		return newLocalNetworkRedis(t, server)
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "-d", "-p", "127.0.0.1::6379", "redis:7-alpine", "redis-server", "--save", "", "--appendonly", "no").CombinedOutput()

@@ -86,6 +86,15 @@ func (m *SonicAgent) GetPortBreakout(ctx context.Context, port string) (*agent.P
 	}
 	out.RuntimeVerified = true
 	out.PersistenceVerified = r != nil && !r.Pending && r.Request.Port == port && reflect.DeepEqual(r.Platform, *p) && reflect.DeepEqual(r.After, breakoutTarget(db, p)) && r.UnrelatedHash == breakoutUnrelatedHash(db, p)
+	if out.PersistenceVerified {
+		out.PersistenceVerified = m.breakoutPersisted(p, r.After)
+		latest, _, err := m.readBreakoutDB(ctx)
+		if err != nil || vlanAuthorityHash(latest) != vlanAuthorityHash(db) {
+			out.ConfigurationVerified, out.RuntimeVerified, out.PersistenceVerified = false, false, false
+			out.Message = "CONFIG_DB changed during persistence observation; retry"
+			return out, nil
+		}
+	}
 	if out.Pending {
 		out.Message = "pending breakout blocks configuration writes; reconcile the recorded request or inspect manually"
 	}
@@ -120,7 +129,7 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())
 	}
-	networkUnlock, err := m.guardNetworkWrites(ctx)
+	networkState, networkUnlock, err := m.guardNetworkWriteState(ctx)
 	if err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, err.Error())
 	}
@@ -142,6 +151,14 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 		if record.Request != r || !reflect.DeepEqual(record.Platform, *p) {
 			return fail("another request/platform has pending breakout; recover the exact recorded request first")
 		}
+		// A recorded transition remains destructive even if its target is now
+		// visible. Retain its exact recovery contract without advancing through
+		// typed ownership left by an older writer.
+		if !reflect.DeepEqual(record.Before, record.After) || !reflect.DeepEqual(record.Native, record.After) {
+			if err := breakoutNetworkDependencies(p, networkState); err != nil {
+				return fail("pending breakout unsafe: " + err.Error())
+			}
+		}
 		return m.finishBreakout(ctx, j, record, db, raw)
 	}
 	if p.Modes[r.Mode] == nil {
@@ -151,13 +168,19 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 	if err := breakoutConfigMatches(db, p, currentMode); err != nil {
 		return fail("current breakout configuration is not exact: " + err.Error())
 	}
-	if err := breakoutDependencies(db, p); err != nil {
-		return fail(err.Error())
-	}
 	before := breakoutTarget(db, p)
 	native, after := before, before
 	transition := currentMode != r.Mode
+	if r.AdoptOnly && transition {
+		return fail("adoption requires the existing exact requested layout; native transition forbidden")
+	}
 	if transition {
+		if err := breakoutNetworkDependencies(p, networkState); err != nil {
+			return fail(err.Error())
+		}
+		if err := breakoutDependencies(db, p); err != nil {
+			return fail(err.Error())
+		}
 		native, after, err = breakoutTargets(db, p, r)
 		if err != nil {
 			return fail(err.Error())
@@ -217,8 +240,12 @@ func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal
 	if breakoutUnrelatedHash(db, p) != r.UnrelatedHash {
 		return fail("unrelated configuration changed during pending breakout; manual inspection required")
 	}
-	if err := breakoutDependencies(db, p); err != nil {
-		return fail("pending breakout unsafe: " + err.Error())
+	// Only an exactly recorded no-op can coexist with populated dependencies.
+	// A transition remains subject to dependency checks even after its CLI ran.
+	if !reflect.DeepEqual(r.Before, r.After) || !reflect.DeepEqual(r.Native, r.After) {
+		if err := breakoutDependencies(db, p); err != nil {
+			return fail("pending breakout unsafe: " + err.Error())
+		}
 	}
 	target := breakoutTarget(db, p)
 	if !reflect.DeepEqual(target, r.After) {
@@ -271,6 +298,9 @@ func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal
 		}
 		return fail("persistence pending; save failed or outcome uncertain")
 	}
+	if !m.breakoutPersisted(p, r.After) {
+		return fail("persistence pending; saved port layout does not match recorded target")
+	}
 	runtimeVerified = false
 	if err := m.waitBreakoutRuntime(convergenceCtx, p, r.After, r.UnrelatedHash); err != nil {
 		latest, _, readErr := m.readBreakoutDB(ctx)
@@ -294,4 +324,9 @@ func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal
 	out.RuntimeVerified, out.PersistenceVerified = true, true
 	out.ConfigurationVerified = true
 	return out, nil
+}
+
+func (m *SonicAgent) breakoutPersisted(p *breakoutPlatform, target vlanChangeDB) bool {
+	saved, err := m.savedPortConfig()
+	return err == nil && breakoutConfigMatches(saved, p, target["BREAKOUT_CFG|"+p.Port]["brkout_mode"]) == nil && reflect.DeepEqual(breakoutTarget(saved, p), target)
 }

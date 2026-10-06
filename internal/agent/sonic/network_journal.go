@@ -27,6 +27,9 @@ type networkRecord struct {
 	// Global EVPN's declared set authorizes mapping creation during local-only
 	// initialization. Omitted on legacy records, which cannot authorize it.
 	EVPNMappings []agent.EVPNMappingSnapshot `json:"evpn_mappings,omitempty"`
+	// Fixed port layout at adoption; a breakout cannot authorize restoring a
+	// previously qualified speed/FEC on a different set of physical lanes.
+	PortLayout string `json:"port_layout,omitempty"`
 }
 
 type networkPending struct {
@@ -143,6 +146,9 @@ func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 		if identity == "" || len(identity) > 1024 || r == nil || r.OwnerID == "" || len(r.OwnerID) > 256 {
 			return nil, fmt.Errorf("invalid network journal identity")
 		}
+		if r.PortLayout != "" && (r.Kind != "Port" || !vlanAuthorityDigestValid(r.PortLayout)) {
+			return nil, fmt.Errorf("invalid port layout journal")
+		}
 		if len(r.EVPNMappings) > 64 || len(r.EVPNMappings) > 0 && (r.Kind != "EVPN" || identity != "EVPN|default") {
 			return nil, fmt.Errorf("invalid journal EVPN mapping declaration")
 		}
@@ -240,12 +246,19 @@ func storeNetworkJournal(j *vlanAuthorityJournal, state *networkJournalState) er
 
 // Caller holds configMutex and any VLAN/breakout locks. Hold through save.
 func (m *SonicAgent) guardNetworkWrites(ctx context.Context) (func(), error) {
+	_, unlock, err := m.guardNetworkWriteState(ctx)
+	return unlock, err
+}
+
+// Return the validated state under the same lock so specialized writers can
+// check confirmed ownership too. The caller must hold the lock through save.
+func (m *SonicAgent) guardNetworkWriteState(ctx context.Context) (*networkJournalState, func(), error) {
 	if m.networkJournalDir == "" {
-		return func() {}, nil
+		return nil, func() {}, nil
 	}
 	j, err := m.lockNetworkJournal(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	state, err := loadNetworkJournal(j)
 	if err == nil {
@@ -258,7 +271,7 @@ func (m *SonicAgent) guardNetworkWrites(ctx context.Context) (func(), error) {
 	}
 	if err != nil {
 		j.close()
-		return nil, err
+		return nil, nil, err
 	}
-	return j.close, nil
+	return state, j.close, nil
 }

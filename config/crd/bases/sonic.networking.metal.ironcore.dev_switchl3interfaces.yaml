@@ -70,11 +70,14 @@ spec:
                 type: string
               name:
                 maxLength: 32
-                pattern: ^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3})|Vlan[1-9][0-9]{0,3})$
+                pattern: ^(Ethernet(0|[1-9][0-9]*)|PortChannel(0|[1-9][0-9]{0,3})|Vlan[1-9][0-9]{0,3}|Loopback(0|[1-9][0-9]{0,3}))$
                 type: string
                 x-kubernetes-validations:
                 - message: VLAN interface ID must be 1..4094
                   rule: '!self.startsWith(''Vlan'') || int(self.substring(4)) <= 4094'
+                - message: Loopback interface ID must be 0..4095
+                  rule: '!self.startsWith(''Loopback'') || int(self.substring(8))
+                    <= 4095'
                 - message: name is immutable
                   rule: self == oldSelf
               switchRef:

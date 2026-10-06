@@ -23,6 +23,16 @@ type SwitchInterfaceSpecApplyConfiguration struct {
 	SwitchRef *v1.LocalObjectReference `json:"switchRef,omitempty"`
 	// AdminState represents the desired administrative state of the interface.
 	AdminState *apiv1alpha1.AdminState `json:"adminState,omitempty"`
+	// ManagementPolicy controls only speed, MTU and FEC ownership. AdminState
+	// retains its separate opt-in management annotation.
+	ManagementPolicy *apiv1alpha1.NetworkManagementPolicy `json:"managementPolicy,omitempty"`
+	// Speed is the existing configured port speed in Mbit/s. Omission is unowned.
+	// Adoption and repair are supported; changing an adopted value is not.
+	Speed *uint32 `json:"speed,omitempty"`
+	// MTU is the existing configured L3 MTU. Omission preserves native defaults.
+	MTU *uint32 `json:"mtu,omitempty"`
+	// FEC is an existing native FEC setting. Omission does not install a default.
+	FEC *string `json:"fec,omitempty"`
 }
 
 // SwitchInterfaceSpecApplyConfiguration constructs a declarative configuration of the SwitchInterfaceSpec type for use with
@@ -60,5 +70,37 @@ func (b *SwitchInterfaceSpecApplyConfiguration) WithSwitchRef(value v1.LocalObje
 // If called multiple times, the AdminState field is set to the value of the last call.
 func (b *SwitchInterfaceSpecApplyConfiguration) WithAdminState(value apiv1alpha1.AdminState) *SwitchInterfaceSpecApplyConfiguration {
 	b.AdminState = &value
+	return b
+}
+
+// WithManagementPolicy sets the ManagementPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ManagementPolicy field is set to the value of the last call.
+func (b *SwitchInterfaceSpecApplyConfiguration) WithManagementPolicy(value apiv1alpha1.NetworkManagementPolicy) *SwitchInterfaceSpecApplyConfiguration {
+	b.ManagementPolicy = &value
+	return b
+}
+
+// WithSpeed sets the Speed field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Speed field is set to the value of the last call.
+func (b *SwitchInterfaceSpecApplyConfiguration) WithSpeed(value uint32) *SwitchInterfaceSpecApplyConfiguration {
+	b.Speed = &value
+	return b
+}
+
+// WithMTU sets the MTU field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MTU field is set to the value of the last call.
+func (b *SwitchInterfaceSpecApplyConfiguration) WithMTU(value uint32) *SwitchInterfaceSpecApplyConfiguration {
+	b.MTU = &value
+	return b
+}
+
+// WithFEC sets the FEC field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FEC field is set to the value of the last call.
+func (b *SwitchInterfaceSpecApplyConfiguration) WithFEC(value string) *SwitchInterfaceSpecApplyConfiguration {
+	b.FEC = &value
 	return b
 }

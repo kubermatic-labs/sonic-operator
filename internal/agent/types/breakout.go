@@ -9,6 +9,8 @@ type PortBreakoutRequest struct {
 	Port            string `json:"port"`
 	Mode            string `json:"mode"`
 	ChildAdminState string `json:"child_admin_state"`
+	// AdoptOnly forbids native transitions if the observed layout has changed.
+	AdoptOnly bool `json:"adopt_only,omitempty"`
 }
 
 type PortBreakoutChild struct {
@@ -20,10 +22,12 @@ type PortBreakoutChild struct {
 }
 
 type PortBreakout struct {
-	Port           string              `json:"port"`
-	Mode           string              `json:"mode"`
-	SupportedModes []string            `json:"supported_modes"`
-	Children       []PortBreakoutChild `json:"children"`
+	// AdoptionSupported advertises enforcement of the AdoptOnly request guard.
+	AdoptionSupported bool                `json:"adoption_supported,omitempty"`
+	Port              string              `json:"port"`
+	Mode              string              `json:"mode"`
+	SupportedModes    []string            `json:"supported_modes"`
+	Children          []PortBreakoutChild `json:"children"`
 	// ConfigurationVerified proves exact native layout in a stable CONFIG_DB
 	// observation, independently of APPL_DB or kernel convergence.
 	ConfigurationVerified bool   `json:"configuration_verified"`

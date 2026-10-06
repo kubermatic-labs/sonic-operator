@@ -35,7 +35,7 @@ func (s *proxyServer) ReconcilePortBreakout(ctx context.Context, request *pb.Por
 		return nil, status.Error(codes.InvalidArgument, "ReconcilePortBreakout requires port, mode, and child_admin_state up or down")
 	}
 	result, st := backend.ReconcilePortBreakout(ctx, &agent.PortBreakoutRequest{
-		Port: request.GetPort(), Mode: request.GetMode(), ChildAdminState: request.GetChildAdminState(),
+		Port: request.GetPort(), Mode: request.GetMode(), ChildAdminState: request.GetChildAdminState(), AdoptOnly: request.GetAdoptOnly(),
 	})
 	return portBreakoutResponse(result, st)
 }
@@ -52,6 +52,7 @@ func portBreakoutResponse(result *agent.PortBreakout, st *agent.Status) (*pb.Por
 		Children:        make([]*pb.PortBreakoutChild, len(result.Children)),
 		RuntimeVerified: result.RuntimeVerified, PersistenceVerified: result.PersistenceVerified,
 		ConfigurationVerified: result.ConfigurationVerified,
+		AdoptionSupported:     result.AdoptionSupported,
 		Pending:               result.Pending, Message: result.Message,
 	}
 	for i, child := range result.Children {

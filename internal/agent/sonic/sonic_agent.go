@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,6 +46,8 @@ type SonicAgent struct {
 	configDirty bool                 // A failed write/save may leave Redis and persisted config inconsistent.
 	journalDir  string               // Explicit persistent root-only VLAN authority journal.
 	journalSync func(*os.File) error // Optional directory fsync implementation.
+
+	readSavedPortConfig func() ([]byte, error) // Optional local saved-file reader for tests.
 
 	verifyVLANRuntime func(context.Context, uint32, vlanChangeDB) error // Optional single APPL_DB observation, for tests.
 
@@ -679,8 +682,9 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 	return m.setInterfaceField(ctx, iface, "alias", iface.AliasName)
 }
 
-// Both setters validate against the same CONFIG_DB snapshot and persist only a
-// changed field. In particular, an admin update never writes an alias.
+// Both setters validate against the same CONFIG_DB snapshot and write only a
+// changed field. Admin persistence is also independently checked on no-op calls.
+// In particular, an admin update never writes an alias.
 func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interface, field, desired string) (*agent.Interface, *agent.Status) {
 	var ifaceName string
 	var err error
@@ -705,6 +709,9 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	abstractName, err := agent.NativeNameToAbstractName(ifaceName)
 	if err != nil || (strings.HasPrefix(iface.Name, "eth") && abstractName != iface.Name) {
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "invalid abstract interface name")
+	}
+	if iface.NativeName != "" && iface.NativeName != ifaceName {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "interface native identity mismatch")
 	}
 	// SaveConfig persists the whole DB, so serialize setters and retain uncertain
 	// persistence across requests rather than treating matching Redis values as saved.
@@ -736,8 +743,11 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to set %s: %v", field, err))
 		}
 	}
+	if field == "admin_status" && !m.adminPersisted(ifaceName, desired) {
+		m.configDirty = true
+	}
 	if m.configDirty {
-		if status := m.saveConfigLocked(ctx); status != nil {
+		if status := m.saveConfigLocked(ctx); status != nil && status.Code != 0 {
 			if changed {
 				// Request cancellation must not prevent restoring the pre-write value.
 				rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RedisDefaultTimeout)
@@ -758,6 +768,16 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	if changed {
 		fields[field] = desired
 	}
+	if field == "admin_status" {
+		// A matching Redis value after a restart cannot hide an interrupted save.
+		// Also reject concurrent target changes rather than returning our old read.
+		persisted := m.adminPersisted(ifaceName, desired)
+		latest, err := configDB.HGetAll(ctx, portKey).Result()
+		if err != nil || !reflect.DeepEqual(latest, fields) || !persisted {
+			m.configDirty = true
+			return nil, errors.NewErrorStatus(errors.SERVER_ERROR, "admin state live/saved verification failed; retry persistence")
+		}
+	}
 
 	applDB, err := m.Connect("APPL_DB")
 	if err != nil {
@@ -771,12 +791,13 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	}
 
 	return &agent.Interface{
-		TypeMeta:        agent.TypeMeta{Kind: agent.InterfaceKind},
-		Name:            abstractName,
-		NativeName:      ifaceName,
-		AliasName:       fields["alias"],
-		AdminStatus:     parseDeviceStatus(fields["admin_status"]),
-		OperationStatus: parseDeviceStatus(applFields["oper_status"]),
-		Status:          agent.Status{Code: 0, Message: "ok"},
+		TypeMeta:                 agent.TypeMeta{Kind: agent.InterfaceKind},
+		Name:                     abstractName,
+		NativeName:               ifaceName,
+		AliasName:                fields["alias"],
+		AdminStatus:              parseDeviceStatus(fields["admin_status"]),
+		OperationStatus:          parseDeviceStatus(applFields["oper_status"]),
+		AdminPersistenceVerified: field == "admin_status",
+		Status:                   agent.Status{Code: 0, Message: "ok"},
 	}, nil
 }

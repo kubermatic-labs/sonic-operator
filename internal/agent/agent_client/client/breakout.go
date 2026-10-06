@@ -35,7 +35,7 @@ func (c *defaultSwitchAgentClient) ReconcilePortBreakout(ctx context.Context, re
 		return nil, fmt.Errorf("ReconcilePortBreakout requires port, mode, and child_admin_state up or down")
 	}
 	resp, err := c.client.ReconcilePortBreakout(ctx, &pb.PortBreakoutRequest{
-		Port: request.Port, Mode: request.Mode, ChildAdminState: request.ChildAdminState,
+		Port: request.Port, Mode: request.Mode, ChildAdminState: request.ChildAdminState, AdoptOnly: request.AdoptOnly,
 	})
 	if err != nil {
 		return nil, err
@@ -56,6 +56,7 @@ func portBreakoutFromProto(method string, resp *pb.PortBreakoutResponse) (*agent
 		Children:        make([]agent.PortBreakoutChild, len(wire.GetChildren())),
 		RuntimeVerified: wire.GetRuntimeVerified(), PersistenceVerified: wire.GetPersistenceVerified(),
 		ConfigurationVerified: wire.GetConfigurationVerified(),
+		AdoptionSupported:     wire.GetAdoptionSupported(),
 		Pending:               wire.GetPending(), Message: wire.GetMessage(),
 	}
 	for i, child := range wire.GetChildren() {

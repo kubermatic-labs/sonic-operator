@@ -5,8 +5,16 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +kubebuilder:validation:XValidation:rule="!has(self.mode) || self.mode != 'Traditional' || ((!has(self.vrf) || self.vrf == 'default') && has(self.prefixes) && size(self.prefixes) == 1 && self.prefixes[0] == self.routerID + '/32')",message="Traditional requires default VRF and the router-ID /32 prefix"
 type SwitchBGPSpec struct {
 	NetworkResourceSpec `json:",inline"`
+	// Mode selects the existing native backend; it never changes FRR mode.
+	// Traditional supports the qualified peerless LeafRouter Loopback0 /32 contract.
+	// +optional
+	// +kubebuilder:default=Unified
+	// +kubebuilder:validation:Enum=Unified;Traditional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="backend mode is immutable"
+	Mode string `json:"mode,omitempty"`
 	// +optional
 	// +kubebuilder:default=default
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="vrf is immutable"

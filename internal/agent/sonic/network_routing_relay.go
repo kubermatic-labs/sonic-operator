@@ -28,6 +28,7 @@ type routingSpecMeta struct {
 
 type routingBGPSpec struct {
 	routingSpecMeta
+	Mode     string   `json:"mode,omitempty"`
 	VRF      string   `json:"vrf"`
 	LocalASN uint32   `json:"localASN"`
 	RouterID string   `json:"routerID"`
@@ -238,7 +239,7 @@ func routingNoImplicitAdvertisements(db vlanChangeDB, vrf string, prefixes []str
 
 func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s routingBGPSpec
-	if err := routingDecode(r, "BGP", &s, "vrf localASN routerID prefixes"); err != nil {
+	if err := routingDecode(r, "BGP", &s, "mode vrf localASN routerID prefixes"); err != nil {
 		return nil, err
 	}
 	if err := routingVRF(db, &s.VRF); err != nil {
@@ -256,6 +257,12 @@ func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 	s.Prefixes, err = routingPrefixes(s.Prefixes)
 	if err != nil {
 		return nil, err
+	}
+	if s.Mode == "Traditional" {
+		return planTraditionalBGP(db, s)
+	}
+	if s.Mode != "" && s.Mode != "Unified" {
+		return nil, fmt.Errorf("unsupported BGP backend mode")
 	}
 	if err := routingUnified(db); err != nil {
 		return nil, err
