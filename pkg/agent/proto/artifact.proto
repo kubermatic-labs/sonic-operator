@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+package artifact;
+option go_package = "github.com/ironcore-dev/sonic-operator/pkg/agent/proto;switchagentproto";
+
+// Bundle JSON is decoded with unknown-field rejection into the bounded artifact
+// model. It cannot contain destinations, commands or activation scripts.
+message ArtifactRequest {
+  bytes bundle_json = 1;
+  string confirmation_token = 2;
+  string content_session = 3;
+}
+message ArtifactBlob { string sha256 = 1; uint64 size = 2; }
+message ArtifactOffset { string sha256 = 1; uint64 offset = 2; }
+message ArtifactPrepareRequest { bytes bundle_json = 1; string operation = 2; repeated ArtifactBlob blobs = 3; }
+message ArtifactPrepareResponse { string session = 1; repeated ArtifactOffset offsets = 2; }
+message ArtifactChunkRequest { string session = 1; string sha256 = 2; uint64 offset = 3; bytes data = 4; }
+message ArtifactChunkResponse { uint64 offset = 1; }
+message ArtifactResponse {
+  bool configuration_verified = 1;
+  bool runtime_verified = 2;
+  bool persistence_verified = 3;
+  string recovery_phase = 4;
+  string confirmation_token = 5;
+  string identity = 6;
+  string reason = 7;
+}
+message ArtifactCapabilitiesRequest {}
+message ArtifactCapabilitiesResponse { string source_commit = 1; repeated string capabilities = 2; }
+service ArtifactService {
+  rpc GetCapabilities(ArtifactCapabilitiesRequest) returns (ArtifactCapabilitiesResponse);
+  rpc PrepareContent(ArtifactPrepareRequest) returns (ArtifactPrepareResponse);
+  rpc UploadContent(ArtifactChunkRequest) returns (ArtifactChunkResponse);
+  rpc Bootstrap(ArtifactRequest) returns (ArtifactResponse);
+  rpc Observe(ArtifactRequest) returns (ArtifactResponse);
+  rpc Stage(ArtifactRequest) returns (ArtifactResponse);
+  rpc Confirm(ArtifactRequest) returns (ArtifactResponse);
+}

@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,11 +81,23 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 	}
 
 	original := i.DeepCopy()
+	i.Status.AdminStateManaged = !r.ObserveOnly && i.Annotations[interfaceManageAdminAnnotation] == "true"
+	i.Status.AdminStateRequest = i.Annotations[interfaceAdminRequestAnnotation]
+	i.Status.AdminStateDigest = interfaceAdminDigest(i, r.ObserveOnly)
+	persistenceVerified := false
 	defer func() {
 		if retErr != nil {
 			i.Status.State = networkingv1alpha1.SwitchInterfaceStateFailed
 		}
-		if err := r.Status().Patch(ctx, i, client.MergeFrom(original)); err != nil {
+		condition := metav1.Condition{Type: "AdminPersistenceReady", Status: metav1.ConditionFalse, Reason: "NotVerified", Message: "Managed admin persistence has not been verified", ObservedGeneration: i.Generation}
+		if !i.Status.AdminStateManaged {
+			condition.Reason, condition.Message = "WritesDisabled", "Admin state is observed only; explicit admin opt-in and manager write gate are required"
+		}
+		if persistenceVerified && retErr == nil {
+			condition.Status, condition.Reason, condition.Message = metav1.ConditionTrue, "SavedStateVerified", "Desired admin state verified in live and saved PORT configuration"
+		}
+		meta.SetStatusCondition(&i.Status.Conditions, condition)
+		if err := r.Status().Patch(ctx, i, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
 			retErr = errors.Join(retErr, fmt.Errorf("update SwitchInterface status: %w", err))
 		}
 	}()
@@ -164,7 +178,7 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 		}
 	}
 
-	if !r.ObserveOnly && i.Annotations["sonic.networking.metal.ironcore.dev/manage-admin-state"] == "true" {
+	if i.Status.AdminStateManaged {
 		desiredState, err := agent.APIAdminStateToAgentDeviceStatus(i.Spec.AdminState)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -175,28 +189,32 @@ func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logg
 		if iface.AdminStatus != agent.StatusUp && iface.AdminStatus != agent.StatusDown {
 			return ctrl.Result{}, fmt.Errorf("cannot manage unknown current admin state %q", iface.AdminStatus)
 		}
-		if iface.AdminStatus != desiredState {
-			updated, err := switchAgentClient.SetInterfaceAdminStatus(ctx, &agent.Interface{
-				TypeMeta:    agent.TypeMeta{Kind: agent.InterfaceKind},
-				Name:        nativeName,
-				NativeName:  nativeName,
-				AdminStatus: desiredState,
-			})
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if updated == nil {
-				return ctrl.Result{}, fmt.Errorf("agent returned nil interface after admin update")
-			}
-			if updated.Status.Code != 0 {
-				return ctrl.Result{}, fmt.Errorf("set admin state: %s", updated.Status.String())
-			}
-			if updated.NativeName != nativeName || updated.AdminStatus != desiredState {
-				return ctrl.Result{}, fmt.Errorf("agent did not confirm admin state for native interface %q", nativeName)
-			}
-			i.Status.AdminState, _ = agent.AgentDeviceStatusToAPIAdminState(updated.AdminStatus)
-			i.Status.OperationalState, _ = agent.AgentDeviceStatusToAPIOperationState(updated.OperationStatus)
+		// Always reconcile persistence, including adoption and interrupted-save
+		// recovery when the live value already matches the desired state.
+		updated, err := switchAgentClient.SetInterfaceAdminStatus(ctx, &agent.Interface{
+			TypeMeta:    agent.TypeMeta{Kind: agent.InterfaceKind},
+			Name:        nativeName,
+			NativeName:  nativeName,
+			AdminStatus: desiredState,
+		})
+		if err != nil {
+			return ctrl.Result{}, err
 		}
+		if updated == nil {
+			return ctrl.Result{}, fmt.Errorf("agent returned nil interface after admin update")
+		}
+		if updated.Status.Code != 0 {
+			return ctrl.Result{}, fmt.Errorf("set admin state: %s", updated.Status.String())
+		}
+		if updated.NativeName != nativeName || updated.AdminStatus != desiredState {
+			return ctrl.Result{}, fmt.Errorf("agent did not confirm admin state for native interface %q", nativeName)
+		}
+		if !updated.AdminPersistenceVerified {
+			return ctrl.Result{}, fmt.Errorf("agent did not verify saved admin state for native interface %q", nativeName)
+		}
+		persistenceVerified = true
+		i.Status.AdminState, _ = agent.AgentDeviceStatusToAPIAdminState(updated.AdminStatus)
+		i.Status.OperationalState, _ = agent.AgentDeviceStatusToAPIOperationState(updated.OperationStatus)
 	}
 	i.Status.State = networkingv1alpha1.SwitchInterfaceStateReady
 	log.Info("Reconciled SwitchInterface")

@@ -1,0 +1,11 @@
+[Unit]
+Description=Recover expired SONiC operator management transactions locally
+After=database.service
+RequiresMountsFor=/host
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/sonic-operator-host-recovery
+TimeoutStartSec=45
+UMask=0077

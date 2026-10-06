@@ -32,6 +32,8 @@ message Interface {
   string operational_status = 4;
   string admin_status = 5;
   string mac_address = 6;
+  // Independent saved PORT evidence returned by the admin setter.
+  bool admin_persistence_verified = 20;
 }
 
 // The request message containing the parameters for the request.
@@ -111,6 +113,128 @@ message SaveConfigResponse {
   Status status = 1;
 }
 
+message VLANMember {
+  string interface_name = 1;
+  string tagging_mode = 2;
+}
+
+message VLAN {
+  uint32 id = 1;
+  repeated VLANMember members = 2;
+}
+
+message GetVLANRequest {
+  uint32 vlan_id = 1;
+}
+
+message GetVLANResponse {
+  Status status = 1;
+  VLAN vlan = 2;
+}
+
+message EnsureVLANRequest {
+  VLAN vlan = 1;
+}
+
+message EnsureVLANResponse {
+  Status status = 1;
+  VLAN vlan = 2;
+}
+
+message VLANAuthorityRequest {
+  string owner_id = 1;
+  VLAN vlan = 2;
+  string adoption_digest = 3;
+  bool delete = 4;
+}
+
+message VLANAuthorityResult {
+  // Absent VLANs still have a snapshot digest; absence is not NOT_FOUND.
+  VLAN vlan = 1;
+  string digest = 2;
+  string owner_id = 3;
+  // CONFIG_DB verification only, not ASIC or forwarding verification.
+  bool runtime_verified = 4;
+  bool persistence_verified = 5;
+  // An unconfigured journal cannot prove that an empty owner_id means unowned.
+  bool ownership_known = 6;
+}
+
+message GetVLANAuthorityRequest {
+  uint32 vlan_id = 1;
+}
+
+message VLANAuthorityResponse {
+  Status status = 1;
+  VLANAuthorityResult result = 2;
+}
+
+message ReleaseVLANAuthorityRequest {
+  uint32 vlan_id = 1;
+  string owner_id = 2;
+}
+
+message ReleaseVLANAuthorityResponse {
+  Status status = 1;
+}
+
+message GetPortBreakoutRequest {
+  string port = 1;
+}
+
+message PortBreakoutRequest {
+  string port = 1;
+  string mode = 2;
+  string child_admin_state = 3;
+  bool adopt_only = 4;
+}
+
+message PortBreakoutChild {
+  string name = 1;
+  string lanes = 2;
+  string speed = 3;
+  string admin_state = 4;
+  string mtu = 5;
+}
+
+message PortBreakout {
+  string port = 1;
+  string mode = 2;
+  repeated string supported_modes = 3;
+  repeated PortBreakoutChild children = 4;
+  bool runtime_verified = 5;
+  bool persistence_verified = 6;
+  bool pending = 7;
+  string message = 8;
+  bool configuration_verified = 9;
+  bool adoption_supported = 10;
+}
+
+message PortBreakoutResponse {
+  Status status = 1;
+  PortBreakout result = 2;
+}
+
+message NetworkRequest {
+  string kind = 1;
+  string owner_id = 2;
+  bytes spec_json = 3;
+}
+
+message NetworkResult {
+  bool exists = 1;
+  bool configuration_verified = 2;
+  bool runtime_verified = 3;
+  bool persistence_verified = 4;
+  bytes observed_json = 5;
+  string message = 6;
+}
+
+message NetworkResponse {
+  Status status = 1;
+  NetworkResult result = 2;
+}
+
 // The interface service definition.
 service SwitchAgentService {
 
@@ -127,5 +251,18 @@ service SwitchAgentService {
   // gNOI alternatives
   rpc SaveConfig (SaveConfigRequest) returns (SaveConfigResponse);
 
-}
+  rpc GetVLAN(GetVLANRequest) returns (GetVLANResponse);
+  rpc EnsureVLAN(EnsureVLANRequest) returns (EnsureVLANResponse);
 
+  rpc GetVLANAuthority(GetVLANAuthorityRequest) returns (VLANAuthorityResponse);
+  rpc ReconcileVLANAuthority(VLANAuthorityRequest) returns (VLANAuthorityResponse);
+  rpc ReleaseVLANAuthority(ReleaseVLANAuthorityRequest) returns (ReleaseVLANAuthorityResponse);
+
+  rpc GetPortBreakout(GetPortBreakoutRequest) returns (PortBreakoutResponse);
+  rpc ReconcilePortBreakout(PortBreakoutRequest) returns (PortBreakoutResponse);
+
+  rpc GetNetworkResource(NetworkRequest) returns (NetworkResponse);
+  rpc EnsureNetworkResource(NetworkRequest) returns (NetworkResponse);
+  rpc RecoverNetworkResource(NetworkRequest) returns (NetworkResponse);
+
+}

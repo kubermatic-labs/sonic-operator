@@ -31,3 +31,10 @@ go.work
 node_modules
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Local git worktrees
+.worktrees/
+
+# Generated host artifact releases
+config/agent/releases/*.json
+!config/agent/releases/host-artifact-v1.schema.json

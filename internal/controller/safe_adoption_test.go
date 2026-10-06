@@ -16,6 +16,7 @@ import (
 	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,6 +81,7 @@ func adoptionFixture(t *testing.T) (*api.Switch, *api.SwitchInterface, *adoption
 	iface := agent.Interface{Name: "eth0-0", NativeName: "Ethernet0", AliasName: "customer-uplink", AdminStatus: agent.StatusUp, OperationStatus: agent.StatusUp}
 	response := iface
 	response.AdminStatus = agent.StatusDown
+	response.AdminPersistenceVerified = true
 	a := &adoptionAgent{iface: &iface, device: &agent.SwitchDevice{}, interfaces: &agent.InterfaceList{Items: []agent.Interface{iface}}, ports: &agent.PortList{}, neighbor: &agent.InterfaceNeighbor{}, writeResponse: &response}
 	return s, i, a, scheme
 }
@@ -122,6 +124,53 @@ func TestSafeAdoptionExistingInterface(t *testing.T) {
 	}
 }
 
+func TestSafeAdoptionAdminRetriesPersistenceWhenRuntimeMatches(t *testing.T) {
+	t.Parallel()
+	s, i, a, scheme := adoptionFixture(t)
+	i.Annotations = map[string]string{manageAdminAnnotation: "true"}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(i).WithObjects(s, i).Build()
+	r := &SwitchInterfaceReconciler{Client: c, Scheme: scheme, NewAgentClient: func(context.Context, client.Reader, *corev1.LocalObjectReference, string) (agentclient.SwitchAgentClient, error) {
+		return a, nil
+	}}
+	a.writeErr = errors.New("save failed")
+	request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(i)}
+	if _, err := r.Reconcile(t.Context(), request); err == nil {
+		t.Fatal("expected initial save error")
+	}
+	a.iface.AdminStatus = agent.StatusDown
+	if _, err := r.Reconcile(t.Context(), request); err == nil {
+		t.Fatal("failed save became Ready because runtime matched")
+	}
+	if len(a.writes) != 2 {
+		t.Fatalf("persistence attempts = %d, want 2", len(a.writes))
+	}
+	a.writeErr = nil
+	if _, err := r.Reconcile(t.Context(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(t.Context(), client.ObjectKeyFromObject(i), i); err != nil {
+		t.Fatal(err)
+	}
+	if !meta.IsStatusConditionTrue(i.Status.Conditions, "AdminPersistenceReady") {
+		t.Fatal("successful recovery lacks persistence condition")
+	}
+	i.Generation = 2
+	i.Annotations = nil
+	if err := c.Update(t.Context(), i); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Reconcile(t.Context(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(t.Context(), client.ObjectKeyFromObject(i), i); err != nil {
+		t.Fatal(err)
+	}
+	condition := meta.FindStatusCondition(i.Status.Conditions, "AdminPersistenceReady")
+	if condition == nil || condition.Status != metav1.ConditionFalse || condition.ObservedGeneration != 2 {
+		t.Fatalf("stale managed evidence after Observe: %+v", condition)
+	}
+}
+
 func TestSafeAdoptionDiscoveryUnknown(t *testing.T) {
 	t.Parallel()
 	s, _, a, scheme := adoptionFixture(t)
@@ -160,7 +209,7 @@ func TestSafeAdoptionAdminGate(t *testing.T) {
 		{name: "opt in must be exact", annotation: "TRUE", desired: api.AdminStateDown, current: agent.StatusUp, native: "Ethernet0"},
 		{name: "explicit change", annotation: "true", desired: api.AdminStateDown, current: agent.StatusUp, native: "Ethernet0", writes: 1},
 		{name: "explicit enable", annotation: "true", desired: api.AdminStateUp, current: agent.StatusDown, native: "Ethernet0", writes: 1},
-		{name: "unchanged", annotation: "true", desired: api.AdminStateUp, current: agent.StatusUp, native: "Ethernet0"},
+		{name: "unchanged", annotation: "true", desired: api.AdminStateUp, current: agent.StatusUp, native: "Ethernet0", writes: 1},
 		{name: "unknown observation", observe: true, desired: api.AdminStateUnknown, current: agent.StatusUnknown, native: "Ethernet0"},
 		{name: "unknown current cannot write", annotation: "true", desired: api.AdminStateDown, current: agent.StatusUnknown, native: "Ethernet0", wantErr: true},
 		{name: "invalid current cannot write", annotation: "true", desired: api.AdminStateDown, current: "bad", native: "Ethernet0", wantErr: true},
@@ -244,6 +293,7 @@ func TestSafeAdoptionInterfaceFailures(t *testing.T) {
 		{name: "nil write", change: func(a *adoptionAgent) { a.writeResponse = nil }, writes: 1},
 		{name: "write status error", change: func(a *adoptionAgent) { a.writeResponse.Status.Code = 1 }, writes: 1},
 		{name: "write unconfirmed", change: func(a *adoptionAgent) { a.writeResponse.AdminStatus = agent.StatusUnknown }, writes: 1},
+		{name: "old agent without persistence evidence", change: func(a *adoptionAgent) { a.writeResponse.AdminPersistenceVerified = false }, writes: 1},
 		{name: "write wrong identity", change: func(a *adoptionAgent) { a.writeResponse.NativeName = "Ethernet4" }, writes: 1},
 		{name: "close error", change: func(a *adoptionAgent) { a.closeErr = failure }, writes: 1},
 	} {

@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	agenterrors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	hp "github.com/ironcore-dev/sonic-operator/internal/agent/hostproto"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/transport"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
@@ -66,11 +67,7 @@ func NewDefaultSwitchAgentClient(address string, connectTimeout time.Duration) (
 	conn, err := grpc.NewClient(address,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		// Bound calls even when callers supply no deadline; shorter caller deadlines win.
-		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-			ctx, cancel := context.WithTimeout(ctx, connectTimeout)
-			defer cancel()
-			return invoker(ctx, method, req, reply, cc, opts...)
-		}),
+		grpc.WithUnaryInterceptor(rpcTimeoutInterceptor(connectTimeout)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to switch proxy: %w", err)
@@ -82,6 +79,36 @@ func NewDefaultSwitchAgentClient(address string, connectTimeout time.Duration) (
 		conn:           conn,
 		client:         pb.NewSwitchAgentServiceClient(conn),
 	}, nil
+}
+
+func rpcTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		callTimeout := timeout
+		if method == hp.HostService_Ensure_FullMethodName {
+			callTimeout = 90 * time.Second
+		}
+		if method == hp.HostService_Get_FullMethodName || method == hp.HostService_Confirm_FullMethodName {
+			callTimeout = 15 * time.Second
+		}
+		if method == pb.ArtifactService_Stage_FullMethodName || method == pb.ArtifactService_Bootstrap_FullMethodName || method == pb.ArtifactService_PrepareContent_FullMethodName {
+			callTimeout = 90 * time.Second
+		}
+		if method == pb.ArtifactService_Observe_FullMethodName || method == pb.ArtifactService_Confirm_FullMethodName {
+			callTimeout = 75 * time.Second
+		}
+		if method == pb.SwitchAgentService_ReconcilePortBreakout_FullMethodName {
+			callTimeout = 180 * time.Second
+		}
+		if method == pb.SwitchAgentService_EnsureNetworkResource_FullMethodName || method == pb.SwitchAgentService_RecoverNetworkResource_FullMethodName {
+			callTimeout = 120 * time.Second
+		}
+		if method == pb.SwitchAgentService_GetNetworkResource_FullMethodName {
+			callTimeout = 15 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(ctx, callTimeout)
+		defer cancel()
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 // Close releases the reusable connection. It is optional on SwitchAgentClient so
@@ -183,6 +210,7 @@ func (c *defaultSwitchAgentClient) SetInterfaceAdminStatus(ctx context.Context, 
 	iface.NativeName = resp.GetInterface().GetNativeName()
 	iface.MacAddress = resp.GetInterface().GetMacAddress()
 	iface.AdminStatus = agent.DeviceStatus(resp.GetInterface().GetAdminStatus())
+	iface.AdminPersistenceVerified = resp.GetInterface().GetAdminPersistenceVerified()
 	iface.OperationStatus = agent.DeviceStatus(resp.GetInterface().GetOperationalStatus())
 	iface.Status = agent.ProtoStatusToStatus(resp.GetStatus())
 

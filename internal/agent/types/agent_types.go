@@ -107,6 +107,9 @@ type Interface struct {
 	MacAddress      string       `json:"mac_address"`
 	OperationStatus DeviceStatus `json:"operation_status"`
 	AdminStatus     DeviceStatus `json:"admin_status"`
+	// AdminPersistenceVerified is response-only evidence from the admin setter's
+	// independent live and saved PORT readback. Observations do not imply ownership.
+	AdminPersistenceVerified bool `json:"admin_persistence_verified,omitempty"`
 
 	Status Status `json:"status"`
 }

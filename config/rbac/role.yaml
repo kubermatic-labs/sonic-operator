@@ -13,6 +13,12 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
   - interfaces
@@ -30,18 +36,113 @@ rules:
 - apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
+  - switchaclbindings
+  - switchaclpolicies
+  - switchbgppeers
+  - switchbgps
+  - switchdhcprelays
+  - switchevpnpeers
+  - switchevpns
+  - switchfrrmigrations
+  - switchl3interfaces
+  - switchmanagements
+  - switchmlags
+  - switchportchannels
+  - switchqosbindings
+  - switchqosmaps
+  - switchschedulers
+  - switchstaticroutes
+  - switchsystems
+  - switchvlanvnis
+  - switchvrfs
+  - switchvxlantunnels
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchaclbindings/finalizers
+  - switchaclpolicies/finalizers
+  - switchbgppeers/finalizers
+  - switchbgps/finalizers
+  - switchdhcprelays/finalizers
+  - switchevpnpeers/finalizers
+  - switchevpns/finalizers
+  - switchfrrmigrations/finalizers
+  - switchl3interfaces/finalizers
+  - switchmlags/finalizers
+  - switchportchannels/finalizers
+  - switchqosbindings/finalizers
+  - switchqosmaps/finalizers
+  - switchschedulers/finalizers
+  - switchstaticroutes/finalizers
+  - switchvlanvnis/finalizers
+  - switchvrfs/finalizers
+  - switchvxlantunnels/finalizers
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchaclbindings/status
+  - switchaclpolicies/status
+  - switchartifacts/status
+  - switchbgppeers/status
+  - switchbgps/status
+  - switchcredentials/status
+  - switchdhcprelays/status
+  - switches/status
+  - switchevpnpeers/status
+  - switchevpns/status
+  - switchfrrmigrations/status
+  - switchinterfaces/status
+  - switchl3interfaces/status
+  - switchmanagements/status
+  - switchmlags/status
+  - switchportbreakouts/status
+  - switchportchannels/status
+  - switchqosbindings/status
+  - switchqosmaps/status
+  - switchschedulers/status
+  - switchstaticroutes/status
+  - switchsystems/status
+  - switchvlans/status
+  - switchvlanvnis/status
+  - switchvrfs/status
+  - switchvxlantunnels/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
+  - switchartifacts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - sonic.networking.metal.ironcore.dev
+  resources:
   - switchcredentials/finalizers
   - switches/finalizers
   - switchinterfaces/finalizers
+  - switchvlans/finalizers
   verbs:
   - update
 - apiGroups:
   - sonic.networking.metal.ironcore.dev
   resources:
-  - switchcredentials/status
-  - switches/status
-  - switchinterfaces/status
+  - switchportbreakouts
+  - switchvlans
   verbs:
   - get
+  - list
   - patch
   - update
+  - watch

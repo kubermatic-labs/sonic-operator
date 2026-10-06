@@ -1,0 +1,19 @@
+{
+  "imageSHA256": "0cd0ea6266506346ed0b456976bfa6ce6a6cca01f0494edf051cbe1d31a47906",
+  "interfacesSHA256": "c3ad5748a83a1c6bf9628de1d4b969f07a3cd994f937276d1588f3069a93f102",
+  "ntpBackend": "chrony",
+  "chronySHA256": "881b628df95ab46e4e4d9547eb215898326ee8a45950a5bcf5f63b603c5f7cef",
+  "snmpSHA256": "3f061411f5bb80d0ea398256513b2e8b809e667a7179c23ea03c3a044c26963e",
+  "consumerSHA256": {
+    "interfaces-generator": "0bb68c930b4fae06d4302f3680653b560fd37c1f17d405b3d38b5d8680e21551",
+    "ntp-generator": "db4344c4576781c46b08de8d61d6d617eda920c9fa1eb050982f02d440e68cea",
+    "ntp-startup": "fb7b5feedd9baa4d613b6a1a1f2d1c5fbf0e94f85db940bb3ebaacbaa911188e",
+    "ntp-daemon": "a7764779efb890339cd9dc52bf39cb9406702de349f9158359e982526f5feff6",
+    "snmp-init": "c7a5278a7b59581d03a0af0ddf3e2ff297362161a0e8faeded580488420c4b2b",
+    "snmp-startup": "b613501285dc87fd270f4c2fcc5c4f79da2d7034bf1e88958c47fcc1e9f6ebf8",
+    "snmp-importer": "d5f6028f6ca458dd17218fcd2a857d6fbec407a54b1d3a426bf5de80b4ff76ad",
+    "snmp-supervisor-template": "3c624c301742de413be93895310e121a11d414b33ab59e846b9cc6ff9e65f7f2",
+    "snmp-daemon": "4c6ee74efa24810bc03808a92d8bd613958cc4c8af70c499238e0823c2d90e49",
+    "snmp-library": "c5314ee5f02476106638556c711f504ad08ab55fad5e68581f536cafeec4abb5"
+  }
+}

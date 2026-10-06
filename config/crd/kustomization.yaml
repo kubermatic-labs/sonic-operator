@@ -2,9 +2,32 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
+- bases/sonic.networking.metal.ironcore.dev_switchmanagements.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchsystems.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchartifacts.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchevpns.yaml
 - bases/sonic.networking.metal.ironcore.dev_switches.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchinterfaces.yaml
 - bases/sonic.networking.metal.ironcore.dev_switchcredentials.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchvlans.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchportbreakouts.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchportchannels.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchvrfs.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchl3interfaces.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchstaticroutes.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchbgps.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchbgppeers.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchdhcprelays.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchfrrmigrations.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchaclpolicies.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchaclbindings.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchqosmaps.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchschedulers.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchqosbindings.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchmlags.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchvxlantunnels.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchvlanvnis.yaml
+- bases/sonic.networking.metal.ironcore.dev_switchevpnpeers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

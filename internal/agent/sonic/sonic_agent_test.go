@@ -121,6 +121,7 @@ func newTestAgent(t *testing.T) (*SonicAgent, map[string]*redisFixture, *int) {
 	}
 	saves := 0
 	m.saveConfig = func(context.Context) *agent.Status { saves++; return nil }
+	m.readSavedPortConfig = func() ([]byte, error) { return portConfigJSON(t, dbs["CONFIG_DB"].hashes), nil }
 	m.linkByName = func(name string) (netlink.Link, error) {
 		return &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{
 			Name: name, HardwareAddr: net.HardwareAddr{2, 0, 0, 0, 0, 1},

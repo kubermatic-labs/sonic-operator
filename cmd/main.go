@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -47,6 +49,9 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	if releaseinfo.PrintRequested() {
+		return
+	}
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -55,6 +60,14 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var observeOnly bool
+	var allowAuthoritativeVLANs bool
+	var allowBreakout bool
+	var allowNetworkConfig bool
+	var allowHostConfig bool
+	var allowFRRMigration bool
+	var allowTrafficPolicy bool
+	var allowRedundancy bool
+	var allowArtifacts bool
 	var disableProvisionsingServer bool
 	var httpServerAddr, onieImagesDir, onieConfigFile, ztpConfigFile, ztpMode, bootstrapControlKubeconfigFile string
 	var tlsOpts []func(*tls.Config)
@@ -76,7 +89,21 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.BoolVar(&observeOnly, "observe-only", true,
-		"Observe switches without device writes or ZTP/ONIE provisioning. Admin-state changes also require the individual interface annotation sonic.networking.metal.ironcore.dev/manage-admin-state=true.")
+		"Observe switches without device writes or ZTP/ONIE provisioning. VLAN writes also require managementPolicy=Manage. Authoritative VLANs require a separate opt-in. Admin-state changes also require the individual interface annotation sonic.networking.metal.ironcore.dev/manage-admin-state=true.")
+	flag.BoolVar(&allowAuthoritativeVLANs, "allow-authoritative-vlans", false,
+		"Allow automatic entire-VLAN reconciliation and guarded deletion. Requires observe-only=false, managementPolicy=Manage, explicit adoption of existing VLANs, and agent write gates.")
+	flag.BoolVar(&allowBreakout, "allow-breakout", false,
+		"Allow guarded port breakout. Requires observe-only=false, managementPolicy=Manage and agent breakout/write gates. Deletion never reverses hardware layout.")
+	flag.BoolVar(&allowNetworkConfig, "allow-network-config", false,
+		"Allow additive network configuration. Requires observe-only=false, individual managementPolicy=Manage and agent network/write gates. Resource deletion leaves device configuration intact.")
+	flag.BoolVar(&allowHostConfig, "allow-host-config", false, "Allow typed management and system configuration with switch-local management rollback; requires observe-only=false and per-resource Manage policy.")
+	flag.BoolVar(&allowArtifacts, "allow-artifacts", false, "Allow immutable declared artifact lifecycle with an independently installed switch-local recovery supervisor.")
+	flag.BoolVar(&allowFRRMigration, "allow-frr-migration", false,
+		"Allow approved empty-routing FRR migration. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage, a matching approvedDigest and agent migration/write gates.")
+	flag.BoolVar(&allowTrafficPolicy, "allow-traffic-policy", false,
+		"Allow guarded ACL and QoS configuration and recovery. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage and agent traffic/network/write gates.")
+	flag.BoolVar(&allowRedundancy, "allow-redundancy", false,
+		"Allow guarded MLAG and EVPN/VXLAN configuration and recovery. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage and agent redundancy/network/write gates. MLAG requires reciprocal Manage peer preflight.")
 	flag.StringVar(&httpServerAddr, "http-server-address", "0", "The address the HTTP server for ZTP and ONIE binds to.")
 	flag.StringVar(&ztpConfigFile, "ztp-config-file", "/etc/ztp.json", "Config file containing the parameters to render ZTP scripts.")
 	flag.StringVar(&ztpMode, "ztp-mode", "templates", "ZTP source: templates, configmap, or generated. Configmap mode serves the referenced script verbatim; generated mode renders from Switch objects.")
@@ -202,6 +229,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SwitchInterface")
 		os.Exit(1)
 	}
+	if err := (&controller.SwitchVLANReconciler{
+		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
+		ObserveOnly:             observeOnly,
+		AllowAuthoritativeVLANs: allowAuthoritativeVLANs,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SwitchVLAN")
+		os.Exit(1)
+	}
 	if err := (&controller.SwitchCredentialsReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -209,7 +245,38 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SwitchCredentials")
 		os.Exit(1)
 	}
+	if err := (&controller.SwitchPortBreakoutReconciler{
+		Client:        mgr.GetClient(),
+		APIReader:     mgr.GetAPIReader(),
+		ObserveOnly:   observeOnly,
+		AllowBreakout: allowBreakout,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SwitchPortBreakout")
+		os.Exit(1)
+	}
+	for _, kind := range []string{"Port", "PortChannel", "VRF", "L3Interface", "StaticRoute", "BGP", "BGPPeer", "DHCPRelay", "FRRMigration", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer", "EVPN"} {
+		if err := (&controller.NetworkReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Kind: kind,
+			ObserveOnly: observeOnly, AllowNetworkConfig: allowNetworkConfig,
+			AllowFRRMigration:  allowFRRMigration,
+			AllowTrafficPolicy: allowTrafficPolicy,
+			AllowRedundancy:    allowRedundancy,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create network controller", "controller", "Switch"+kind)
+			os.Exit(1)
+		}
+	}
+	for _, kind := range []string{"Management", "System"} {
+		if err := (&controller.HostReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Kind: kind, ObserveOnly: observeOnly, AllowHostConfig: allowHostConfig}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create host controller", "controller", "Switch"+kind)
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
+	if err := (&controller.ArtifactReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), ObserveOnly: observeOnly, AllowArtifacts: allowArtifacts}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create artifact controller")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

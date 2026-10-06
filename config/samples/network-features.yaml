@@ -1,0 +1,118 @@
+# Observation-only examples. Requires an existing Switch named leaf and VLAN 10.
+# These declarations do not establish a BGP session or advertise prefixes.
+# The SVI, routes, BGP and dual-stack relay share the default VRF.
+# BGP requires unified frrcfgd already provisioned out of band; these resources
+# never change the switch's FRR management mode.
+# IPv6 relay supports only the default VRF. LACP supports only active mode.
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchPortChannel
+metadata:
+  name: leaf-portchannel10
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  name: PortChannel10
+  members: [Ethernet0, Ethernet4]
+  minLinks: 1
+  lacpMode: active
+  fastRate: false
+  mtu: 9100
+  adminState: Up
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchL3Interface
+metadata:
+  name: leaf-vlan10-l3
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  name: Vlan10
+  vrf: default
+  addresses: [192.0.2.1/24, '2001:db8:10::1/64']
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchStaticRoute
+metadata:
+  name: leaf-default-route-v4
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  vrf: default
+  prefix: 203.0.113.0/24
+  nextHops:
+    - address: 192.0.2.2
+      interfaceName: Vlan10
+      distance: 1
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchStaticRoute
+metadata:
+  name: leaf-default-route-v6
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  vrf: default
+  prefix: '2001:db8:20::/64'
+  nextHops:
+    - address: '2001:db8:10::2'
+      interfaceName: Vlan10
+      distance: 1
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBGP
+metadata:
+  name: leaf-default-bgp
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  vrf: default
+  localASN: 65001
+  routerID: 192.0.2.1
+  prefixes: []
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchBGPPeer
+metadata:
+  name: leaf-default-peer
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  vrf: default
+  address: 192.0.2.2
+  remoteASN: 65002
+  localAddress: 192.0.2.1
+  addressFamilies: [ipv4Unicast, ipv6Unicast]
+  adminState: Down
+  maxPrefixes: 1000
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchDHCPRelay
+metadata:
+  name: leaf-vlan10-relay
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  vlanID: 10
+  vrf: default
+  ipv4Servers: [192.0.2.10]
+  ipv6Servers: ['2001:db8:10::10']
+---
+# Independent named-VRF example. No SVI, route, peer or relay above uses VrfBlue.
+# In particular, do not bind the dual-stack relay SVI to this VRF:
+# named-VRF relay is supported only for native DHCPv4, not IPv6 or legacy IPv4.
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchVRF
+metadata:
+  name: leaf-blue
+spec:
+  switchRef:
+    name: leaf
+  managementPolicy: Observe
+  name: VrfBlue

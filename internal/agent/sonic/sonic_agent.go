@@ -7,6 +7,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	errors "github.com/ironcore-dev/sonic-operator/internal/agent/errors"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	agent "github.com/ironcore-dev/sonic-operator/internal/agent/types"
 
 	"github.com/redis/go-redis/v9"
@@ -33,14 +37,36 @@ const (
 )
 
 type SonicAgent struct {
-	redisAddr   string
-	clientPool  map[string]*redis.Client
-	poolMutex   sync.RWMutex
-	linkByName  func(string) (netlink.Link, error)
-	saveConfig  func(context.Context) *agent.Status
-	versionInfo func() (map[string]string, error)
-	configMutex sync.Mutex
-	configDirty bool // A failed write/save may leave Redis and persisted config inconsistent.
+	// Set only on a private request-scoped backend, never on the shared agent.
+	redisContext     context.Context
+	artifactStateDir string // empty selects the fixed production reservation directory
+	redisAddr        string
+	clientPool       map[string]*redis.Client
+	poolMutex        sync.RWMutex
+	linkByName       func(string) (netlink.Link, error)
+	saveConfig       func(context.Context) *agent.Status
+	versionInfo      func() (map[string]string, error)
+	configMutex      sync.Mutex
+	configDirty      bool                 // A failed write/save may leave Redis and persisted config inconsistent.
+	journalDir       string               // Explicit persistent root-only VLAN authority journal.
+	journalSync      func(*os.File) error // Optional directory fsync implementation.
+
+	readSavedPortConfig func() ([]byte, error) // Optional local saved-file reader for tests.
+
+	verifyVLANRuntime func(context.Context, uint32, vlanChangeDB) error // Optional single APPL_DB observation, for tests.
+
+	breakoutJournalDir     string
+	resolveBreakout        func(context.Context, string, map[string]string) (*breakoutPlatform, error)
+	runBreakout            func(context.Context, *exec.Cmd) ([]byte, error)
+	validateBreakoutConfig func(context.Context) error
+	breakoutSnapshot       func(context.Context) (vlanChangeDB, string, error)
+	breakoutCAS            func(context.Context, string, vlanChangeDB, vlanChangeDB) (bool, error)
+	verifyBreakoutRuntime  func(context.Context, *breakoutPlatform, vlanChangeDB) error
+
+	networkJournalDir    string
+	hostJournalDir       string
+	hostRecoverySnapshot func(context.Context) (host.Snapshot, error)
+	planNetwork          func(vlanChangeDB, *agent.NetworkRequest) (*networkPlan, error)
 }
 
 func getRedisDBIDByName(name string) int {
@@ -111,13 +137,23 @@ func NewSonicRedisAgent(redisAddr string) (*SonicAgent, error) {
 }
 
 func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
+	return m.ConnectContext(context.Background(), dbName)
+}
+
+func (m *SonicAgent) ConnectContext(ctx context.Context, dbName string) (*redis.Client, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	m.poolMutex.RLock()
 	if client, exists := m.clientPool[dbName]; exists {
 		m.poolMutex.RUnlock()
 
 		// Test if connection is still alive
-		if err := client.Ping(context.Background()).Err(); err == nil {
+		if err := client.Ping(ctx).Err(); err == nil {
 			return client, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 	} else {
 		m.poolMutex.RUnlock()
@@ -129,8 +165,11 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 
 	// Double-check in case another goroutine created it
 	if client, exists := m.clientPool[dbName]; exists {
-		if err := client.Ping(context.Background()).Err(); err == nil {
+		if err := client.Ping(ctx).Err(); err == nil {
 			return client, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		// Close the dead connection
 		if err := client.Close(); err != nil {
@@ -145,7 +184,7 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 		return nil, fmt.Errorf("unknown database name: %s", dbName)
 	}
 
-	client := redis.NewClient(&redis.Options{
+	options := &redis.Options{
 		Addr:                  m.redisAddr,
 		DB:                    dbID,
 		DialTimeout:           RedisDialTimeout,
@@ -165,10 +204,16 @@ func (m *SonicAgent) Connect(dbName string) (*redis.Client, error) {
 		ConnMaxLifetime: 1 * time.Hour,
 
 		DisableIndentity: true, // Disable identity/protocol checks to avoid warnings
-	})
+	}
+	if m.redisContext != nil {
+		options.MaxRetries = -1
+		options.MinIdleConns = 0
+		options.Dialer = requestRedisDialer(m.redisContext)
+	}
+	client := redis.NewClient(options)
 
 	// Test the new connection
-	if err := client.Ping(context.Background()).Err(); err != nil {
+	if err := client.Ping(ctx).Err(); err != nil {
 		if err := client.Close(); err != nil {
 			return nil, fmt.Errorf("failed to close Redis client: %w", err)
 		}
@@ -313,6 +358,26 @@ func (m *SonicAgent) ListInterfaces(ctx context.Context) (*agent.InterfaceList, 
 }
 
 func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
+	unlock, status := m.lockOrdinaryConfig(ctx, 0)
+	if status != nil {
+		return status
+	}
+	defer unlock()
+	m.configDirty = true
+	if status := m.saveConfigLocked(ctx); status != nil && status.Code != 0 {
+		return status
+	}
+	m.configDirty = false
+	return nil
+}
+
+// saveConfigLocked is for callers already holding configMutex and, when
+// configured, the journal lock. Authority recovery intentionally bypasses the
+// ordinary pending guard while persisting its own recorded operation.
+func (m *SonicAgent) saveConfigLocked(ctx context.Context) *agent.Status {
+	if err := ctx.Err(); err != nil {
+		return errors.NewErrorStatus(errors.SERVER_ERROR, err.Error())
+	}
 	if m.saveConfig != nil {
 		return m.saveConfig(ctx)
 	}
@@ -329,10 +394,19 @@ func (m *SonicAgent) SaveConfig(ctx context.Context) *agent.Status {
 	}()
 
 	obj := conn.Object("org.SONiC.HostService", "/org/SONiC/HostService/config")
-	call := obj.CallWithContext(ctx, "save", 0, "")
-	if call.Err != nil {
-		log.Printf("D-Bus call failed: %v", call.Err)
-		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: %v", call.Err))
+	return saveConfigViaDBus(ctx, obj.CallWithContext)
+}
+
+func saveConfigViaDBus(ctx context.Context, callWithContext func(context.Context, string, dbus.Flags, ...any) *dbus.Call) *agent.Status {
+	call := callWithContext(ctx, "org.SONiC.HostService.config.save", 0, "")
+	var exitCode int32
+	var output string
+	if err := call.Store(&exitCode, &output); err != nil {
+		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: %v", err))
+	}
+	// HostService output may contain sensitive config; report only the exit code.
+	if exitCode != 0 {
+		return errors.NewErrorStatus(errors.BAD_REQUEST, fmt.Sprintf("failed to save config via D-Bus: exit code %d", exitCode))
 	}
 
 	log.Printf("Config saved successfully via D-Bus")
@@ -633,8 +707,9 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 	return m.setInterfaceField(ctx, iface, "alias", iface.AliasName)
 }
 
-// Both setters validate against the same CONFIG_DB snapshot and persist only a
-// changed field. In particular, an admin update never writes an alias.
+// Both setters validate against the same CONFIG_DB snapshot and write only a
+// changed field. Admin persistence is also independently checked on no-op calls.
+// In particular, an admin update never writes an alias.
 func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interface, field, desired string) (*agent.Interface, *agent.Status) {
 	var ifaceName string
 	var err error
@@ -660,10 +735,16 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	if err != nil || (strings.HasPrefix(iface.Name, "eth") && abstractName != iface.Name) {
 		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "invalid abstract interface name")
 	}
+	if iface.NativeName != "" && iface.NativeName != ifaceName {
+		return nil, errors.NewErrorStatus(errors.BAD_REQUEST, "interface native identity mismatch")
+	}
 	// SaveConfig persists the whole DB, so serialize setters and retain uncertain
 	// persistence across requests rather than treating matching Redis values as saved.
-	m.configMutex.Lock()
-	defer m.configMutex.Unlock()
+	unlock, status := m.lockOrdinaryConfig(ctx, 0)
+	if status != nil {
+		return nil, status
+	}
+	defer unlock()
 
 	configDB, err := m.Connect("CONFIG_DB")
 	if err != nil {
@@ -687,8 +768,11 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 			return nil, errors.NewErrorStatus(errors.REDIS_HSET_FAIL, fmt.Sprintf("failed to set %s: %v", field, err))
 		}
 	}
+	if field == "admin_status" && !m.adminPersisted(ifaceName, desired) {
+		m.configDirty = true
+	}
 	if m.configDirty {
-		if status := m.SaveConfig(ctx); status != nil {
+		if status := m.saveConfigLocked(ctx); status != nil && status.Code != 0 {
 			if changed {
 				// Request cancellation must not prevent restoring the pre-write value.
 				rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), RedisDefaultTimeout)
@@ -709,6 +793,16 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	if changed {
 		fields[field] = desired
 	}
+	if field == "admin_status" {
+		// A matching Redis value after a restart cannot hide an interrupted save.
+		// Also reject concurrent target changes rather than returning our old read.
+		persisted := m.adminPersisted(ifaceName, desired)
+		latest, err := configDB.HGetAll(ctx, portKey).Result()
+		if err != nil || !reflect.DeepEqual(latest, fields) || !persisted {
+			m.configDirty = true
+			return nil, errors.NewErrorStatus(errors.SERVER_ERROR, "admin state live/saved verification failed; retry persistence")
+		}
+	}
 
 	applDB, err := m.Connect("APPL_DB")
 	if err != nil {
@@ -722,12 +816,13 @@ func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interfa
 	}
 
 	return &agent.Interface{
-		TypeMeta:        agent.TypeMeta{Kind: agent.InterfaceKind},
-		Name:            abstractName,
-		NativeName:      ifaceName,
-		AliasName:       fields["alias"],
-		AdminStatus:     parseDeviceStatus(fields["admin_status"]),
-		OperationStatus: parseDeviceStatus(applFields["oper_status"]),
-		Status:          agent.Status{Code: 0, Message: "ok"},
+		TypeMeta:                 agent.TypeMeta{Kind: agent.InterfaceKind},
+		Name:                     abstractName,
+		NativeName:               ifaceName,
+		AliasName:                fields["alias"],
+		AdminStatus:              parseDeviceStatus(fields["admin_status"]),
+		OperationStatus:          parseDeviceStatus(applFields["oper_status"]),
+		AdminPersistenceVerified: field == "admin_status",
+		Status:                   agent.Status{Code: 0, Message: "ok"},
 	}, nil
 }

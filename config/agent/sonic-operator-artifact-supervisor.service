@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+[Unit]
+Description=Durable SONiC artifact recovery supervisor
+After=local-fs.target
+Before=sonic-operator-agent.service syncd.service swss.service pmon.service rc-local.service platform-modules-z9100.service
+RequiresMountsFor=/host
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=/usr/local/sbin/sonic-operator-artifact-supervisor
+Restart=always
+RestartSec=2
+User=root
+Group=root
+UMask=0077
+Environment=GOMEMLIMIT=512MiB
+MemoryHigh=768M
+MemoryMax=1G
+RuntimeDirectory=sonic-operator-artifacts
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target
