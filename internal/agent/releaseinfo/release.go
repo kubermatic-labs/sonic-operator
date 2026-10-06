@@ -3,6 +3,7 @@
 package releaseinfo
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,7 +14,9 @@ import (
 
 // Marker is retained in each executable by Current. Release tooling verifies
 // this bounded compiled declaration alongside Go VCS provenance and ELF identity.
-const Marker = `SONIC-RELEASE-V1:["routing-safe-writers-v1","artifact-reservation-v1","artifact-chunks-v1","host-observed-active-mac-v1","host-causal-runtime-v1","host-artifact-admission-v1","host-mac-ownership-v1","host-bootstrap-v1"]:END-SONIC-RELEASE`
+const LegacyMarker = `SONIC-RELEASE-V1:["routing-safe-writers-v1","artifact-reservation-v1","artifact-chunks-v1","host-observed-active-mac-v1","host-causal-runtime-v1","host-artifact-admission-v1","host-mac-ownership-v1","host-bootstrap-v1"]:END-SONIC-RELEASE`
+const Marker = `SONIC-RELEASE-V1:["routing-safe-writers-v1","artifact-reservation-v1","artifact-chunks-v1","host-observed-active-mac-v1","host-causal-runtime-v1","host-artifact-admission-v1","host-mac-ownership-v1","host-bootstrap-v1","host-imported-mac-unit-v1"]:END-SONIC-RELEASE`
+const ImportedMACUnit = "host-imported-mac-unit-v1"
 
 var compiledDeclaration = Marker
 
@@ -58,25 +61,51 @@ func PrintRequested() bool {
 	return true
 }
 
-// Validate requires the exact, bounded integrated floor. Unknown names do not
-// certify future behavior; adding one requires a reviewed policy migration.
+// Validate requires the eight-capability legacy floor and permits only the
+// additional imported-unit reader. Profile-specific readers require it explicitly;
+// old policies remain readable. Unknown names never certify future behavior.
 func Validate(i Info) error {
-	if !commitPattern.MatchString(i.SourceCommit) || len(i.Capabilities) != len(capabilities) {
+	if !commitPattern.MatchString(i.SourceCommit) || (len(i.Capabilities) != len(capabilities) && len(i.Capabilities) != len(capabilities)+1) {
 		return fmt.Errorf("invalid release declaration")
 	}
 	seen := map[string]bool{}
 	for _, c := range i.Capabilities {
-		if !slices.Contains(capabilities[:], c) || seen[c] {
+		if (!slices.Contains(capabilities[:], c) && c != ImportedMACUnit) || seen[c] {
 			return fmt.Errorf("unsupported release capability")
 		}
 		seen[c] = true
+	}
+	for _, c := range capabilities {
+		if !seen[c] {
+			return fmt.Errorf("missing release capability")
+		}
 	}
 	return nil
 }
 
 func Equal(a, b Info) bool {
-	if Validate(a) != nil || Validate(b) != nil || a.SourceCommit != b.SourceCommit {
+	if Validate(a) != nil || Validate(b) != nil || a.SourceCommit != b.SourceCommit || len(a.Capabilities) != len(b.Capabilities) {
 		return false
 	}
-	return true // Validation requires the exact same finite set, independent of order.
+	return true // Same finite capability set, independent of order.
+}
+
+// BinaryCapabilities preserves the declaration actually present in the binary;
+// inspecting an older release must not copy the inspecting tool's capabilities.
+// As with the original marker, this is provenance metadata, not an approval.
+func BinaryCapabilities(raw []byte) ([]string, error) {
+	marker := Marker
+	if !bytes.Contains(raw, []byte(marker)) {
+		marker = LegacyMarker
+		if !bytes.Contains(raw, []byte(marker)) {
+			return nil, fmt.Errorf("compiled release declaration unavailable")
+		}
+	}
+	var caps []string
+	err := json.Unmarshal([]byte(marker[len("SONIC-RELEASE-V1:"):len(marker)-len(":END-SONIC-RELEASE")]), &caps)
+	return caps, err
+}
+
+func SupportsImportedMACUnit(i Info) bool {
+	return Validate(i) == nil && slices.Contains(i.Capabilities, ImportedMACUnit)
 }

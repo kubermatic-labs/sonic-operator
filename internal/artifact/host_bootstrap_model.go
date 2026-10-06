@@ -3,8 +3,10 @@ package artifact
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 )
 
 type HostRecoveryBootstrap struct {
@@ -76,6 +78,12 @@ func (h *HostRecoveryBootstrap) Validate(content bool) error {
 		p, err := host.ValidateNativeProfile(h.Profile)
 		if err != nil {
 			return err
+		}
+		if p.ImportedMACEnvironment != "" {
+			caps, err := releaseinfo.BinaryCapabilities(h.Binary)
+			if err != nil || !slices.Contains(caps, releaseinfo.ImportedMACUnit) {
+				return fmt.Errorf("imported environment requires qualified watchdog reader")
+			}
 		}
 		if len(p.LegacyMACHooks) != len(h.MACHooks) {
 			return fmt.Errorf("profile/imported hook mismatch")

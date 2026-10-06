@@ -29,14 +29,15 @@ const macUnit = "[Service]\nExecStartPost=/usr/local/sbin/sonic-operator-host-re
 // NativeProfile is an operator-qualified image/template baseline, installed as
 // an immutable site artifact. A filename resemblance is never baseline proof.
 type NativeProfile struct {
-	ImageSHA256      string            `json:"imageSHA256"`
-	InterfacesSHA256 string            `json:"interfacesSHA256"`
-	ChronySHA256     string            `json:"chronySHA256"`
-	SNMPSHA256       string            `json:"snmpSHA256"`
-	NTPBackend       string            `json:"ntpBackend"`
-	NTPsecSHA256     string            `json:"ntpsecSHA256,omitempty"`
-	LegacyMACHooks   []LegacyMACHook   `json:"legacyMACHooks,omitempty"`
-	ConsumerSHA256   map[string]string `json:"consumerSHA256"`
+	ImageSHA256            string            `json:"imageSHA256"`
+	InterfacesSHA256       string            `json:"interfacesSHA256"`
+	ChronySHA256           string            `json:"chronySHA256"`
+	SNMPSHA256             string            `json:"snmpSHA256"`
+	NTPBackend             string            `json:"ntpBackend"`
+	NTPsecSHA256           string            `json:"ntpsecSHA256,omitempty"`
+	LegacyMACHooks         []LegacyMACHook   `json:"legacyMACHooks,omitempty"`
+	ImportedMACEnvironment string            `json:"importedMACEnvironment,omitempty"`
+	ConsumerSHA256         map[string]string `json:"consumerSHA256"`
 }
 
 // Native callbacks are internal and wired by the SONiC adapter. Load/CAS operate
@@ -51,6 +52,7 @@ type Native struct {
 	BeforePublication func(context.Context) error
 	Run               func(context.Context, []string, []byte) ([]byte, error)
 	ReadFile          func(string) ([]byte, error)
+	ReadUnitFile      func(string) ([]byte, os.FileInfo, error)
 	WriteFile         func(string, []byte, os.FileMode) error
 	SNMPExchange      func(context.Context, []byte) ([]byte, error)
 	BeforeRecovery    func(context.Context) error
@@ -146,16 +148,9 @@ func (n *Native) read(path string) ([]byte, error) {
 	if n.ReadFile != nil {
 		return n.ReadFile(path)
 	}
-	if path == "/usr/bin/python3" || path == "/bin/sh" {
-		resolved, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return nil, ErrNative
-		}
-		allowed := resolved == "/usr/bin/dash" || resolved == "/bin/dash" || resolved == "/usr/bin/python3.11" || resolved == "/usr/bin/python3.13"
-		if !allowed {
-			return nil, ErrNative
-		}
-		path = resolved
+	path, limit, e := nativeReadPath(path, filepath.EvalSymlinks)
+	if e != nil {
+		return nil, e
 	}
 	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if e != nil {
@@ -163,14 +158,43 @@ func (n *Native) read(path string) ([]byte, error) {
 	}
 	defer func() { _ = f.Close() }()
 	i, e := f.Stat()
+	if e != nil {
+		return nil, ErrNative
+	}
+	return readNativeContents(f, i, limit)
+}
+
+func nativeReadPath(path string, resolve func(string) (string, error)) (string, int64, error) {
 	limit := int64(4 << 20)
+	if path == "/usr/bin/python3" || path == "/bin/sh" {
+		resolved, err := resolve(path)
+		if err != nil {
+			return "", 0, ErrNative
+		}
+		allowed := resolved == "/usr/bin/dash" || resolved == "/bin/dash" || resolved == "/usr/bin/python3.11" || resolved == "/usr/bin/python3.13"
+		if !allowed {
+			return "", 0, ErrNative
+		}
+		path = resolved
+		// Only an explicitly requested, allowlisted interpreter gets the
+		// executable bound. Callers still verify its pinned content hash.
+		limit = 96 << 20
+	}
 	if path == RecoveryBinaryFile {
 		limit = 96 << 20
 	}
-	if e != nil || !i.Mode().IsRegular() || i.Size() > limit {
+	return path, limit, nil
+}
+
+func readNativeContents(r io.Reader, i os.FileInfo, limit int64) ([]byte, error) {
+	if !i.Mode().IsRegular() || i.Size() > limit {
 		return nil, ErrNative
 	}
-	return io.ReadAll(f)
+	b, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if int64(len(b)) > limit {
+		return nil, ErrNative
+	}
+	return b, err
 }
 func (n *Native) write(path string, data []byte, mode os.FileMode) error {
 	if n.WriteFile != nil {

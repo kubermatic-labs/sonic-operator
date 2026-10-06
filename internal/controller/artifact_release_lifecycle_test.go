@@ -177,7 +177,7 @@ func releaseControllerFixture(t *testing.T, initial string) (*ArtifactReconciler
 	t.Helper()
 	kube, obj, _, _, _ := artifactFreshnessFixture(t)
 	tlsConfig := hostFreshnessTLS(t)
-	a, b := releaseFixtureELF("accepted-A"), releaseFixtureELF("candidate-B")
+	a, b := releaseFixtureELF("accepted-A"+releaseinfo.Marker), releaseFixtureELF("candidate-B"+releaseinfo.Marker)
 	infoA, infoB := releaseinfo.Current(), releaseinfo.Current()
 	infoA.SourceCommit = strings.Repeat("a", 40)
 	infoB.SourceCommit = strings.Repeat("b", 40)

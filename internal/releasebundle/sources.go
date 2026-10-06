@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 )
 
@@ -18,9 +19,10 @@ type HookInput struct {
 	SourceHookSHA256  string             `json:"sourceHookSHA256"`
 }
 type SwitchInput struct {
-	Switch string                `json:"switch"`
-	Agent  artifact.AgentOptions `json:"agent"`
-	Hooks  []HookInput           `json:"hooks"`
+	ImportedMACEnvironment string                `json:"importedMACEnvironment,omitempty"`
+	Switch                 string                `json:"switch"`
+	Agent                  artifact.AgentOptions `json:"agent"`
+	Hooks                  []HookInput           `json:"hooks"`
 }
 type Sources struct {
 	HostRecovery        *artifact.HostRecoveryBootstrap `json:"hostRecovery"`
@@ -50,12 +52,12 @@ func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profi
 		return s, nil, fmt.Errorf("explicit bounded baseline and extra-public byte count required")
 	}
 	for _, b := range r.Builds {
-		if CheckAncestry(repo, b.SourceCommit) != nil {
+		if CheckAncestry(repo, b.Info) != nil {
 			return s, nil, fmt.Errorf("candidate below source floor")
 		}
 	}
 	for _, b := range r.Fallbacks {
-		if CheckAncestry(repo, b.SourceCommit) != nil {
+		if CheckAncestry(repo, b.Info) != nil {
 			return s, nil, fmt.Errorf("fallback below source floor")
 		}
 	}
@@ -66,7 +68,7 @@ func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profi
 	payloads := map[string][]byte{}
 	for role, slot := range map[string]string{"agent": "AgentBinary", "supervisor": "SupervisorBinary", "watchdog": "HostRecoveryBinary"} {
 		b, payload, err := readInspectedBinary(repo, paths[role], role)
-		if err != nil || b.SHA256 != r.Builds[role].SHA256 || b.SourceCommit != r.Builds[role].SourceCommit || b.Size != r.Builds[role].Size {
+		if err != nil || b.SHA256 != r.Builds[role].SHA256 || !releaseinfo.Equal(b.Info, r.Builds[role].Info) || b.Size != r.Builds[role].Size {
 			return s, nil, fmt.Errorf("built source differs from release")
 		}
 		payloads[slot] = payload
@@ -103,6 +105,9 @@ func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profi
 			payloads["ImportedHelper"] = helper
 			payloads["ImportedHook"] = hook
 			s.GeneratedSHA256["ImportedMACUnit"] = artifact.Digest(host.ImportedMACUnit(decl.Kind))
+		}
+		if err := sourceImportedEnvironment(&p, input.ImportedMACEnvironment, r); err != nil {
+			return s, nil, err
 		}
 		profileRaw, err = JSON(p)
 		if err != nil {
@@ -154,6 +159,27 @@ func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profi
 		objects = append(objects, cms...)
 	}
 	return s, objects, nil
+}
+
+func sourceImportedEnvironment(p *host.NativeProfile, recipe string, r Release) error {
+	if recipe == "" {
+		return nil
+	}
+	if recipe != host.ImportedMACEnvironmentNone || len(p.LegacyMACHooks) != 1 {
+		return fmt.Errorf("explicit native environment requires one imported hook and a known recipe")
+	}
+	for _, b := range r.Builds {
+		if !releaseinfo.SupportsImportedMACUnit(b.Info) {
+			return fmt.Errorf("release lacks imported native unit reader")
+		}
+	}
+	for _, b := range r.AgentBuilds {
+		if !releaseinfo.SupportsImportedMACUnit(b) {
+			return fmt.Errorf("accepted fallback lacks imported native unit reader")
+		}
+	}
+	p.ImportedMACEnvironment = recipe
+	return nil
 }
 
 // Imported source units contain only the captured fixed activation commands;

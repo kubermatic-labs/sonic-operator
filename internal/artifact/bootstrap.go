@@ -9,11 +9,13 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 )
 
 const bootstrapState = "/host/sonic-operator-artifact-bootstrap"
@@ -64,6 +66,42 @@ func (b Bootstrap) Validate(content bool) error {
 	}
 	if content && (Digest(b.Supervisor) != b.SupervisorSHA256 || Digest(b.Policy) != b.PolicySHA256) {
 		return fmt.Errorf("bootstrap content identity mismatch")
+	}
+	if content {
+		var policy Policy
+		if Decode(b.Policy, &policy) != nil {
+			return fmt.Errorf("invalid bootstrap policy")
+		}
+		requiresImportedReader := false
+		if b.HostRecovery != nil {
+			p, err := host.ValidateNativeProfile(b.HostRecovery.Profile)
+			if err != nil {
+				return err
+			}
+			requiresImportedReader = p.ImportedMACEnvironment != ""
+		}
+		if requiresImportedReader {
+			if len(policy.AgentBuilds) == 0 || len(policy.AgentBuilds) > 16 {
+				return fmt.Errorf("imported native unit reader policy required")
+			}
+			for hash, build := range policy.AgentBuilds {
+				if !shaPattern.MatchString(hash) || !releaseinfo.SupportsImportedMACUnit(build) {
+					return fmt.Errorf("accepted agent lacks imported native unit reader")
+				}
+			}
+		}
+		// Even without a host profile, an old supervisor cannot read a policy
+		// declaring the ninth capability. Inspect its actual payload before any
+		// bootstrap ownership or payload publication, not its agent policy entry.
+		for _, build := range policy.AgentBuilds {
+			requiresImportedReader = requiresImportedReader || slices.Contains(build.Capabilities, releaseinfo.ImportedMACUnit)
+		}
+		if requiresImportedReader {
+			caps, err := releaseinfo.BinaryCapabilities(b.Supervisor)
+			if err != nil || !slices.Contains(caps, releaseinfo.ImportedMACUnit) {
+				return fmt.Errorf("bootstrap requires qualified supervisor imported native unit reader")
+			}
+		}
 	}
 	return nil
 }

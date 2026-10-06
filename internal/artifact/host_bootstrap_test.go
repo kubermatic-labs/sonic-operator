@@ -302,9 +302,13 @@ func TestHostBootstrapImportedInstallPrefixesRetainOriginalEvidence(t *testing.T
 		if kind == "management-mac-python" {
 			helperName = "management-only-mac.py"
 		}
-		helper, err := os.ReadFile(filepath.Join(os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR"), helperName))
+		dir := os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR")
+		if dir == "" {
+			t.Skip("set SONIC_TEST_MAC_FIXTURE_DIR to the captured MAC helper scripts")
+		}
+		helper, err := os.ReadFile(filepath.Join(dir, helperName))
 		if err != nil {
-			t.Skip("local captured helper fixture unavailable")
+			t.Fatal("captured helper fixture unavailable", err)
 		}
 		hookPath, helperPath, _ := host.ImportedMACPaths(kind)
 		for _, phase := range []string{helperPath, hookPath} {

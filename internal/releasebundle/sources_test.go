@@ -5,10 +5,96 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 )
+
+func TestSourceInputExplicitNativeEnvironment(t *testing.T) {
+	var input SwitchInput
+	if err := artifact.Decode([]byte(`{"switch":"leaf-02","importedMACEnvironment":"sonic-dpu-none-v1"}`), &input); err != nil {
+		t.Fatal("explicit source recipe rejected", err)
+	}
+}
+
+func TestSourceEnvironmentReaderFloorAndProfileHash(t *testing.T) {
+	raw, err := os.ReadFile("../../config/agent/profiles/202511.1217682-4784cca11.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := host.ValidateNativeProfile(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := releaseinfo.Current()
+	i.SourceCommit = strings.Repeat("a", 40)
+	for _, change := range []string{"valid", "legacy", "unknown", "no-hook", "old-reader", "old-fallback"} {
+		t.Run(change, func(t *testing.T) {
+			p := base
+			p.ConsumerSHA256 = map[string]string{}
+			for k, v := range base.ConsumerSHA256 {
+				p.ConsumerSHA256[k] = v
+			}
+			r := Release{Builds: map[string]Binary{"watchdog": {Info: i}}, AgentBuilds: map[string]artifact.ReleaseBuild{strings.Repeat("b", 64): i}}
+			recipe := host.ImportedMACEnvironmentNone
+			p.LegacyMACHooks = []host.LegacyMACHook{{Kind: "management-mac-shell", BaseMAC: "00:00:5e:00:53:01", MAC: "02:00:5e:00:53:01", Addresses: []host.Address{{Prefix: "10.0.0.22/24", Gateway: "10.0.0.1"}}, HelperSHA256: host.ImportedHelperSHA256("management-mac-shell"), HookSHA256: artifact.Digest(host.ImportedMACUnit("management-mac-shell"))}}
+			p.ConsumerSHA256["imported-shell"] = strings.Repeat("c", 64)
+			legacy := i
+			legacy.Capabilities = slices.DeleteFunc(slices.Clone(i.Capabilities), func(s string) bool { return s == releaseinfo.ImportedMACUnit })
+			switch change {
+			case "legacy":
+				p = base
+				recipe = ""
+			case "unknown":
+				recipe = "allow-extra-dropins"
+			case "no-hook":
+				p = base
+			case "old-reader":
+				r.Builds["watchdog"] = Binary{Info: legacy}
+			case "old-fallback":
+				r.AgentBuilds[strings.Repeat("b", 64)] = legacy
+			}
+			err := sourceImportedEnvironment(&p, recipe, r)
+			if change != "valid" && change != "legacy" {
+				if err == nil {
+					t.Fatal("unqualified recipe accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := JSON(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, err := host.ValidateNativeProfile(encoded)
+			if err != nil || decoded.ImportedMACEnvironment != recipe {
+				t.Fatal("profile round trip lost recipe", err)
+			}
+			baseline, _ := JSON(base)
+			if change == "legacy" && artifact.Digest(encoded) != artifact.Digest(baseline) {
+				t.Fatal("no-hook profile serialization changed")
+			}
+			if change == "valid" {
+				without := p
+				without.ImportedMACEnvironment = ""
+				old, _ := JSON(without)
+				if artifact.Digest(encoded) == artifact.Digest(old) {
+					t.Fatal("profile identity omitted recipe")
+				}
+				ref, cms, err := ChunkSource("HostProfile", encoded)
+				if err != nil || ValidateChunks(ref, cms) != nil || ref.SHA256 != artifact.Digest(encoded) {
+					t.Fatal("chunk metadata lost profile binding", err)
+				}
+			}
+		})
+	}
+}
 
 func TestSourceBinaryReplacementRetainsInspectedBytes(t *testing.T) {
 	fixture := os.Getenv("SONIC_TEST_RELEASE_AGENT")

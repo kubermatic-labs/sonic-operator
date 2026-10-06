@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestImportedMACFixedCommands(t *testing.T) {
 
 func TestCapturedImportedBootMACGuards(t *testing.T) {
 	for _, kind := range []string{"management-mac-python", "management-mac-shell"} {
-		for _, change := range []string{"valid", "foreign-mac", "base", "addresses", "foreign-interface", "hostname", "vrf", "gateway", "helper", "interpreter", "typed-boot", "typed-dropin", "rollback-unit", "pending", "reservation"} {
+		for _, change := range []string{"valid", "bootstrap-newline", "bootstrap-environment", "foreign-mac", "base", "addresses", "foreign-interface", "hostname", "vrf", "gateway", "helper", "interpreter", "typed-boot", "typed-dropin", "rollback-unit", "pending", "reservation"} {
 			t.Run(kind+"/"+change, func(t *testing.T) {
 				if change == "hostname" && kind == "management-mac-shell" {
 					t.Skip("shell helper has no hostname selector")
@@ -47,9 +48,13 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 				if kind == "management-mac-python" {
 					helperName = "management-only-mac.py"
 				}
-				helper, err := os.ReadFile(filepath.Join(os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR"), helperName))
+				dir := os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR")
+				if dir == "" {
+					t.Skip("set SONIC_TEST_MAC_FIXTURE_DIR to the captured MAC helper scripts")
+				}
+				helper, err := os.ReadFile(filepath.Join(dir, helperName))
 				if err != nil {
-					t.Skip("local captured helper fixture unavailable")
+					t.Fatal("captured helper fixture unavailable", err)
 				}
 				if !hashMatches(helper, ImportedHelperSHA256(kind)) {
 					t.Fatal("capture differs from approved helper")
@@ -89,6 +94,16 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 				files[RecoveryReceiptFile], _ = json.Marshal(receipt)
 				_ = json.Unmarshal(files[profileFile], &p)
 				active, base := h.BaseMAC, h.BaseMAC
+				bootstrap := strings.HasPrefix(change, "bootstrap-")
+				if bootstrap {
+					active = h.MAC
+				}
+				if change == "bootstrap-environment" {
+					var raw map[string]any
+					_ = json.Unmarshal(files[profileFile], &raw)
+					raw["importedMACEnvironment"] = "sonic-dpu-none-v1"
+					files[profileFile], _ = json.Marshal(raw)
+				}
 				source := strings.TrimSuffix(h.Addresses[0].Prefix, "/24")
 				gateway := "10.0.0.1"
 				db := Database{"MGMT_INTERFACE": {"eth0|" + h.Addresses[0].Prefix: {"gwaddr": gateway}}}
@@ -162,18 +177,45 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 						return nil, nil
 					}
 					if args[0] == "systemctl" {
+						if change == "bootstrap-environment" {
+							if b, ok := fixtureImportedEnvironmentProperty(args); ok {
+								return b, nil
+							}
+						}
 						for _, a := range args {
 							switch a {
 							case "--property=DropInPaths":
+								if change == "bootstrap-environment" {
+									return []byte("/run/systemd/generator/interfaces-config.service.d/environment.conf " + hookPath), nil
+								}
 								return []byte(hookPath), nil
 							case "--property=NeedDaemonReload":
 								return []byte("no"), nil
 							case "--property=ExecStartPost":
+								if bootstrap {
+									command := helperPath
+									if kind == "management-mac-python" {
+										command = "/usr/bin/python3 " + helperPath + " boot"
+									}
+									return []byte("{ path=" + strings.Fields(command)[0] + " ; argv[]=" + command + " ; }"), nil
+								}
 								return []byte("{ path=" + RecoveryBinaryFile + " ; argv[]=" + RecoveryBinaryFile + " --apply-imported-boot-mac=" + kind + " ; }"), nil
 							}
 						}
 						if change == "rollback-unit" {
 							return []byte("Id=unknown-rollback.service\nExecStart=/usr/local/sbin/rollback-management-mac"), nil
+						}
+						if bootstrap {
+							b, err := os.ReadFile("testdata/imported-mac/loaded-interfaces.txt")
+							if err != nil {
+								t.Fatal(err)
+							}
+							text := strings.TrimSuffix(string(b), "\n")
+							if kind == "management-mac-python" {
+								text = strings.ReplaceAll(text, "path=/usr/local/sbin/set-management-mac", "path=/usr/bin/python3")
+								text = strings.ReplaceAll(text, "argv[]=/usr/local/sbin/set-management-mac", "argv[]=/usr/bin/python3 "+helperPath+" boot")
+							}
+							return []byte(text), nil
 						}
 						return []byte("Id=interfaces-config.service\nExecStartPost=" + RecoveryBinaryFile), nil
 					}
@@ -206,6 +248,19 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 						return []byte(`[{"dst":"10.0.0.0/24","table":"default"},{"dst":"default","gateway":"` + gateway + `","table":"default","metric":201}]`), nil
 					}
 					return nil, ErrNative
+				}
+				n.ReadUnitFile = func(path string) ([]byte, os.FileInfo, error) {
+					b, err := os.ReadFile("testdata/imported-mac/" + filepath.Base(path))
+					if path == hookPath {
+						b, err = []byte("[Service]\nExecStartPost="+originalImportedCommand(kind)+"\n"), nil
+					}
+					return b, unitFixtureInfo{size: int64(len(b)), mode: 0644, stat: syscall.Stat_t{Uid: 0, Gid: 0, Nlink: 1}}, err
+				}
+				if bootstrap {
+					if err = n.QualifyBootstrapProfile(t.Context(), files[profileFile], false); err != nil || calls != 0 {
+						t.Fatalf("read-only bootstrap qualification failed: %v calls=%d", err, calls)
+					}
+					return
 				}
 				err = n.ApplyImportedBootMAC(t.Context(), kind)
 				if change == "valid" {
@@ -251,4 +306,39 @@ func TestImportedIdentityHostname(t *testing.T) {
 			t.Errorf("%s/%q: got %v", tc.kind, tc.hostname, err)
 		}
 	}
+}
+
+type unitFixtureInfo struct {
+	size int64
+	mode os.FileMode
+	stat syscall.Stat_t
+}
+
+func (i unitFixtureInfo) Name() string       { return "fixture" }
+func (i unitFixtureInfo) Size() int64        { return i.size }
+func (i unitFixtureInfo) Mode() os.FileMode  { return i.mode }
+func (i unitFixtureInfo) ModTime() time.Time { return time.Time{} }
+func (i unitFixtureInfo) IsDir() bool        { return false }
+func (i unitFixtureInfo) Sys() any           { return &i.stat }
+
+func fixtureImportedEnvironmentProperty(args []string) ([]byte, bool) {
+	for _, a := range args {
+		switch a {
+		case "--property=FragmentPath":
+			return []byte("/usr/lib/systemd/system/interfaces-config.service\n"), true
+		case "--property=Environment":
+			return []byte("NUM_DPU=0 IS_DPU_DEVICE=false\n"), true
+		case "--property=Type":
+			return []byte("oneshot\n"), true
+		case "--property=RemainAfterExit":
+			return []byte("yes\n"), true
+		case "--property=DynamicUser":
+			return []byte("no\n"), true
+		case "--property=ExecStart":
+			return []byte("{ path=/usr/bin/interfaces-config.sh ; argv[]=/usr/bin/interfaces-config.sh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }\n"), true
+		case "--property=EnvironmentFiles", "--property=PassEnvironment", "--property=UnsetEnvironment", "--property=User", "--property=Group", "--property=SupplementaryGroups", "--property=RootDirectory", "--property=RootImage", "--property=WorkingDirectory", "--property=ExecSearchPath", "--property=ExecStartPre", "--property=ExecReload", "--property=ExecStop", "--property=ExecStopPost":
+			return []byte("\n"), true
+		}
+	}
+	return nil, false
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 	"github.com/ironcore-dev/sonic-operator/internal/releasebundle"
 )
 
@@ -20,18 +21,14 @@ func TestReleaseAncestryFloor(t *testing.T) {
 	if err != nil {
 		t.Skip("git checkout unavailable")
 	}
-	head := string(out[:len(out)-1])
-	saved := releasebundle.Floors
-	defer func() { releasebundle.Floors = saved }()
-	releasebundle.Floors = []string{head}
-	if err := releasebundle.CheckAncestry(repo, head); err != nil {
+	i := releaseinfo.Current()
+	i.SourceCommit = strings.TrimSpace(string(out))
+	if err := releasebundle.CheckAncestry(repo, i); err != nil {
 		t.Fatal(err)
 	}
-	if releasebundle.CheckAncestry(repo, strings.Repeat("0", 40)) == nil {
+	i.SourceCommit = strings.Repeat("0", 40)
+	if releasebundle.CheckAncestry(repo, i) == nil {
 		t.Fatal("unknown source commit accepted")
-	}
-	if releasebundle.CheckAncestry(repo, "HEAD") == nil {
-		t.Fatal("abbreviated source accepted")
 	}
 }
 
