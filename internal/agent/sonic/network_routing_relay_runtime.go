@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -155,15 +156,25 @@ func runRoutingRead(ctx context.Context, command routingReadCommand) ([]byte, er
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.WaitDelay = time.Second
 	if run, ok := ctx.Value(routingCommandRunnerKey{}).(routingCommandRunner); ok {
-		return run(cmd)
+		data, err := run(cmd)
+		return data, routingSupervisorError(command, data, err)
 	}
 	var stdout routingBoundedOutput
 	cmd.Stdout = &stdout
 	// Stderr and FRR config can contain passwords. Never return either raw.
-	if err := cmd.Run(); err != nil {
+	runErr := cmd.Run()
+	if err := routingSupervisorError(command, stdout.buffer.Bytes(), runErr); err != nil {
 		return nil, fmt.Errorf("routing read %d failed: %w", command, err)
 	}
 	return stdout.buffer.Bytes(), nil
+}
+
+func routingSupervisorError(command routingReadCommand, data []byte, err error) error {
+	var exit *exec.ExitError
+	if command == routingBGPDaemons && errors.As(err, &exit) && exit.ExitCode() == 3 && frrMigrationSupervisorReport(data) {
+		return nil
+	}
+	return err
 }
 
 // Fixed read-only /proc query. Numeric PIDs and argv come from the kernel, not
@@ -346,6 +357,9 @@ func observeRoutingBGP(ctx context.Context, run routingRead, vrf string, asn uin
 			}
 		}
 		for family, lines := range afLines {
+			if family == "l2vpn evpn" && ctx.Value(evpnCoexistVerifiedKey{}) == true {
+				continue
+			}
 			if family != "ipv4 unicast" && family != "ipv6 unicast" && lines[nbr+"activate"] {
 				matched = false
 			}

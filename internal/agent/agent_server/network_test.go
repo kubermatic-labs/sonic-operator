@@ -18,7 +18,7 @@ import (
 
 func TestGroupedNetworkEnvelope(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding"} {
+	for _, kind := range []string{"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "MLAG", "VXLANTunnel", "VLANVNI", "EVPNPeer"} {
 		t.Run(kind, func(t *testing.T) {
 			for _, tc := range []struct {
 				name, kind string
@@ -47,6 +47,14 @@ func TestTrafficPolicyFlagDefaultsDisabled(t *testing.T) {
 	f := flag.Lookup("allow-traffic-policy")
 	if f == nil || f.DefValue != "false" {
 		t.Fatalf("traffic policy must have an independent, default-disabled flag: %v", f)
+	}
+}
+
+func TestRedundancyFlagDefaultsDisabled(t *testing.T) {
+	t.Parallel()
+	f := flag.Lookup("allow-redundancy")
+	if f == nil || f.DefValue != "false" {
+		t.Fatalf("redundancy must have an independent, default-disabled flag: %v", f)
 	}
 }
 

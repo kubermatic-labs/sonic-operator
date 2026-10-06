@@ -93,6 +93,27 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 		return e == nil && n <= max && s == prefix+strconv.FormatUint(n, 10)
 	}
 	switch r.Kind {
+	case "EVPN":
+		return "EVPN|default", nil
+	case "MLAG":
+		var id uint32
+		if json.Unmarshal(fields["domainID"], &id) == nil && id > 0 && id <= 4095 {
+			return r.Kind + "|" + strconv.FormatUint(uint64(id), 10), nil
+		}
+	case "VXLANTunnel":
+		if evpnName.MatchString(name) {
+			return r.Kind + "|" + name, nil
+		}
+	case "VLANVNI":
+		var id uint32
+		if json.Unmarshal(fields["vlanID"], &id) == nil && id > 0 && id <= 4094 && evpnName.MatchString(text("tunnel")) {
+			return r.Kind + "|" + text("tunnel") + "|" + strconv.FormatUint(uint64(id), 10), nil
+		}
+	case "EVPNPeer":
+		a, err := netip.ParseAddr(text("address"))
+		if vrf == "default" && err == nil && a.Zone() == "" && !a.Is4In6() {
+			return r.Kind + "|default|" + a.String(), nil
+		}
 	case "ACLPolicy":
 		if networkTrafficIdentifier.MatchString(name) {
 			return r.Kind + "|" + name, nil
@@ -152,6 +173,16 @@ func networkIdentity(r *agent.NetworkRequest) (string, error) {
 
 func planNetworkResource(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	switch r.Kind {
+	case "EVPN":
+		return planNetworkEVPN(db, r)
+	case "MLAG":
+		return planNetworkMLAG(db, r)
+	case "VXLANTunnel":
+		return planNetworkVXLANTunnel(db, r)
+	case "VLANVNI":
+		return planNetworkVLANVNI(db, r)
+	case "EVPNPeer":
+		return planNetworkEVPNPeer(db, r)
 	case "ACLPolicy":
 		return planNetworkACLPolicy(db, r)
 	case "ACLBinding":
@@ -202,9 +233,10 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		"BGPPeer":      {"BGP_NEIGHBOR": "asn local_addr admin_status", "BGP_NEIGHBOR_AF": "admin_status max_prefix_limit max_prefix_warning_threshold prefix_list_out send_default_route"},
 		"DHCPRelay":    {"VLAN": "dhcp_servers@", "DHCP_RELAY": "dhcpv6_servers@", "DHCPV4_RELAY": "dhcpv4_servers@"},
 		"MLAG":         {"MCLAG_DOMAIN": "source_ip peer_ip peer_link keepalive_interval session_timeout", "MCLAG_INTERFACE": "if_type"},
+		"EVPN":         {"BGP_GLOBALS_AF": "advertise-all-vni advertise-svi-ip advertise-default-gw advertise-ipv4-unicast advertise-ipv6-unicast"},
 		"VXLANTunnel":  {"VXLAN_TUNNEL": "src_ip", "VXLAN_EVPN_NVO": "source_vtep"},
 		"VLANVNI":      {"VXLAN_TUNNEL_MAP": "vlan vni", "BGP_GLOBALS_EVPN_VNI": "route-distinguisher", "BGP_GLOBALS_EVPN_VNI_RT": "route-target-type"},
-		"EVPNPeer":     {"BGP_NEIGHBOR_AF": "admin_status"},
+		"EVPNPeer":     {"BGP_NEIGHBOR_AF": "admin_status route_map_in@ route_map_out@ send_community unchanged_nexthop", "ROUTE_MAP": "route_operation match_ext_community", "EXTENDED_COMMUNITY_SET": "set_type match_action community_member@"},
 		// Policy and binding deliberately reserve disjoint fields on ACL_TABLE.
 		"ACLPolicy":  {"ACL_TABLE": "type stage policy_desc", "ACL_RULE": "PRIORITY PACKET_ACTION IP_TYPE SRC_IP DST_IP SRC_IPV6 DST_IPV6 IP_PROTOCOL NEXT_HEADER L4_SRC_PORT L4_DST_PORT"},
 		"ACLBinding": {"ACL_TABLE": "ports@"},
@@ -226,13 +258,91 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		if !networkTrafficTarget(kind, table, name) {
 			return fmt.Errorf("invalid traffic policy target %s", key)
 		}
-
+		if !networkRedundancyTarget(kind, table, name) {
+			return fmt.Errorf("invalid redundancy target %s", key)
+		}
+		if kind == "EVPNPeer" && table == "BGP_NEIGHBOR_AF" && fields["admin_status"] != "up" && fields["admin_status"] != "down" {
+			return fmt.Errorf("invalid EVPN address-family admin status")
+		}
+		if kind == "EVPN" && !evpnGlobalConfigValid(fields) {
+			return fmt.Errorf("invalid global EVPN fields")
+		}
+		if kind == "VLANVNI" {
+			if rd, ok := fields["route-distinguisher"]; ok && evpnRD(rd) != nil {
+				return fmt.Errorf("invalid VNI route distinguisher")
+			}
+			if typ, ok := fields["route-target-type"]; ok && typ != "import" && typ != "export" && typ != "both" {
+				return fmt.Errorf("invalid VNI route target type")
+			}
+		}
 		for field := range fields {
 			if kind == "QoSMap" && networkQoSMapField(table, field) {
 				continue
 			}
 			if !slices.Contains(strings.Fields(allowed[table]), field) {
 				return fmt.Errorf("unsupported network target table/field %s/%s", table, field)
+			}
+		}
+	}
+	return nil
+}
+
+// Restrict shared routing tables to the initial default-VRF EVPN scope. In
+// particular an EVPN peer must never reserve the shared neighbor's fields.
+func networkRedundancyTarget(kind, table, name string) bool {
+	canonicalID := func(s string, max uint64) bool {
+		n, err := strconv.ParseUint(s, 10, 32)
+		return err == nil && n > 0 && n <= max && s == strconv.FormatUint(n, 10)
+	}
+	switch kind {
+	case "EVPN":
+		return table == "BGP_GLOBALS_AF" && name == "default|l2vpn_evpn"
+	case "MLAG":
+		if table == "MCLAG_DOMAIN" {
+			return canonicalID(name, 4095)
+		}
+		if table == "MCLAG_INTERFACE" {
+			domain, iface, ok := strings.Cut(name, "|")
+			n, err := strconv.ParseUint(strings.TrimPrefix(iface, "PortChannel"), 10, 16)
+			return ok && canonicalID(domain, 4095) && err == nil && iface == "PortChannel"+strconv.FormatUint(n, 10)
+		}
+		return false
+	case "VXLANTunnel":
+		return (table == "VXLAN_TUNNEL" || table == "VXLAN_EVPN_NVO") && evpnName.MatchString(name)
+	case "VLANVNI":
+		if table == "VXLAN_TUNNEL_MAP" {
+			tunnel, mapping, ok := strings.Cut(name, "|")
+			parts := strings.Split(mapping, "_")
+			return ok && evpnName.MatchString(tunnel) && len(parts) == 3 && parts[0] == "map" && canonicalID(parts[1], 16777215) && strings.HasPrefix(parts[2], "Vlan") && canonicalID(strings.TrimPrefix(parts[2], "Vlan"), 4094)
+		}
+		parts := strings.Split(name, "|")
+		if len(parts) < 3 || parts[0] != "default" || parts[1] != "l2vpn_evpn" || !canonicalID(parts[2], 16777215) {
+			return false
+		}
+		return (table == "BGP_GLOBALS_EVPN_VNI" && len(parts) == 3) || (table == "BGP_GLOBALS_EVPN_VNI_RT" && len(parts) == 4 && evpnRD(parts[3]) == nil)
+	case "EVPNPeer":
+		parts := strings.Split(name, "|")
+		if table == "EXTENDED_COMMUNITY_SET" {
+			return regexp.MustCompile(`^SOEV_[a-f0-9]{20}_[IO]$`).MatchString(name)
+		}
+		if table == "ROUTE_MAP" {
+			return len(parts) == 2 && regexp.MustCompile(`^SOEV_[a-f0-9]{20}_[IO]$`).MatchString(parts[0]) && (parts[1] == "10" || parts[1] == "65535")
+		}
+		if table != "BGP_NEIGHBOR_AF" || len(parts) != 3 || parts[0] != "default" || parts[2] != "l2vpn_evpn" {
+			return false
+		}
+		a, err := netip.ParseAddr(parts[1])
+		return err == nil && a.Zone() == "" && !a.Is4In6() && a.String() == parts[1]
+	default:
+		return true
+	}
+}
+
+func validateNetworkActivationPreflight(kind string, p *networkPlan) error {
+	if kind == "EVPNPeer" {
+		for _, fields := range p.Desired {
+			if fields["admin_status"] == "up" && (p.Preflight == nil || p.Runtime == nil) {
+				return fmt.Errorf("EVPN Up requires runtime safety preflight and observation")
 			}
 		}
 	}
@@ -396,6 +506,15 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		}
 	}
 	record := state.Records[identity]
+	if r.Kind == "EVPN" && record != nil && len(record.EVPNMappings) > 0 && operation != "recover" {
+		var spec evpnGlobalSpec
+		if err := mlagJSON(r.Spec, &spec, false); err != nil {
+			return failure(err)
+		}
+		if !reflect.DeepEqual(record.EVPNMappings, spec.Mappings) {
+			return failure(fmt.Errorf("global EVPN mapping declaration is durably bound; replacement requires explicit recovery"))
+		}
+	}
 	if record != nil && (record.OwnerID != r.OwnerID || record.Kind != r.Kind) {
 		return nil, agenterrors.NewErrorStatus(agenterrors.ALREADY_EXISTS, "network identity owned by a different UID or kind; ownership cannot transfer")
 	}
@@ -416,7 +535,9 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 		if original == nil || original.Identity != identity || !reflect.DeepEqual(original.Desired, pending.After) {
 			return failure(fmt.Errorf("pending planner output changed; manual inspection required"))
 		}
-
+		if err := validateNetworkActivationPreflight(r.Kind, original); err != nil {
+			return failure(err)
+		}
 		if (original.Activate != nil) != (pending.Activation != "") {
 			return failure(fmt.Errorf("pending activation contract changed; manual inspection required"))
 		}
@@ -449,7 +570,9 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 	if !write {
 		return m.observeNetwork(ctx, db, p, record)
 	}
-
+	if err := validateNetworkActivationPreflight(r.Kind, p); err != nil {
+		return failure(err)
+	}
 	fail := func(message string) (*agent.NetworkResult, *agent.Status) {
 		out, _ := m.observeNetwork(ctx, db, p, record)
 		out.PersistenceVerified = false
@@ -508,9 +631,11 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 				// mutable. Never adopt foreign fields or overwrite ownership drift.
 				previous, ours := owned[key][field]
 				peerAdmin := r.Kind == "BGPPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR|") && field == "admin_status" && (value == "up" || value == "down")
+				evpnAdmin := r.Kind == "EVPNPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR_AF|default|") && strings.HasSuffix(key, "|l2vpn_evpn") && field == "admin_status" && (old == "up" || old == "down") && (value == "up" || value == "down")
+				globalEVPNAdmin := r.Kind == "EVPN" && key == evpnGlobalKey && field == "advertise-all-vni" && (old == "true" || old == "false") && (value == "true" || value == "false")
 				relayServers := r.Kind == "DHCPRelay" && routingRelayMutableField(key, field)
 				modeUpdate := migrationUpdate && frrMigrationModeUpdate(key, field, old, value) && (record == nil || (ours && previous == old))
-				if !modeUpdate && (!ours || previous != old || (!peerAdmin && !relayServers)) {
+				if !modeUpdate && (!ours || previous != old || (!peerAdmin && !evpnAdmin && !globalEVPNAdmin && !relayServers)) {
 					return fail("conflicting network field; only durably owned peer/EVPN AF admin_status and relay destinations support updates")
 				}
 			}
@@ -719,6 +844,14 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 		return fail("network configuration changed during save; persistence pending")
 	}
 	oldFields, oldOwned, oldHash := r.Fields, r.Owned, r.Fingerprint
+	oldMappings := r.EVPNMappings
+	if r.Kind == "EVPN" {
+		var spec evpnGlobalSpec
+		if err := mlagJSON(p.Request.Spec, &spec, false); err != nil {
+			return fail("invalid recorded EVPN mapping declaration")
+		}
+		r.EVPNMappings = spec.Mappings
+	}
 	r.Fields, r.Owned, r.Fingerprint, r.Pending = p.After, p.Owned, p.PostHash, nil
 	// SaveConfig persists the entire DB. Refresh proof for all matching records,
 	// otherwise independent controllers repeatedly save each other's stale proof.
@@ -729,6 +862,7 @@ func (m *SonicAgent) finishNetwork(ctx context.Context, j *vlanAuthorityJournal,
 	}
 	if err := storeNetworkJournal(j, state); err != nil {
 		r.Fields, r.Owned, r.Fingerprint, r.Pending = oldFields, oldOwned, oldHash, p
+		r.EVPNMappings = oldMappings
 		return fail("network save acknowledged but completion durability uncertain; retry")
 	}
 	m.configDirty = false

@@ -1,0 +1,76 @@
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchMLAG
+metadata:
+  name: leaf-a-mlag
+spec:
+  switchRef:
+    name: leaf-a
+  managementPolicy: Observe
+  domainID: 1
+  peerSwitchRef:
+    name: leaf-b
+  localAddress: 192.0.2.1
+  peerAddress: 192.0.2.2
+  peerLink: PortChannel10
+  members: [PortChannel20]
+  keepaliveInterval: 1
+  sessionTimeout: 30
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchMLAG
+metadata:
+  name: leaf-b-mlag
+spec:
+  switchRef:
+    name: leaf-b
+  managementPolicy: Observe
+  domainID: 1
+  peerSwitchRef:
+    name: leaf-a
+  localAddress: 192.0.2.2
+  peerAddress: 192.0.2.1
+  peerLink: PortChannel10
+  members: [PortChannel20]
+  keepaliveInterval: 1
+  sessionTimeout: 30
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchVXLANTunnel
+metadata:
+  name: leaf-a-vtep
+spec:
+  switchRef:
+    name: leaf-a
+  managementPolicy: Observe
+  name: vtep
+  sourceAddress: 192.0.2.1
+  evpnNVO: nvo
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchVLANVNI
+metadata:
+  name: leaf-a-vlan10-vni
+spec:
+  switchRef:
+    name: leaf-a
+  managementPolicy: Observe
+  tunnel: vtep
+  vlanID: 10
+  vni: 10010
+  routeDistinguisher: "65000:10"
+  importRouteTargets: ["65000:10"]
+  exportRouteTargets: ["65000:10"]
+---
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchEVPNPeer
+metadata:
+  name: leaf-a-evpn-peer
+spec:
+  switchRef:
+    name: leaf-a
+  managementPolicy: Observe
+  vrf: default
+  address: 192.0.2.2
+  remoteASN: 65002
+  localAddress: 192.0.2.1
+  adminState: Down

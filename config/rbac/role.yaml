@@ -36,6 +36,7 @@ rules:
   - switchbgps
   - switchdhcprelays
   - switchevpnpeers
+  - switchevpns
   - switchfrrmigrations
   - switchl3interfaces
   - switchmlags
@@ -61,6 +62,7 @@ rules:
   - switchbgps/finalizers
   - switchdhcprelays/finalizers
   - switchevpnpeers/finalizers
+  - switchevpns/finalizers
   - switchfrrmigrations/finalizers
   - switchl3interfaces/finalizers
   - switchmlags/finalizers
@@ -86,6 +88,7 @@ rules:
   - switchdhcprelays/status
   - switches/status
   - switchevpnpeers/status
+  - switchevpns/status
   - switchfrrmigrations/status
   - switchinterfaces/status
   - switchl3interfaces/status

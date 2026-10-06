@@ -20,6 +20,16 @@ import (
 // Explicit dispatch keeps the shared safety loop restricted to known APIs.
 func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 	switch kind {
+	case "EVPN":
+		return &api.SwitchEVPN{}, &api.SwitchEVPNList{}, nil
+	case "MLAG":
+		return &api.SwitchMLAG{}, &api.SwitchMLAGList{}, nil
+	case "VXLANTunnel":
+		return &api.SwitchVXLANTunnel{}, &api.SwitchVXLANTunnelList{}, nil
+	case "VLANVNI":
+		return &api.SwitchVLANVNI{}, &api.SwitchVLANVNIList{}, nil
+	case "EVPNPeer":
+		return &api.SwitchEVPNPeer{}, &api.SwitchEVPNPeerList{}, nil
 	case "PortChannel":
 		return &api.SwitchPortChannel{}, &api.SwitchPortChannelList{}, nil
 	case "VRF":
@@ -53,6 +63,16 @@ func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 
 func networkFields(obj client.Object) (any, *api.NetworkResourceStatus, *api.NetworkResourceSpec) {
 	switch o := obj.(type) {
+	case *api.SwitchEVPN:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchMLAG:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchVXLANTunnel:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchVLANVNI:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchEVPNPeer:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchPortChannel:
 		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchVRF:
@@ -144,6 +164,33 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 	}
 	target := ""
 	switch s := spec.(type) {
+	case *api.SwitchEVPNSpec:
+		if !redundancyName.MatchString(string(s.Tunnel)) || len(s.MappingRefs) > 64 {
+			return nil, "", fmt.Errorf("invalid EVPN tunnel or mapping references")
+		}
+		if s.AdminState == "" {
+			s.AdminState = api.AdminStateDown
+		}
+		if s.AdminState != api.AdminStateDown && s.AdminState != api.AdminStateUp {
+			return nil, "", fmt.Errorf("invalid EVPN admin state")
+		}
+		if s.AdminState == api.AdminStateUp && len(s.MappingRefs) == 0 {
+			return nil, "", fmt.Errorf("EVPN Up requires mappings")
+		}
+		seen := map[string]bool{}
+		for _, ref := range s.MappingRefs {
+			if seen[ref.Name] || len(validation.IsDNS1123Subdomain(ref.Name)) != 0 {
+				return nil, "", fmt.Errorf("invalid or duplicate mapping reference")
+			}
+			seen[ref.Name] = true
+		}
+		target = "default"
+	case *api.SwitchMLAGSpec, *api.SwitchVXLANTunnelSpec, *api.SwitchVLANVNISpec, *api.SwitchEVPNPeerSpec:
+		var err error
+		target, err = redundancyDesired(spec)
+		if err != nil {
+			return nil, "", err
+		}
 	case *api.SwitchACLPolicySpec, *api.SwitchACLBindingSpec, *api.SwitchQoSMapSpec, *api.SwitchSchedulerSpec, *api.SwitchQoSBindingSpec:
 		var err error
 		target, err = trafficDesired(spec)

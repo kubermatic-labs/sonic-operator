@@ -24,6 +24,9 @@ type networkRecord struct {
 	Owned       vlanChangeDB    `json:"owned"`
 	Fingerprint string          `json:"fingerprint"`
 	Pending     *networkPending `json:"pending,omitempty"`
+	// Global EVPN's declared set authorizes mapping creation during local-only
+	// initialization. Omitted on legacy records, which cannot authorize it.
+	EVPNMappings []agent.EVPNMappingSnapshot `json:"evpn_mappings,omitempty"`
 }
 
 type networkPending struct {
@@ -139,6 +142,16 @@ func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 	for identity, r := range state.Records {
 		if identity == "" || len(identity) > 1024 || r == nil || r.OwnerID == "" || len(r.OwnerID) > 256 {
 			return nil, fmt.Errorf("invalid network journal identity")
+		}
+		if len(r.EVPNMappings) > 64 || len(r.EVPNMappings) > 0 && (r.Kind != "EVPN" || identity != "EVPN|default") {
+			return nil, fmt.Errorf("invalid journal EVPN mapping declaration")
+		}
+		mappingNames, mappingUIDs := map[string]bool{}, map[string]bool{}
+		for _, ref := range r.EVPNMappings {
+			if ref.Name == "" || ref.UID == "" || ref.Generation < 1 || mappingNames[ref.Name] || mappingUIDs[ref.UID] {
+				return nil, fmt.Errorf("invalid journal EVPN mapping reference")
+			}
+			mappingNames[ref.Name], mappingUIDs[ref.UID] = true, true
 		}
 		if r.Fields != nil {
 			if err := validateNetworkFields(r.Kind, r.Fields); err != nil {

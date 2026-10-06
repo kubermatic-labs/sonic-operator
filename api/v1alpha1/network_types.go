@@ -89,7 +89,8 @@ func init() {
 			&SwitchACLPolicy{}, &SwitchACLPolicyList{}, &SwitchACLBinding{}, &SwitchACLBindingList{},
 			&SwitchQoSMap{}, &SwitchQoSMapList{}, &SwitchScheduler{}, &SwitchSchedulerList{},
 			&SwitchQoSBinding{}, &SwitchQoSBindingList{},
-		)
+			&SwitchMLAG{}, &SwitchMLAGList{}, &SwitchVXLANTunnel{}, &SwitchVXLANTunnelList{},
+			&SwitchVLANVNI{}, &SwitchVLANVNIList{}, &SwitchEVPNPeer{}, &SwitchEVPNPeerList{})
 		return nil
 	})
 }
