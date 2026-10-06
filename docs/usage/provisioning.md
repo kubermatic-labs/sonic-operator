@@ -1,8 +1,11 @@
 # Provisioning (ZTP + ONIE)
 
-The provisioning server serves ZTP scripts and ONIE installer artifacts over HTTP. It can run as part of the controller manager or as a standalone binary.
+The provisioning server serves ZTP scripts and ONIE installer artifacts over HTTP so that new switches can install SONiC and receive their initial configuration. It can run as part of the controller manager or as a standalone binary.
+
+When embedded in the manager, provisioning is not served while the manager runs with `--observe-only=true` (the default).
 
 ## Manager flags
+- `--disable-static-config`: do not start the provisioning HTTP server (default `false`).
 - `--http-server-address`: bind address for the provisioning server.
 - `--ztp-config-file`: JSON file with ZTP parameters (default `/etc/ztp.json`).
 - `--ztp-mode`: ZTP source: `templates` (default), `configmap`, or `generated`.
