@@ -41,7 +41,9 @@ func TestArtifactReconcilerEnforcesAndFreshlyConfirms(t *testing.T) {
 	sw := &api.Switch{ObjectMeta: metav1.ObjectMeta{Name: "switch", UID: "switch-uid"}}
 	sw.Spec.Management.Host = "10.1.2.3"
 	sw.Spec.Management.Port = "50051"
-	source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "fleet", UID: "source-uid"}, Immutable: &yes, BinaryData: map[string][]byte{"file": data}}
+	source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "fleet", UID: "source-uid"}, Immutable: &yes, BinaryData: map[string][]byte{"file": data, "policy": []byte("{}")}}
+	obj.Spec.Bootstrap.PolicyRef.Key = "policy"
+	obj.Spec.Bootstrap.PolicySHA256 = artifact.Digest(source.BinaryData["policy"])
 	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(obj).WithObjects(obj, sw, source).Build()
 	calls := []string{}
 	connections := 0

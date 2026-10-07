@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
@@ -22,11 +23,25 @@ import (
 
 const Format = "host-artifact-v1"
 
-// Floors lists commits that every release build must descend from, for example
-// fixes that older agents in the field must not be rolled back below. It is a
-// source ancestry floor, not an approval attestation. Empty means only that each
-// build commit must exist in the repository.
+// Floors lists full commit hashes that every release build must descend from,
+// for example fixes that agents in the field must never be rolled back below.
+// It is a source ancestry floor, not an approval attestation. Empty means only
+// that each build commit must exist in the repository.
 var Floors = []string{}
+
+// ImportedMACFloors are additional floors for builds that declare the
+// imported-MAC-unit capability. The capability marker alone does not prove the
+// imported unit qualification fixes are present.
+var ImportedMACFloors = []string{}
+
+func requiredFloors(i releaseinfo.Info) []string {
+	floors := slices.Clone(Floors)
+	if releaseinfo.SupportsImportedMACUnit(i) {
+		floors = append(floors, ImportedMACFloors...)
+	}
+	return floors
+}
+
 var fullCommit = regexp.MustCompile(`^[a-f0-9]{40}$`)
 var hashPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
@@ -62,14 +77,23 @@ func ReadBounded(path string, limit int64) ([]byte, error) {
 	return b, nil
 }
 
-func CheckAncestry(repo, commit string) error {
+// CheckAncestry checks the source against the capabilities it actually declares.
+// Binary callers must pass inspected Info, never infer it from manifest floors.
+func CheckAncestry(repo string, i releaseinfo.Info) error {
+	if err := releaseinfo.Validate(i); err != nil {
+		return err
+	}
+	return checkSourceFloors(repo, i.SourceCommit, requiredFloors(i))
+}
+
+func checkSourceFloors(repo, commit string, floors []string) error {
 	if !fullCommit.MatchString(commit) {
 		return fmt.Errorf("full source commit required")
 	}
 	if exec.Command("git", "-C", repo, "cat-file", "-e", commit+"^{commit}").Run() != nil {
 		return fmt.Errorf("source commit not in repository")
 	}
-	for _, floor := range Floors {
+	for _, floor := range floors {
 		if exec.Command("git", "-C", repo, "merge-base", "--is-ancestor", floor, commit).Run() != nil {
 			return fmt.Errorf("source is below integrated ancestry floor")
 		}
@@ -87,7 +111,9 @@ func CheckCleanSource(repo string) (string, error) {
 		return "", fmt.Errorf("source identity unavailable")
 	}
 	commit := strings.TrimSpace(string(out))
-	return commit, CheckAncestry(repo, commit)
+	// This only checks the checkout prerequisite; each actual binary is checked
+	// against its own compiled capabilities below.
+	return commit, checkSourceFloors(repo, commit, Floors)
 }
 
 func InspectBinary(repo, path, role string) (Binary, error) {
@@ -138,8 +164,9 @@ func inspectBinaryBytes(repo, role string, raw []byte) (Binary, error) {
 	if strings.Contains(settings["-ldflags"], "-X") {
 		return result, fmt.Errorf("unqualified release link-time override")
 	}
-	result.Info = releaseinfo.Info{SourceCommit: settings["vcs.revision"], Capabilities: releaseinfo.Current().Capabilities}
-	if CheckAncestry(repo, result.SourceCommit) != nil || !bytes.Contains(raw, []byte(releaseinfo.Marker)) || releaseinfo.Validate(result.Info) != nil {
+	caps, capErr := releaseinfo.BinaryCapabilities(raw)
+	result.Info = releaseinfo.Info{SourceCommit: settings["vcs.revision"], Capabilities: caps}
+	if capErr != nil || CheckAncestry(repo, result.Info) != nil {
 		return result, fmt.Errorf("binary lacks integrated compiled release floor")
 	}
 	result.SHA256 = artifact.Digest(raw)
@@ -183,24 +210,24 @@ func NewRelease(repo string, paths map[string]string, fallbackPaths []string) (R
 	if err := CheckAggregate(sizes); err != nil {
 		return r, err
 	}
-	r.SourceFloors = []string{}
-	for _, floor := range Floors {
-		out, err := exec.Command("git", "-C", repo, "rev-parse", floor).Output()
-		if err != nil {
-			return r, fmt.Errorf("floor identity unavailable")
-		}
-		r.SourceFloors = append(r.SourceFloors, strings.TrimSpace(string(out)))
+	r.SourceFloors = requiredFloors(r.Builds["agent"].Info)
+	if err := ValidateRelease(r); err != nil {
+		return r, err
 	}
 	return r, nil
 }
 
+// ValidateRelease checks metadata structure, exact claimed floors and reader
+// agreement. It is not source/payload attestation: NewRelease inspects every
+// actual binary, and BuildSources checks ancestry and its inspected payloads.
 func ValidateRelease(r Release) error {
-	if r.Format != Format || !r.ReviewRequired || len(r.Builds) != 4 || len(r.Fallbacks) == 0 || len(r.Fallbacks) > 15 || len(r.SourceFloors) != len(Floors) {
+	floors := requiredFloors(r.Builds["agent"].Info)
+	if r.Format != Format || !r.ReviewRequired || len(r.Builds) != 4 || len(r.Fallbacks) == 0 || len(r.Fallbacks) > 15 || len(r.SourceFloors) != len(floors) {
 		return fmt.Errorf("invalid offline release manifest")
 	}
 	seenFloors := map[string]bool{}
 	for _, s := range r.SourceFloors {
-		if !fullCommit.MatchString(s) || seenFloors[s] {
+		if !slices.Contains(floors, s) || seenFloors[s] {
 			return fmt.Errorf("invalid release source floor")
 		}
 		seenFloors[s] = true
@@ -215,12 +242,24 @@ func ValidateRelease(r Release) error {
 		if commit != "" && commit != b.SourceCommit {
 			return fmt.Errorf("mixed candidate source commits")
 		}
+		if releaseinfo.SupportsImportedMACUnit(b.Info) != releaseinfo.SupportsImportedMACUnit(r.Builds["agent"].Info) {
+			return fmt.Errorf("mixed candidate reader capabilities")
+		}
 		commit = b.SourceCommit
 	}
 	expected[r.Builds["agent"].SHA256] = r.Builds["agent"].Info
 	for _, b := range r.Fallbacks {
 		if releaseinfo.Validate(b.Info) != nil || !hashPattern.MatchString(b.SHA256) || b.Size <= 0 || b.Size > 96<<20 {
 			return fmt.Errorf("invalid fallback build")
+		}
+		// An old reader rejects a policy containing the new capability, even when
+		// the profile itself has no imported environment. Preserve old all-eight
+		// releases, but never generate a mixed unreadable fallback policy.
+		if releaseinfo.SupportsImportedMACUnit(b.Info) != releaseinfo.SupportsImportedMACUnit(r.Builds["agent"].Info) {
+			return fmt.Errorf("fallback cannot read candidate capability policy")
+		}
+		if previous, ok := expected[b.SHA256]; ok && !releaseinfo.Equal(previous, b.Info) {
+			return fmt.Errorf("same accepted binary has conflicting release declarations")
 		}
 		expected[b.SHA256] = b.Info
 	}

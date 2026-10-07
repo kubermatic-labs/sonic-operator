@@ -1,0 +1,3 @@
+ExecStart={ path=/usr/bin/interfaces-config.sh ; argv[]=/usr/bin/interfaces-config.sh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+ExecStartPost={ path=/usr/local/sbin/set-management-mac ; argv[]=/usr/local/sbin/set-management-mac ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+Id=interfaces-config.service

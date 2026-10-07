@@ -92,6 +92,9 @@ func ValidateNativeProfile(data []byte) (NativeProfile, error) {
 	if len(p.LegacyMACHooks) > 1 {
 		return p, ErrInvalid
 	} // one eth0 MAC writer
+	if p.ImportedMACEnvironment != "" && (p.ImportedMACEnvironment != ImportedMACEnvironmentNone || len(p.LegacyMACHooks) != 1) {
+		return p, ErrInvalid
+	}
 	for _, h := range p.LegacyMACHooks {
 		if h.Kind != ImportedKindPython && h.Kind != ImportedKindShell {
 			return p, ErrInvalid
@@ -145,6 +148,11 @@ func (n *Native) QualifyInstalledProfile(ctx context.Context) (NativeProfile, er
 	b, err := n.containerFile(ctx, snmpTemplate)
 	if err != nil || !hashMatches(b, p.SNMPSHA256) {
 		return p, ErrNative
+	}
+	if p.ImportedMACEnvironment != "" {
+		if err := n.qualifyImportedEnvironment(ctx, p); err != nil {
+			return p, err
+		}
 	}
 	return p, nil
 }

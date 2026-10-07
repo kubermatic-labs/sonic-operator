@@ -136,25 +136,42 @@ func (n *Native) importedState(ctx context.Context, p NativeProfile, boot bool, 
 			return h, ErrNative
 		}
 	}
-	if len(adoption) < 2 || !adoption[1] {
-		for property, want := range map[string]string{"DropInPaths": hook, "NeedDaemonReload": "no"} {
-			value, err := n.run(ctx, "systemctl", "show", "--property="+property, "--value", "interfaces-config.service")
-			if err != nil || strings.TrimSpace(string(value)) != want {
-				return h, ErrNative
-			}
+	repair := len(adoption) > 1 && adoption[1]
+	if p.ImportedMACEnvironment != "" {
+		if err := n.qualifyImportedEnvironment(ctx, p); err != nil {
+			return h, err
 		}
-		effective, err := n.run(ctx, "systemctl", "show", "--property=ExecStartPost", "--value", "interfaces-config.service")
-		want := RecoveryBinaryFile + " --apply-imported-boot-mac=" + h.Kind
-		if len(adoption) > 0 && adoption[0] {
-			if h.Kind == ImportedKindPython {
-				want = "/usr/bin/python3 " + helper + " boot"
-			} else {
-				want = helper
-			}
+	}
+	nativeDropin := ""
+	if p.ImportedMACEnvironment != "" {
+		nativeDropin = importedEnvironmentPath
+	}
+	dropins := strings.TrimSpace(nativeDropin + " " + hook)
+	for property, want := range map[string]string{"DropInPaths": dropins, "NeedDaemonReload": "no"} {
+		value, err := n.run(ctx, "systemctl", "show", "--property="+property, "--value", "interfaces-config.service")
+		actual := strings.TrimSpace(string(value))
+		match := actual == want
+		if property == "DropInPaths" {
+			match = exactUnitPaths(actual, want)
 		}
-		if err != nil || strings.Count(string(effective), "path=") != 1 || (!strings.Contains(string(effective), "argv[]="+want+" ;") && !strings.Contains(string(effective), "argv[]="+RecoveryBinaryFile+" --apply-imported-boot-mac="+h.Kind+" ;")) {
+		if repair && property == "DropInPaths" && actual == nativeDropin {
+			match = true
+		}
+		if repair && property == "NeedDaemonReload" && actual == "yes" {
+			match = true
+		}
+		if err != nil || !match {
 			return h, ErrNative
 		}
+	}
+	effective, err := n.run(ctx, "systemctl", "show", "--property=ExecStartPost", "--value", "interfaces-config.service")
+	command := strings.TrimSpace(string(effective))
+	qualified := exactUnitCommand(command, RecoveryBinaryFile+" --apply-imported-boot-mac="+h.Kind)
+	if len(adoption) > 0 && adoption[0] {
+		qualified = qualified || exactUnitCommand(command, originalImportedCommand(h.Kind))
+	}
+	if err != nil || (!qualified && !(repair && command == "")) {
+		return h, ErrNative
 	}
 	// Query loaded activation commands, including timers' service targets. Unknown
 	// historical rollback activation is not retirement authority.
@@ -162,16 +179,7 @@ func (n *Native) importedState(ctx context.Context, p NativeProfile, boot bool, 
 	if err != nil || len(units) == 0 {
 		return h, ErrNative
 	}
-	for _, block := range strings.Split(string(units), "\n\n") {
-		if strings.Contains(block, "rollback-management-mac") || (strings.Contains(strings.ToLower(block), "rollback") && strings.Contains(strings.ToLower(block), "mac")) {
-			return h, ErrConflict
-		}
-		originalAllowed := len(adoption) > 0 && adoption[0] && strings.Contains(block, "Id=interfaces-config.service\n")
-		if (strings.Contains(block, "dc-management-only-mac.py") || strings.Contains(block, "/usr/local/sbin/set-management-mac")) && !originalAllowed {
-			return h, ErrConflict
-		}
-	}
-	return h, nil
+	return h, qualifyLoadedImportedUnits(units, h.Kind, len(adoption) > 0 && adoption[0])
 }
 
 // QualifyBootstrapProfile overlays only the declared profile and fixed generated
@@ -181,6 +189,14 @@ func (n *Native) QualifyBootstrapProfile(ctx context.Context, raw []byte, repair
 	p, err := ValidateNativeProfile(raw)
 	if err != nil {
 		return err
+	}
+	if !repair && p.ImportedMACEnvironment != "" {
+		h := p.LegacyMACHooks[0]
+		hook, _, _ := ImportedMACPaths(h.Kind)
+		original := "[Service]\nExecStartPost=" + originalImportedCommand(h.Kind) + "\n"
+		if n.nativeUnitFile(hook, original) != nil && n.nativeUnitFile(hook, string(ImportedMACUnit(h.Kind))) != nil {
+			return ErrNative
+		}
 	}
 	copy := *n
 	copy.ReadFile = func(path string) ([]byte, error) {

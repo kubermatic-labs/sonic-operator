@@ -4,12 +4,28 @@ package releasebundle
 import (
 	"bytes"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 )
+
+func TestNoHookProfilesRemainReadable(t *testing.T) {
+	for _, name := range []string{"202411.1216684-48c2d4c3e.json", "202511.1217682-4784cca11.json"} {
+		raw, err := os.ReadFile(filepath.Join("../../config/agent/profiles", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := host.ValidateNativeProfile(raw)
+		if err != nil || p.ImportedMACEnvironment != "" || len(p.LegacyMACHooks) != 0 {
+			t.Fatal("no-hook profile changed semantics", name, err)
+		}
+	}
+}
 
 func TestReleaseRejectsUnknownCapabilityAndWrongAcceptedFallback(t *testing.T) {
 	i := releaseinfo.Current()
@@ -21,10 +37,22 @@ func TestReleaseRejectsUnknownCapabilityAndWrongAcceptedFallback(t *testing.T) {
 	}
 	saved := Floors
 	defer func() { Floors = saved }()
-	Floors = []string{"floor-a", "floor-b"}
+	savedMAC := ImportedMACFloors
+	defer func() { ImportedMACFloors = savedMAC }()
+	Floors, ImportedMACFloors = []string{i.SourceCommit, strings.Repeat("b", 40)}, nil
 	if ValidateRelease(r) != nil {
 		t.Fatal("valid release rejected")
 	}
+	legacy := b
+	legacy.Capabilities = slices.DeleteFunc(slices.Clone(b.Capabilities), func(s string) bool { return s == releaseinfo.ImportedMACUnit })
+	legacy.SHA256 = strings.Repeat("f", 64)
+	r.Fallbacks = []Binary{legacy}
+	r.AgentBuilds[legacy.SHA256] = legacy.Info
+	if ValidateRelease(r) == nil {
+		t.Fatal("legacy fallback cannot read new capability policy")
+	}
+	r.Fallbacks = []Binary{b}
+	delete(r.AgentBuilds, legacy.SHA256)
 	duplicated := r
 	duplicated.SourceFloors = append([]string(nil), r.SourceFloors...)
 	duplicated.SourceFloors[1] = duplicated.SourceFloors[0]

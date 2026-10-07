@@ -49,13 +49,15 @@ func artifactFreshnessFixture(t *testing.T) (client.Client, *api.SwitchArtifact,
 	_ = corev1.AddToScheme(scheme)
 	yes := true
 	data := []byte(`{"ports":[]}`)
-	source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "fleet", UID: "source-uid"}, Immutable: &yes, BinaryData: map[string][]byte{"file": data}}
+	source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "fleet", UID: "source-uid"}, Immutable: &yes, BinaryData: map[string][]byte{"file": data, "policy": []byte("{}")}}
 	credentials := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "credentials", Namespace: "fleet", UID: "credentials-uid"}, Data: map[string][]byte{"password": []byte("private-credential-fixture")}}
 	keySource := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "key-source", Namespace: "fleet", UID: "key-uid"}, Immutable: &yes, Data: map[string][]byte{"key": []byte("private-artifact-key-fixture")}}
 	sw := &api.Switch{ObjectMeta: metav1.ObjectMeta{Name: "switch", UID: "switch-uid"}, Spec: api.SwitchSpec{MacAddress: "00:11:22:33:44:55", Management: api.Management{Host: "10.0.0.11", Port: "50051", Credentials: corev1.ObjectReference{Namespace: "fleet", Name: "credentials"}}}}
 	ref := api.ArtifactContentRef{Kind: "ConfigMap", Name: source.Name, UID: string(source.UID), Key: "file"}
 	obj := &api.SwitchArtifact{ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "fleet", UID: "owner", Generation: 1}, Spec: api.SwitchArtifactSpec{SwitchName: sw.Name, ManagementPolicy: "Manage", Baseline: "base", Files: []api.ArtifactFile{{Slot: "PlatformJSON", SHA256: artifact.Digest(data), Chunks: []api.ArtifactContentRef{ref}}}, Bootstrap: &api.ArtifactBootstrapSpec{SupervisorSHA256: artifact.Digest(data), SupervisorChunks: []api.ArtifactContentRef{ref}, PolicySHA256: artifact.Digest(data), PolicyRef: ref, UnitSHA256: artifact.Digest([]byte(artifact.SupervisorUnit))}}}
 	obj.Spec.Files = append(obj.Spec.Files, api.ArtifactFile{Slot: "AgentKey", SHA256: artifact.Digest(keySource.Data["key"]), Chunks: []api.ArtifactContentRef{{Kind: "Secret", Name: keySource.Name, UID: string(keySource.UID), Key: "key"}}})
+	obj.Spec.Bootstrap.PolicyRef.Key = "policy"
+	obj.Spec.Bootstrap.PolicySHA256 = artifact.Digest(source.BinaryData["policy"])
 	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(obj).WithObjects(obj, sw, source, credentials, keySource).Build()
 	// The first reconciliation persists the existing target identity before I/O.
 	r := &ArtifactReconciler{Client: kube, APIReader: kube, AllowArtifacts: true}

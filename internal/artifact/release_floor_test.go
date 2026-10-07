@@ -23,6 +23,9 @@ func TestReleaseFloor(t *testing.T) {
 	}
 	for i := range testReleaseBuild().Capabilities {
 		b := testReleaseBuild()
+		if b.Capabilities[i] == releaseinfo.ImportedMACUnit {
+			continue
+		} // Optional for legacy profiles.
 		b.Capabilities = append(b.Capabilities[:i:i], b.Capabilities[i+1:]...)
 		p.AgentBuilds[hash] = b
 		if ValidateAgentRelease(p, hash) == nil {

@@ -18,7 +18,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +28,7 @@ import (
 	api "github.com/ironcore-dev/sonic-operator/api/v1alpha1"
 	agentclient "github.com/ironcore-dev/sonic-operator/internal/agent/agent_client/client"
 	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
+	"github.com/ironcore-dev/sonic-operator/internal/agent/releaseinfo"
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 	"google.golang.org/grpc"
@@ -37,12 +40,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func hostArtifactFreshFixture(t *testing.T) (client.Client, *api.SwitchArtifact, *api.Switch, *api.SwitchManagement, map[string]*corev1.ConfigMap) {
+func hostArtifactFreshFixture(t *testing.T, environment ...bool) (client.Client, *api.SwitchArtifact, *api.Switch, *api.SwitchManagement, map[string]*corev1.ConfigMap) {
 	t.Helper()
 	kube, obj, sw, _, _ := artifactFreshnessFixture(t)
-	helper, err := os.ReadFile(filepath.Join(os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR"), "set-management-mac.sh"))
+	dir := os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR")
+	if dir == "" {
+		t.Skip("set SONIC_TEST_MAC_FIXTURE_DIR to the captured MAC helper scripts")
+	}
+	helper, err := os.ReadFile(filepath.Join(dir, "set-management-mac.sh"))
 	if err != nil {
-		t.Skip("local captured helper fixture unavailable")
+		t.Fatal("captured helper fixture unavailable", err)
 	}
 	profile, err := os.ReadFile("../../config/agent/profiles/202411.1216684-48c2d4c3e.json")
 	if err != nil {
@@ -54,8 +61,19 @@ func hostArtifactFreshFixture(t *testing.T) (client.Client, *api.SwitchArtifact,
 	}
 	p.LegacyMACHooks = []host.LegacyMACHook{{Kind: "management-mac-shell", BaseMAC: "00:00:5e:00:53:01", MAC: "02:00:5e:00:53:01", Addresses: []host.Address{{Prefix: "10.0.0.22/24", Gateway: "10.0.0.1"}}, HookSHA256: artifact.Digest(host.ImportedMACUnit("management-mac-shell")), HelperSHA256: host.ImportedHelperSHA256("management-mac-shell")}}
 	p.ConsumerSHA256["imported-shell"] = artifact.Digest([]byte("qualified-shell"))
+	withEnvironment := len(environment) > 0 && environment[0]
+	if withEnvironment {
+		p.ImportedMACEnvironment = host.ImportedMACEnvironmentNone
+	}
 	profile, _ = json.Marshal(p)
 	data := map[string][]byte{"binary": bytes.Repeat([]byte("host-binary"), artifact.ChunkBytes/5), "profile": profile, "helper": helper, "hook": []byte("[Service]\nExecStartPost=/usr/local/sbin/set-management-mac\n")}
+	if withEnvironment {
+		data["binary"] = append(data["binary"], []byte(releaseinfo.Marker)...)
+		data["supervisor"] = []byte("supervisor-test-binary" + releaseinfo.Marker)
+		i := releaseinfo.Current()
+		i.SourceCommit = strings.Repeat("a", 40)
+		data["policy"], _ = json.Marshal(artifact.Policy{AgentBuilds: map[string]artifact.ReleaseBuild{strings.Repeat("b", 64): i}})
+	}
 	sources := map[string]*corev1.ConfigMap{}
 	refs := map[string]api.ArtifactContentRef{}
 	yes := true
@@ -73,6 +91,12 @@ func hostArtifactFreshFixture(t *testing.T) (client.Client, *api.SwitchArtifact,
 	cfg, _ := host.EncodeRecoveryConfig(host.FleetRecoveryConfig())
 	obj.Spec.Agent = &api.ArtifactAgentOptions{HostGuard: true, HostConfig: true, BindAddress: "0.0.0.0", Port: 50051}
 	obj.Spec.Bootstrap.HostRecovery = &api.ArtifactHostRecoverySpec{BinarySHA256: artifact.Digest(data["binary"]), BinaryChunks: []api.ArtifactContentRef{refs["binary"]}, ProfileSHA256: artifact.Digest(profile), ProfileRef: refs["profile"], ServiceSHA256: artifact.Digest(host.RecoveryServiceUnit()), TimerSHA256: artifact.Digest(host.RecoveryTimerUnit()), ConfigSHA256: artifact.Digest(cfg), JournalLayout: "FleetHostV1", MACHooks: []api.ArtifactMACHookSpec{{Kind: "management-mac-shell", SourceHookSHA256: artifact.Digest(data["hook"]), SourceHookRef: refs["hook"], HelperSHA256: artifact.Digest(helper), HelperRef: refs["helper"]}}}
+	if withEnvironment {
+		obj.Spec.Bootstrap.SupervisorSHA256 = artifact.Digest(data["supervisor"])
+		obj.Spec.Bootstrap.SupervisorChunks = []api.ArtifactContentRef{refs["supervisor"]}
+		obj.Spec.Bootstrap.PolicySHA256 = artifact.Digest(data["policy"])
+		obj.Spec.Bootstrap.PolicyRef = refs["policy"]
+	}
 	if err := kube.Update(t.Context(), obj); err != nil {
 		t.Fatal(err)
 	}
@@ -88,6 +112,110 @@ func hostArtifactFreshFixture(t *testing.T) (client.Client, *api.SwitchArtifact,
 		t.Fatal(err)
 	}
 	return kube, obj, sw, m, sources
+}
+
+func TestImportedSupervisorSourceReaderFloor(t *testing.T) {
+	for _, tc := range []struct {
+		name                                                  string
+		environment, hostRecovery, newPolicy, capable, reject bool
+	}{
+		{"environment-old-supervisor", true, true, true, false, true},
+		{"environment-capable", true, true, true, true, false},
+		{"no-hook-new-policy-old-supervisor", false, true, true, false, true},
+		{"no-hook-new-policy-capable", false, true, true, true, false},
+		{"no-host-new-policy-old-supervisor", false, false, true, false, true},
+		{"no-host-new-policy-capable", false, false, true, true, false},
+		{"wholly-legacy-no-hook", false, true, false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			kube, obj, _, _, sources := hostArtifactFreshFixture(t, true)
+			setSource := func(name string, raw []byte) {
+				t.Helper()
+				sources[name].BinaryData["content"] = raw
+				if err := kube.Update(t.Context(), sources[name]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !tc.environment {
+				var p host.NativeProfile
+				if err := json.Unmarshal(sources["profile"].BinaryData["content"], &p); err != nil {
+					t.Fatal(err)
+				}
+				p.ImportedMACEnvironment, p.LegacyMACHooks = "", nil
+				delete(p.ConsumerSHA256, "imported-shell")
+				raw, _ := json.Marshal(p)
+				setSource("profile", raw)
+				obj.Spec.Bootstrap.HostRecovery.ProfileSHA256 = artifact.Digest(raw)
+				obj.Spec.Bootstrap.HostRecovery.MACHooks = nil
+			}
+			if !tc.hostRecovery {
+				obj.Spec.Bootstrap.HostRecovery = nil
+				obj.Spec.Agent.HostConfig = false
+			}
+			marker := releaseinfo.LegacyMarker
+			if tc.capable {
+				marker = releaseinfo.Marker
+			}
+			setSource("supervisor", []byte("supervisor-test-binary"+marker))
+			obj.Spec.Bootstrap.SupervisorSHA256 = artifact.Digest(sources["supervisor"].BinaryData["content"])
+			if !tc.newPolicy {
+				i := releaseinfo.Current()
+				i.SourceCommit = strings.Repeat("a", 40)
+				i.Capabilities = slices.DeleteFunc(slices.Clone(i.Capabilities), func(s string) bool { return s == releaseinfo.ImportedMACUnit })
+				raw, _ := json.Marshal(artifact.Policy{AgentBuilds: map[string]artifact.ReleaseBuild{strings.Repeat("b", 64): i}})
+				setSource("policy", raw)
+				obj.Spec.Bootstrap.PolicySHA256 = artifact.Digest(raw)
+				setSource("binary", []byte("watchdog-test-binary"+releaseinfo.LegacyMarker))
+				obj.Spec.Bootstrap.HostRecovery.BinarySHA256 = artifact.Digest(sources["binary"].BinaryData["content"])
+			}
+			if err := kube.Update(t.Context(), obj); err != nil {
+				t.Fatal(err)
+			}
+			b, err := resolveArtifactSources(t.Context(), kube, obj, "target")
+			if (err != nil) != tc.reject || (tc.reject && !strings.Contains(err.Error(), "supervisor")) {
+				t.Fatalf("supervisor source reader floor: %v, reject=%v", err, tc.reject)
+			}
+			if !tc.reject && artifact.Digest(b.Bootstrap.Supervisor) != obj.Spec.Bootstrap.SupervisorSHA256 {
+				t.Fatal("resolver changed supervisor payload identity")
+			}
+		})
+	}
+}
+
+func TestImportedEnvironmentProfileSourceBinding(t *testing.T) {
+	kube, obj, sw, m, sources := hostArtifactFreshFixture(t, true)
+	b, err := resolveArtifactSources(t.Context(), kube, obj, "target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := host.ValidateNativeProfile(b.Bootstrap.HostRecovery.Profile)
+	if err != nil || p.ImportedMACEnvironment != host.ImportedMACEnvironmentNone {
+		t.Fatal("resolver lost explicit recipe", err)
+	}
+	if b.Bootstrap.HostRecovery.ProfileSHA256 != artifact.Digest(sources["profile"].BinaryData["content"]) {
+		t.Fatal("profile hash not retained")
+	}
+	r := &HostReconciler{APIReader: kube}
+	q, inputs, err := r.hostDesired(t.Context(), m, string(sw.UID))
+	if err != nil || q.Management.MAC != "" {
+		t.Fatal("source resolution changed typed MAC omission", err)
+	}
+	source := sources["profile"]
+	if err := kube.Delete(t.Context(), source); err != nil {
+		t.Fatal(err)
+	}
+	replacement := source.DeepCopy()
+	replacement.UID = "replacement-profile"
+	replacement.ResourceVersion = ""
+	if err := kube.Create(t.Context(), replacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := inputs.fresh(t.Context()); err == nil {
+		t.Fatal("same bytes with replacement UID remained fresh")
+	}
+	if _, err := resolveArtifactSources(t.Context(), kube, obj, "target"); err == nil {
+		t.Fatal("replacement UID bypassed immutable source binding")
+	}
 }
 
 func TestHostDesiredTracksRetainedSourceIdentities(t *testing.T) {
