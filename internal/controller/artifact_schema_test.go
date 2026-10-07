@@ -119,4 +119,47 @@ func TestArtifactSchema(t *testing.T) {
 	if err := c.Update(t.Context(), changedHost); !apierrors.IsInvalid(err) {
 		t.Fatalf("host immutable baseline changed: %v", err)
 	}
+	testBootstrapMigration(t, c, valid)
+}
+
+func testBootstrapMigration(t *testing.T, c client.Client, valid *api.SwitchArtifact) {
+	t.Helper()
+	oldPolicy := valid.Spec.Bootstrap.PolicySHA256
+	migrate := func(change func(*api.SwitchArtifact)) *api.SwitchArtifact {
+		candidate := valid.DeepCopy()
+		candidate.Spec.Bootstrap.SupervisorSHA256 = strings.Repeat("1", 64)
+		candidate.Spec.Bootstrap.PolicySHA256 = strings.Repeat("2", 64)
+		candidate.Spec.BootstrapMigrationFrom = oldPolicy
+		change(candidate)
+		return candidate
+	}
+	for name, change := range map[string]func(*api.SwitchArtifact){
+		"without approval":     func(a *api.SwitchArtifact) { a.Spec.BootstrapMigrationFrom = "" },
+		"wrong policy":         func(a *api.SwitchArtifact) { a.Spec.BootstrapMigrationFrom = strings.Repeat("9", 64) },
+		"changed unit":         func(a *api.SwitchArtifact) { a.Spec.Bootstrap.UnitSHA256 = strings.Repeat("3", 64) },
+		"changed host":         func(a *api.SwitchArtifact) { a.Spec.Bootstrap.HostRecovery.ProfileSHA256 = strings.Repeat("f", 64) },
+		"removed host":         func(a *api.SwitchArtifact) { a.Spec.Bootstrap.HostRecovery = nil; a.Spec.Agent.HostConfig = false },
+		"removed bootstrap":    func(a *api.SwitchArtifact) { a.Spec.Bootstrap = nil; a.Spec.Agent.HostConfig = false },
+		"invalid approval sha": func(a *api.SwitchArtifact) { a.Spec.BootstrapMigrationFrom = "not-a-hash" },
+	} {
+		if err := c.Update(t.Context(), migrate(change)); !apierrors.IsInvalid(err) {
+			t.Fatalf("bootstrap migration %s accepted: %v", name, err)
+		}
+	}
+	migrated := migrate(func(*api.SwitchArtifact) {})
+	if err := c.Update(t.Context(), migrated); err != nil {
+		t.Fatal("approved bootstrap migration rejected", err)
+	}
+	// A stale approval cannot authorize a second replacement.
+	again := migrated.DeepCopy()
+	again.Spec.Bootstrap.PolicySHA256 = strings.Repeat("4", 64)
+	if err := c.Update(t.Context(), again); !apierrors.IsInvalid(err) {
+		t.Fatalf("stale migration approval accepted: %v", err)
+	}
+	// Unrelated updates stay possible while the approval field remains set.
+	unrelated := migrated.DeepCopy()
+	unrelated.Spec.Activation = "PlatformNextBoot"
+	if err := c.Update(t.Context(), unrelated); err != nil {
+		t.Fatal("unrelated update rejected after migration", err)
+	}
 }

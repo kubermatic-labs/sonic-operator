@@ -145,6 +145,7 @@ _Appears in:_
 
 ArtifactBootstrapSpec declares the immutable recovery baseline. The main
 agent independently enforces it so recovery never depends on replacing itself.
+Changes are governed by SwitchArtifactSpec.BootstrapMigrationFrom.
 
 
 
@@ -1007,6 +1008,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bootstrap` _[ArtifactBootstrapSpec](#artifactbootstrapspec)_ |  |  |  |
+| `bootstrapMigrationFrom` _string_ | BootstrapMigrationFrom explicitly approves replacing the bootstrap<br />supervisor and policy. It must equal the policySHA256 being replaced;<br />hostRecovery and unitSHA256 must stay unchanged. The switch still rejects<br />the new identity until its recorded bootstrap owner is migrated. |  | Pattern: `^[a-f0-9]\{64\}$` <br /> |
 | `retireLegacyHook` _boolean_ | Retire the existing legacy site hook only after full site content health and<br />protected persistence are proven by the confirming controller connection. |  |  |
 | `activation` _string_ |  | AgentRestart | Enum: [AgentRestart PlatformNextBoot] <br /> |
 | `switchName` _string_ |  |  | MinLength: 1 <br /> |

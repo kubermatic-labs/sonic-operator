@@ -10,6 +10,7 @@ package v1alpha1
 //
 // ArtifactBootstrapSpec declares the immutable recovery baseline. The main
 // agent independently enforces it so recovery never depends on replacing itself.
+// Changes are governed by SwitchArtifactSpec.BootstrapMigrationFrom.
 type ArtifactBootstrapSpecApplyConfiguration struct {
 	HostRecovery     *ArtifactHostRecoverySpecApplyConfiguration `json:"hostRecovery,omitempty"`
 	SupervisorSHA256 *string                                     `json:"supervisorSHA256,omitempty"`
