@@ -200,6 +200,7 @@ var (
 	vlanAuthorityBreakoutMode = regexp.MustCompile(`^[1-9][0-9]{0,5}x[1-9][0-9]{0,5}G?(\[[1-9][0-9]{0,5}G?(,[1-9][0-9]{0,5}G?)*\])?(\([1-9][0-9]{0,5}\))?(\+[1-9][0-9]{0,5}x[1-9][0-9]{0,5}G?(\[[1-9][0-9]{0,5}G?(,[1-9][0-9]{0,5}G?)*\])?(\([1-9][0-9]{0,5}\))?)*$`)
 )
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 	if err := vlanAuthorityTargetSafe(target, id); err != nil {
 		return err

@@ -73,6 +73,7 @@ func (r *SwitchInterfaceReconciler) delete(ctx context.Context, log logr.Logger,
 	return ctrl.Result{}, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchInterfaceReconciler) reconcile(ctx context.Context, log logr.Logger, i *networkingv1alpha1.SwitchInterface) (result ctrl.Result, retErr error) {
 	log.Info("Reconciling SwitchInterface")
 

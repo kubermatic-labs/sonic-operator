@@ -199,6 +199,8 @@ func lagL3Routed(db vlanChangeDB, name string) bool {
 
 // A narrow grammar for dependency absence, not permission to rewrite these rows.
 // Unsupported native extensions remain intact and block unsafe topology changes.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func lagL3DependencyGrammar(key string, fields map[string]string) error {
 	parts := strings.Split(key, "|")
 	if len(parts) < 2 || len(fields) == 0 {
@@ -313,6 +315,7 @@ func lagL3Members(db vlanChangeDB, name string) ([]string, error) {
 	return members, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func lagL3PortFree(db vlanChangeDB, name, ownLAG string) error {
 	if err := lagL3InterfaceExists(db, name); err != nil {
 		return err
@@ -405,6 +408,7 @@ func vlanLAGMemberSafe(db vlanChangeDB, name string) error {
 	return nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkPortChannel(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var spec lagL3PortChannelSpec
 	if err := lagL3Decode(r, "PortChannel", &spec); err != nil {
@@ -504,6 +508,7 @@ func planNetworkVRF(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 	}}, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var spec lagL3InterfaceSpec
 	if err := lagL3Decode(r, "L3Interface", &spec); err != nil {
@@ -619,6 +624,7 @@ func planNetworkL3Interface(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 	return plan, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkStaticRoute(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var spec lagL3RouteSpec
 	if err := lagL3Decode(r, "StaticRoute", &spec); err != nil {

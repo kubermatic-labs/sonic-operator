@@ -15,7 +15,7 @@ func (e *Engine) pruneContent(j *journal) error {
 		return err
 	}
 	entries, err := directory.ReadDir(-1)
-	directory.Close()
+	_ = directory.Close()
 	if err != nil {
 		return err
 	}

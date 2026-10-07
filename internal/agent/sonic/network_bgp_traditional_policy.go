@@ -14,6 +14,8 @@ import (
 // IPv4 network and implicit prefix-list sequence normalize to FRR readback.
 // Unknown commands (especially neighbors/policy) block native regeneration.
 // Missing/changed owned scalars are drift, not permission to drop foreign policy.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func traditionalPolicy(configs map[string]string, s routingBGPSpec, runtime bool) (bool, error) {
 	expected := map[string]string{"asn": strconv.FormatUint(uint64(s.LocalASN), 10), "routerID": s.RouterID, "network": s.RouterID + "/32", "prefixList": s.RouterID + "/32", "source": s.RouterID, "route-map RM_SET_SRC permit 10": "true", "ip protocol bgp route-map RM_SET_SRC": "true"}
 	bgpFlags := []string{"bgp suppress-fib-pending", "bgp log-neighbor-changes", "no bgp ebgp-requires-policy", "no bgp default ipv4-unicast", "bgp bestpath as-path multipath-relax"}

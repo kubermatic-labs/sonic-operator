@@ -47,6 +47,7 @@ func (c *defaultSwitchAgentClient) Artifact(ctx context.Context, r artifact.Requ
 	return c.ArtifactFresh(ctx, r, nil)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (c *defaultSwitchAgentClient) ArtifactFresh(ctx context.Context, r artifact.Request, fresh func(context.Context) error) (*artifact.Result, error) {
 	var expectedRelease releaseinfo.Info
 	var acceptedPolicy artifact.Policy

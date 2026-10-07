@@ -96,7 +96,7 @@ func openContentFile(e *Engine, p string) (*os.File, error) {
 	}
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("untrusted content cache file")
 	}
 	return f, nil
@@ -120,7 +120,7 @@ func removeContentFile(e *Engine, p string) error {
 	if err != nil {
 		return err
 	}
-	f.Close()
+	_ = f.Close()
 	if err := e.root.Remove(p); err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func cachedSize(e *Engine, blob Blob) (uint64, error) {
 		if checkErr == nil && matches {
 			checkErr = f.Sync()
 		}
-		f.Close()
+		_ = f.Close()
 		if checkErr != nil {
 			return 0, checkErr
 		}
@@ -166,20 +166,20 @@ func cachedSize(e *Engine, blob Blob) (uint64, error) {
 	}
 	info, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return 0, err
 	}
 	size := uint64(info.Size())
 	if size < blob.Size {
 		err = f.Sync()
-		f.Close()
+		_ = f.Close()
 		return size, err
 	}
 	matches, checkErr := contentFileMatches(f, blob)
 	if checkErr == nil && matches {
 		checkErr = f.Sync()
 	}
-	f.Close()
+	_ = f.Close()
 	if checkErr != nil {
 		return 0, checkErr
 	}
@@ -200,6 +200,8 @@ func cachedSize(e *Engine, blob Blob) (uint64, error) {
 	}
 	return blob.Size, nil
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func PrepareContent(ctx context.Context, root string, b Bundle, op string, blobs []Blob) (ContentSession, []ContentOffset, error) {
 	var empty ContentSession
 	if err := ctx.Err(); err != nil {
@@ -277,7 +279,7 @@ func PrepareContent(ctx context.Context, root string, b Bundle, op string, blobs
 	for _, folder := range []string{"blobs", "partial"} {
 		dir, _ := e.root.Open(path.Join(e.state, folder))
 		entries, err := dir.ReadDir(-1)
-		dir.Close()
+		_ = dir.Close()
 		if err != nil {
 			return empty, nil, err
 		}
@@ -355,7 +357,7 @@ func uploadContent(ctx context.Context, root, sessionID, digest string, offset u
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil || uint64(info.Size()) != offset {
 		return 0, fmt.Errorf("chunk offset conflict")

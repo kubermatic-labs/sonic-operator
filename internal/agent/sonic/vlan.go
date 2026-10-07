@@ -37,6 +37,7 @@ func (m *SonicAgent) EnsureVLAN(ctx context.Context, desired *agent.VLAN) (*agen
 	return m.vlan(ctx, desired, true)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (m *SonicAgent) vlan(ctx context.Context, desired *agent.VLAN, ensure bool) (*agent.VLAN, *agent.Status) {
 	if desired == nil || desired.ID < 1 || desired.ID > 4094 {
 		return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, "VLAN ID must be between 1 and 4094")

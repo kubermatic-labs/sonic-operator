@@ -34,7 +34,7 @@ func (m *SonicAgent) recoverHostDependencies(ctx context.Context) error {
 				return host.ErrStorage
 			}
 			files, e := d.ReadDir(-1)
-			d.Close()
+			_ = d.Close()
 			if e != nil {
 				return host.ErrStorage
 			}

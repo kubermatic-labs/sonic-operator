@@ -13,26 +13,26 @@ import (
 func TestArtifactMutationsRespectManagementRecoveryFence(t *testing.T) {
 	e, root := testEngine(t)
 	n := &Native{Engine: e}
-	os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
-	os.MkdirAll(filepath.Join(root, "host/sonic-operator-host-journal"), 0700)
-	os.WriteFile(filepath.Join(root, "etc/sonic/sonic-operator-host-recovery.json"), []byte(`{"journalDir":"/host/sonic-operator-host-journal","redisAddress":"127.0.0.1:6379"}`), 0600)
+	_ = os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
+	_ = os.MkdirAll(filepath.Join(root, "host/sonic-operator-host-journal"), 0700)
+	_ = os.WriteFile(filepath.Join(root, "etc/sonic/sonic-operator-host-recovery.json"), []byte(`{"journalDir":"/host/sonic-operator-host-journal","redisAddress":"127.0.0.1:6379"}`), 0600)
 	journal := filepath.Join(root, "host/sonic-operator-host-journal/host.json")
-	os.WriteFile(journal, []byte(`{"pending":{"id":"management-operation"}}`), 0600)
+	_ = os.WriteFile(journal, []byte(`{"pending":{"id":"management-operation"}}`), 0600)
 	called := false
 	action := func() error { called = true; return nil }
 	if err := n.WithHostFence(t.Context(), action); err == nil || called {
 		t.Fatal("artifact mutation invalidated pending management recovery")
 	}
-	os.WriteFile(journal, []byte(`{"pending":null}`), 0600)
+	_ = os.WriteFile(journal, []byte(`{"pending":null}`), 0600)
 	if err := n.WithHostFence(t.Context(), action); err != nil || !called {
 		t.Fatalf("cleared management fence not released: %v", err)
 	}
-	os.WriteFile(journal, []byte(`{"futureUnknownRecord":true}`), 0600)
+	_ = os.WriteFile(journal, []byte(`{"futureUnknownRecord":true}`), 0600)
 	called = false
 	if err := n.WithHostFence(t.Context(), action); err == nil || called {
 		t.Fatal("unknown host record treated as safe")
 	}
-	os.WriteFile(journal, []byte(`{"pending":{"id":"active"},"pending":null}`), 0600)
+	_ = os.WriteFile(journal, []byte(`{"pending":{"id":"active"},"pending":null}`), 0600)
 	called = false
 	if err := n.WithHostFence(t.Context(), action); err == nil || called {
 		t.Fatal("duplicate JSON keys bypassed management recovery fence")

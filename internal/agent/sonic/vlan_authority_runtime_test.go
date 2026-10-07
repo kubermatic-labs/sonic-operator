@@ -246,17 +246,18 @@ func TestVLANAuthorityAllChangesWaitBeforePersistence(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				m, f, r, saves := newAuthorityRuntimeTest(t)
 				r.VLAN.Members[0].TaggingMode = "tagged"
-				if name == "delete" {
+				switch name {
+				case "delete":
 					m.verifyVLANRuntime = func(context.Context, uint32, vlanChangeDB) error { return nil }
 					if _, s := m.ReconcileVLANAuthority(t.Context(), r); s != nil {
 						t.Fatal(s)
 					}
 					*saves = 0
 					r.Delete = true
-				} else if name == "create" {
+				case "create":
 					delete(f.hashes, "VLAN|Vlan100")
 					delete(f.hashes, "VLAN_MEMBER|Vlan100|Ethernet0")
-				} else if name == "prune" {
+				case "prune":
 					r.VLAN.Members = nil
 				}
 				calls := 0

@@ -13,6 +13,8 @@ import (
 
 // Correlate a learned remote MAC through its VLAN bridge port and VTEP. This is
 // programmed-state evidence; only endpoint packet capture proves delivery.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnRemoteFDBASIC(ctx context.Context, read qosRead, tunnel, source string, vlan, vni uint32, mac, remote string) (bool, error) {
 	address, err := net.ParseMAC(mac)
 	if err != nil || len(address) != 6 {

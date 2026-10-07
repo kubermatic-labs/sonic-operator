@@ -21,13 +21,13 @@ func TestReleaseCapabilitiesReadOnlyGRPC(t *testing.T) {
 	a := newArtifactAdmission()
 	s := grpc.NewServer(grpc.InTapHandle(a.tap), grpc.StatsHandler(a))
 	pb.RegisterArtifactServiceServer(s, &artifactServer{allow: false})
-	go s.Serve(l)
+	go func() { _ = s.Serve(l) }()
 	defer s.Stop()
 	c, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	for range 2 {
 		got, err := pb.NewArtifactServiceClient(c).GetCapabilities(context.Background(), &pb.ArtifactCapabilitiesRequest{})
 		if err != nil {

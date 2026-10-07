@@ -312,7 +312,7 @@ func releaseControllerFixture(t *testing.T, initial string) (*ArtifactReconciler
 	}
 	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
 	pb.RegisterArtifactServiceServer(server, wire)
-	go server.Serve(listener)
+	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
 	factory := func() agentclient.ArtifactClient {
 		t.Helper()
@@ -320,7 +320,7 @@ func releaseControllerFixture(t *testing.T, initial string) (*ArtifactReconciler
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { c.(io.Closer).Close() })
+		t.Cleanup(func() { _ = c.(io.Closer).Close() })
 		return c.(agentclient.ArtifactClient)
 	}
 	reconciler := &ArtifactReconciler{Client: kube, APIReader: kube, AllowArtifacts: true, NewClient: func(context.Context, client.Reader, *api.Switch) (artifactRPC, io.Closer, error) {

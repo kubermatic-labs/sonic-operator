@@ -139,35 +139,35 @@ func openStore(root, state string, policy Policy, health, activate func() error,
 	e := &Engine{root: r, state: strings.TrimPrefix(state, "/"), Policy: policy, Health: health, Activate: activate}
 	for slot, p := range policy.Platform {
 		if !validPlatformPath(slot, p) {
-			r.Close()
+			_ = r.Close()
 			return nil, fmt.Errorf("invalid baseline destination allowlist")
 		}
 	}
 	if err := e.safe(e.state); err != nil {
-		r.Close()
+		_ = r.Close()
 		return nil, err
 	}
 	if err := e.mkdirDurable(e.state); err != nil {
-		r.Close()
+		_ = r.Close()
 		return nil, err
 	}
 	info, err := r.Stat(e.state)
 	if err != nil || info.Mode().Perm() != 0700 {
-		r.Close()
+		_ = r.Close()
 		return nil, fmt.Errorf("private supervisor state required")
 	}
 	if err := e.safe(path.Join(e.state, ".lock")); err != nil {
-		r.Close()
+		_ = r.Close()
 		return nil, err
 	}
 	l, err := r.OpenFile(path.Join(e.state, ".lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
-		r.Close()
+		_ = r.Close()
 		return nil, err
 	}
 	if err := unix.Flock(int(l.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
-		l.Close()
-		r.Close()
+		_ = l.Close()
+		_ = r.Close()
 		return nil, fmt.Errorf("supervisor already running")
 	}
 	e.lock = l
@@ -183,11 +183,11 @@ func (e *Engine) Close() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.lock != nil {
-		e.lock.Close()
+		_ = e.lock.Close()
 		e.lock = nil
 	}
 	if e.root != nil {
-		e.root.Close()
+		_ = e.root.Close()
 	}
 }
 
@@ -260,7 +260,7 @@ func (e *Engine) read(p string) ([]byte, fs.FileMode, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() > MaxBundleBytes {
 		return nil, 0, fmt.Errorf("invalid artifact file")
@@ -290,7 +290,7 @@ func (e *Engine) atomic(p string, b []byte, mode fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer e.root.Remove(tmp)
+	defer func() { _ = e.root.Remove(tmp) }()
 	_, err = f.Write(b)
 	if err == nil {
 		err = f.Chmod(mode)
@@ -309,7 +309,7 @@ func (e *Engine) atomic(p string, b []byte, mode fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }
 
@@ -318,7 +318,7 @@ func (e *Engine) syncDir(p string) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }
 func (e *Engine) mkdirDurable(p string) error {
@@ -431,6 +431,8 @@ func (e *Engine) Ensure(b Bundle, now time.Time) (result *Result, retErr error) 
 func (e *Engine) EnsureContext(ctx context.Context, b Bundle, now time.Time) (*Result, error) {
 	return e.ensure(ctx, b, now)
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e *Engine) ensure(ctx context.Context, b Bundle, now time.Time) (result *Result, retErr error) {
 	if err := e.mu.LockContext(ctx); err != nil {
 		return nil, err
@@ -639,6 +641,7 @@ func (e *Engine) ensure(ctx context.Context, b Bundle, now time.Time) (result *R
 	return &Result{Phase: j.Phase, Token: j.Token, Identity: j.Identity}, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func validateCandidates(files []File) error {
 	if err := validatePlatformWheel(files); err != nil {
 		return err
@@ -662,7 +665,7 @@ func validateCandidates(files []File) error {
 				return fmt.Errorf("agent candidate is not a valid ELF executable")
 			}
 			valid := (binary.Type == elf.ET_EXEC || binary.Type == elf.ET_DYN) && binary.Machine == elf.EM_X86_64 && binary.Class == elf.ELFCLASS64 && len(binary.Progs) > 0
-			binary.Close()
+			_ = binary.Close()
 			if !valid {
 				return fmt.Errorf("agent candidate does not match supported x86-64 baseline")
 			}
@@ -723,6 +726,8 @@ func (e *Engine) Tick(now time.Time) error {
 	}
 	return e.tick(now)
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e *Engine) tick(now time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -906,6 +911,8 @@ func (e *Engine) tick(now time.Time) error {
 	}
 	return nil
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e *Engine) rollback(j *journal) error {
 	if err := e.validateProtectedAgent(j, "old", j.Files); err != nil {
 		return err

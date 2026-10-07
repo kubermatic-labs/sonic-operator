@@ -44,7 +44,7 @@ func TestColdBootWaitsForSyncdAndNativeInstallers(t *testing.T) {
 	if _, err := e.Ensure(b, now); err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	for i := 0; i < 3; i++ {
 		if i == 1 {
 			settled = true

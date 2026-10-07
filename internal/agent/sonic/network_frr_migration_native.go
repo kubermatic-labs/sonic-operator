@@ -328,6 +328,7 @@ func frrMigrationModeReady(ctx context.Context, mode ...string) (bool, error) {
 	return frrMigrationDaemonReady(daemons, frrMigrationMode(mode...) == "Unified"), nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func inspectFRRMigration(ctx context.Context, db vlanChangeDB, modes ...string) (evidence frrMigrationEvidence, resultErr error) {
 	mode := frrMigrationMode(modes...)
 	stage := frrMigrationDiagnostic("ConfigDBNotEmptyOrUnsupported")
@@ -525,6 +526,8 @@ func inspectFRRMigration(ctx context.Context, db vlanChangeDB, modes ...string) 
 
 // Permit only management and fixed SONiC host plumbing. No forwarding-port
 // connected routes, unknown tables, static FRR routes or protocol-learned routes.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func frrMigrationRouteAllowed(dst, dev, protocol, kind, gateway string, db vlanChangeDB, kernel bool) bool {
 	if protocol != "connected" && !(kernel && (protocol == "kernel" || protocol == "" || protocol == "boot")) {
 		return false

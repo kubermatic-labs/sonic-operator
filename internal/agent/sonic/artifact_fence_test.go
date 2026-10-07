@@ -34,7 +34,7 @@ func TestArtifactFenceSerializesAndRejectsPendingNetworkRecovery(t *testing.T) {
 				t.Fatal(err)
 			}
 			err = unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB)
-			lock.Close()
+			_ = lock.Close()
 			if err == nil {
 				t.Fatal("cooperating writer journal was not locked")
 			}

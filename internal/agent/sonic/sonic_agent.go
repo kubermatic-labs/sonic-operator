@@ -710,6 +710,8 @@ func (m *SonicAgent) SetInterfaceAliasName(ctx context.Context, iface *agent.Int
 // Both setters validate against the same CONFIG_DB snapshot and write only a
 // changed field. Admin persistence is also independently checked on no-op calls.
 // In particular, an admin update never writes an alias.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (m *SonicAgent) setInterfaceField(ctx context.Context, iface *agent.Interface, field, desired string) (*agent.Interface, *agent.Status) {
 	var ifaceName string
 	var err error

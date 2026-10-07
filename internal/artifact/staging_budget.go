@@ -25,12 +25,12 @@ func (e *Engine) available(dir string) (uint64, error) {
 	for {
 		f, err := e.root.Open(dir)
 		if err == nil {
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			var stat unix.Statfs_t
 			if err := unix.Fstatfs(int(f.Fd()), &stat); err != nil {
 				return 0, err
 			}
-			return uint64(stat.Bavail) * uint64(stat.Bsize), nil
+			return stat.Bavail * uint64(stat.Bsize), nil
 		}
 		if dir == "." {
 			return 0, err

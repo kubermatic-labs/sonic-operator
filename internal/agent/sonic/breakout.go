@@ -101,6 +101,7 @@ func (m *SonicAgent) GetPortBreakout(ctx context.Context, port string) (*agent.P
 	return out, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.PortBreakoutRequest) (*agent.PortBreakout, *agent.Status) {
 	if err := validateBreakoutRequest(request); err != nil {
 		return nil, agenterrors.NewErrorStatus(agenterrors.BAD_REQUEST, err.Error())
@@ -223,6 +224,8 @@ func (m *SonicAgent) ReconcilePortBreakout(ctx context.Context, request *agent.P
 
 // Every caller retains the validated network state under its existing flock.
 // Recovery must apply typed ownership checks even after native CLI completion.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (m *SonicAgent) finishBreakout(ctx context.Context, j *vlanAuthorityJournal, r *breakoutRecord, networkState *networkJournalState, db vlanChangeDB, raw string) (*agent.PortBreakout, *agent.Status) {
 	p := &r.Platform
 	runtimeVerified := false

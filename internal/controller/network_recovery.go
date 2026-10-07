@@ -23,6 +23,8 @@ import (
 
 // recoverNetwork only completes an already journaled operation. The request
 // persisted before Ensure avoids validating or applying subsequently edited intent.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Object) (retErr error) {
 	_, _, common := networkFields(obj)
 	if r.networkWritesDisabled(common) {
@@ -37,12 +39,12 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 		return fmt.Errorf("missing recorded network request; retaining finalizer")
 	}
 	saved.SetUID(obj.GetUID())
-	spec, _, savedCommon := networkFields(saved)
+	spec, _, _ := networkFields(saved)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		return fmt.Errorf("invalid recorded request: %w", err)
 	}
 	// SwitchInterface projects the common selectors from its existing spec.
-	_, _, savedCommon = networkFields(saved)
+	_, _, savedCommon := networkFields(saved)
 	request, target, err := networkDesired(r.Kind, saved)
 	if err != nil {
 		return fmt.Errorf("invalid recorded request: %w", err)
@@ -139,7 +141,7 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 			return err
 		}
 		if !current.DeletionTimestamp.IsZero() || networkBinding(obj, current, r.Kind, target) != binding {
-			return fmt.Errorf("Switch changed during recovery; retaining finalizer")
+			return fmt.Errorf("switch changed during recovery; retaining finalizer")
 		}
 		return nil
 	}

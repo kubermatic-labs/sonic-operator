@@ -25,6 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const reasonBreakoutPrepared = "BreakoutPrepared"
+
 const (
 	breakoutTargetAnnotation      = "sonic.networking.metal.ironcore.dev/breakout-target"
 	breakoutManageAdminAnnotation = "sonic.networking.metal.ironcore.dev/manage-admin-state"
@@ -44,6 +46,7 @@ type SwitchPortBreakoutReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches;switchvlans,verbs=get;list;watch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchinterfaces,verbs=get;list;watch;create;delete
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
 		return result, fmt.Errorf("breakout requires an uncached APIReader")
@@ -115,7 +118,7 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 	identity := breakoutTargetIdentity(b, s)
 	binding := b.Annotations[breakoutTargetAnnotation]
 	if (binding != "" && binding != identity) || (original.Status.TargetIdentity != "" && (original.Status.TargetIdentity != identity || binding == "")) {
-		return result, fmt.Errorf("Switch identity, endpoint or target binding changed; restore the original target before writing")
+		return result, fmt.Errorf("switch identity, endpoint or target binding changed; restore the original target before writing")
 	}
 	factory := r.NewAgentClient
 	if factory == nil {
@@ -183,13 +186,13 @@ func (r *SwitchPortBreakoutReconciler) Reconcile(ctx context.Context, req ctrl.R
 		original.ResourceVersion = b.ResourceVersion
 		b.Status.TargetIdentity = identity
 		b.Status.PreviousChildren = previous
-		reason, message = "BreakoutPrepared", "Target binding and prior children persisted before the first operation"
+		reason, message = reasonBreakoutPrepared, "Target binding and prior children persisted before the first operation"
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 	b.Status.TargetIdentity = identity
 	if !reflect.DeepEqual(previous, original.Status.PreviousChildren) {
 		b.Status.PreviousChildren = previous
-		reason, message = "BreakoutPrepared", "Prior children recorded; retry before the operation"
+		reason, message = reasonBreakoutPrepared, "Prior children recorded; retry before the operation"
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 	b.Status.Pending = true

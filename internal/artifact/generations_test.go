@@ -45,7 +45,7 @@ func newGenerationFixture(t *testing.T) *generationFixture {
 	seed, _ := bootstrapFixture(t)
 	binary := seed.Bootstrap.Supervisor
 	b.Files = append(b.Files, File{Slot: "AgentBinary", SHA256: Digest(binary), Data: binary})
-	os.WriteFile(filepath.Join(root, "usr/local/sbin/sonic-operator-agent"), binary, 0755)
+	_ = os.WriteFile(filepath.Join(root, "usr/local/sbin/sonic-operator-agent"), binary, 0755)
 	completeAgentFixture(t, e, &b)
 	e.Policy.AgentBuilds[Digest(append(append([]byte(nil), binary...), []byte("next-agent")...))] = testReleaseBuild()
 	e.Policy.ConsumerSHA256 = map[string]string{}
@@ -65,10 +65,10 @@ func newGenerationFixture(t *testing.T) *generationFixture {
 	}
 	h := &generationFixture{t: t, e: e, root: root, bundle: b, policy: e.Policy, boot: "boot-0", ready: true, incarnation: "container-0"}
 	for _, target := range []string{"host", "pmon"} {
-		for name, entry := range candidatePackage(members, wheel.SHA256, target).Entries {
+		for name, entry := range candidatePackage(members, wheel.SHA256).Entries {
 			p := filepath.Join(h.packageRoot(target), name)
-			os.MkdirAll(filepath.Dir(p), 0700)
-			os.WriteFile(p, entry.Data, os.FileMode(entry.Mode))
+			_ = os.MkdirAll(filepath.Dir(p), 0700)
+			_ = os.WriteFile(p, entry.Data, os.FileMode(entry.Mode))
 		}
 	}
 	h.wire()
@@ -178,7 +178,7 @@ func (h *generationFixture) run(ctx context.Context, name string, args ...string
 				return nil, err
 			}
 			var value map[string]any
-			json.Unmarshal(raw, &value)
+			_ = json.Unmarshal(raw, &value)
 			value["root"] = canonical
 			return json.Marshal(value)
 		}
@@ -215,13 +215,13 @@ func (h *generationFixture) input(ctx context.Context, input []byte, _ string, a
 	}
 	if raw, ok := request["manifest"]; ok {
 		var manifest []byte
-		json.Unmarshal(raw, &manifest)
+		_ = json.Unmarshal(raw, &manifest)
 		h.configured = Digest(manifest)
 		return []byte("ready"), nil
 	}
 	var target, mode string
-	json.Unmarshal(request["target"], &target)
-	json.Unmarshal(request["mode"], &mode)
+	_ = json.Unmarshal(request["target"], &target)
+	_ = json.Unmarshal(request["mode"], &mode)
 	if mode == "snapshot" && h.failSnapshot == target {
 		return nil, fmt.Errorf("snapshot interrupted")
 	}
@@ -292,7 +292,7 @@ func TestAgentOnlyGenerationRetainsPackageAuthorityForConfirmBootAndRollback(t *
 			if err != nil {
 				t.Fatal(err)
 			}
-			h.e.Tick(now)
+			_ = h.e.Tick(now)
 			if err := h.e.Tick(now); err != nil {
 				t.Fatal(err)
 			}
@@ -346,7 +346,7 @@ func TestOwnedPackageSourceDriftUsesConfirmedBeforeAuthority(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			os.WriteFile(p, []byte("# owned source drift\n"), 0644)
+			_ = os.WriteFile(p, []byte("# owned source drift\n"), 0644)
 			h.bundle.Generation++
 			now := time.Now()
 			r, err := h.e.Ensure(h.bundle, now)
@@ -404,14 +404,14 @@ func TestUnknownPackagePathIsNotAuthorizedByObservedDrift(t *testing.T) {
 	defer func() { h.e.Close() }()
 	h.confirmInitial()
 	p := filepath.Join(h.packageRoot("pmon"), "sonic_platform/foreign.py")
-	os.WriteFile(p, []byte("unowned"), 0644)
+	_ = os.WriteFile(p, []byte("unowned"), 0644)
 	h.bundle.Generation++
 	now := time.Now()
 	if _, err := h.e.Ensure(h.bundle, now); err != nil {
 		t.Fatal(err)
 	}
 	h.boot = "repair-boot"
-	h.e.Tick(now)
+	_ = h.e.Tick(now)
 	if err := h.e.Tick(now); err == nil {
 		t.Fatal("unknown package path did not block repair")
 	}
@@ -427,14 +427,14 @@ func TestDriftRepairRetainsBeforeAuthorityWhenPreparationFails(t *testing.T) {
 	h.confirmInitial()
 	p := filepath.Join(h.packageRoot("pmon"), "sonic_platform/chassis.py")
 	before, _ := os.ReadFile(p)
-	os.WriteFile(p, []byte("# owned drift\n"), 0644)
+	_ = os.WriteFile(p, []byte("# owned drift\n"), 0644)
 	h.bundle.Generation++
 	now := time.Now()
 	if _, err := h.e.Ensure(h.bundle, now); err != nil {
 		t.Fatal(err)
 	}
 	h.boot = "repair-boot"
-	h.e.Tick(now)
+	_ = h.e.Tick(now)
 	h.failSnapshot = "pmon"
 	if err := h.e.Tick(now); err != nil {
 		t.Fatal(err)

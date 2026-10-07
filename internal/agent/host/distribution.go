@@ -64,6 +64,8 @@ var nativeSHA = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 // ValidateNativeProfile accepts strict JSON and canonical typed values; whitespace
 // does not affect qualification, but the publication hash pins the exact bytes.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func ValidateNativeProfile(data []byte) (NativeProfile, error) {
 	var p NativeProfile
 	if strictDecodeLimit(data, &p, 256<<10) != nil {
@@ -270,6 +272,8 @@ func (n *Native) VerifyRecoveryUnits(ctx context.Context) error {
 
 // InstallationReceipt checks private-store and fixed-destination trust before
 // interpreting any immutable authority. Injected IO is used by native fixtures.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) InstallationReceipt(confirmed bool) (InstallationReceipt, error) {
 	if n.ReadFile == nil {
 		dir, err := os.Open(RecoveryBootstrapDir)

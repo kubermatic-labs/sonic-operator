@@ -79,8 +79,8 @@ func PublishLoadedTLS(filename string, proof *LoadedTLS) error {
 		return err
 	}
 	name := f.Name()
-	defer os.Remove(name)
-	f.Chmod(0600)
+	defer func() { _ = os.Remove(name) }()
+	_ = f.Chmod(0600)
 	_, err = f.Write(data)
 	if err == nil {
 		err = f.Sync()
@@ -99,6 +99,6 @@ func PublishLoadedTLS(filename string, proof *LoadedTLS) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }

@@ -17,13 +17,13 @@ func TestPackageRepairAfterMissingRecordAndPartialUninstall(t *testing.T) {
 	root, _ = filepath.EvalSymlinks(root)
 	state := filepath.Join(root, "state")
 	pkg := filepath.Join(root, "lib")
-	os.MkdirAll(pkg, 0700)
+	_ = os.MkdirAll(pkg, 0700)
 	before := packageSnapshot{Version: 1, Entries: map[string]packageEntry{"sonic_platform/chassis.py": {Data: []byte("old code"), Mode: 0644}, "sonic_platform-1.0.dist-info/METADATA": {Data: []byte("old metadata"), Mode: 0644}, "sonic_platform-1.0.dist-info/RECORD": {Data: []byte("old record"), Mode: 0644}}}
 	candidate := packageSnapshot{Version: 1, Entries: map[string]packageEntry{"sonic_platform/chassis.py": {Data: []byte("new code"), Mode: 0644}, "sonic_platform-1.0.dist-info/METADATA": {Data: []byte("new metadata"), Mode: 0644}, "sonic_platform-1.0.dist-info/RECORD": {Data: []byte("new record"), Mode: 0644}}}
 	for name, entry := range before.Entries {
 		p := filepath.Join(pkg, name)
-		os.MkdirAll(filepath.Dir(p), 0700)
-		os.WriteFile(p, entry.Data, os.FileMode(entry.Mode))
+		_ = os.MkdirAll(filepath.Dir(p), 0700)
+		_ = os.WriteFile(p, entry.Data, os.FileMode(entry.Mode))
 	}
 	packet, _ := json.Marshal(map[string]any{"before": before, "candidate": candidate, "root": pkg, "state": state})
 	script := packageTransactionScript + `
@@ -60,14 +60,14 @@ func TestPackageRepairWaitsForSurvivingInstallerLock(t *testing.T) {
 	root, _ = filepath.EvalSymlinks(root)
 	state := filepath.Join(root, "state")
 	pkg := filepath.Join(root, "lib")
-	os.MkdirAll(state, 0700)
-	os.MkdirAll(pkg, 0700)
+	_ = os.MkdirAll(state, 0700)
+	_ = os.MkdirAll(pkg, 0700)
 	marker := filepath.Join(root, "held")
 	holder := exec.Command("python3", "-I", "-B", "-c", "import fcntl,time,pathlib,sys\nf=open(sys.argv[1],'w');fcntl.flock(f,fcntl.LOCK_EX);pathlib.Path(sys.argv[2]).write_text('held');time.sleep(.4)", filepath.Join(state, "lock"), marker)
 	if err := holder.Start(); err != nil {
 		t.Fatal(err)
 	}
-	defer holder.Wait()
+	defer func() { _ = holder.Wait() }()
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		if _, err := os.Stat(marker); err == nil {
@@ -94,13 +94,13 @@ func TestRepairSerializesWithInstallerSurvivingClientCancellation(t *testing.T) 
 	root, _ = filepath.EvalSymlinks(root)
 	pkg := filepath.Join(root, "lib")
 	state := filepath.Join(root, "state")
-	os.MkdirAll(pkg, 0700)
+	_ = os.MkdirAll(pkg, 0700)
 	before := packageSnapshot{Version: 1, Entries: map[string]packageEntry{"sonic_platform/chassis.py": {Data: []byte("before"), Mode: 0644}, "sonic_platform-1.0.dist-info/METADATA": {Data: []byte("before metadata"), Mode: 0644}, "sonic_platform-1.0.dist-info/RECORD": {Data: []byte("before receipt"), Mode: 0644}}}
 	candidate := packageSnapshot{Version: 1, Entries: map[string]packageEntry{"sonic_platform/chassis.py": {Data: []byte("candidate"), Mode: 0644}, "sonic_platform-1.0.dist-info/METADATA": {Data: []byte("candidate metadata"), Mode: 0644}, "sonic_platform-1.0.dist-info/RECORD": {Data: []byte("candidate receipt"), Mode: 0644}}}
 	for name, entry := range before.Entries {
 		p := filepath.Join(pkg, name)
-		os.MkdirAll(filepath.Dir(p), 0700)
-		os.WriteFile(p, entry.Data, 0644)
+		_ = os.MkdirAll(filepath.Dir(p), 0700)
+		_ = os.WriteFile(p, entry.Data, 0644)
 	}
 	marker, finished := filepath.Join(root, "held"), filepath.Join(root, "finished")
 	packet, _ := json.Marshal(map[string]any{"root": pkg, "state": state, "before": before, "candidate": candidate, "marker": marker, "finished": finished})
@@ -130,7 +130,7 @@ p.wait()
 		}
 		if time.Now().After(deadline) {
 			cancel()
-			client.Wait()
+			_ = client.Wait()
 			t.Fatal("installer did not hold transaction fence")
 		}
 		time.Sleep(time.Millisecond)

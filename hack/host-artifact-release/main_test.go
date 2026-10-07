@@ -37,13 +37,13 @@ func TestReleaseAncestryFloor(t *testing.T) {
 
 func TestReleaseRejectsUnknownBinaryAndBounds(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "binary")
-	os.WriteFile(p, []byte("PRIVATE KEY must not appear in errors"), 0600)
+	_ = os.WriteFile(p, []byte("PRIVATE KEY must not appear in errors"), 0600)
 	if _, err := releasebundle.InspectBinary("../..", p, "agent"); err == nil {
 		t.Fatal("arbitrary bytes accepted")
 	}
 	f, _ := os.OpenFile(p, os.O_RDWR, 0600)
-	f.Truncate((96 << 20) + 1)
-	f.Close()
+	_ = f.Truncate((96 << 20) + 1)
+	_ = f.Close()
 	if _, err := releasebundle.InspectBinary("../..", p, "agent"); err == nil {
 		t.Fatal("oversize binary accepted")
 	}

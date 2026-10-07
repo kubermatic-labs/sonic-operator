@@ -64,6 +64,7 @@ type NetworkReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchevpns/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchevpns/finalizers,verbs=update;patch
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
 		return result, fmt.Errorf("network resources require an uncached APIReader")
@@ -152,7 +153,7 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	binding := networkBinding(obj, sw, r.Kind, target)
 	if saved := obj.GetAnnotations()[networkTargetAnnotation]; saved != "" && saved != binding {
 		reason = "TargetChanged"
-		return result, fmt.Errorf("Switch identity, endpoint or target binding changed; restore the original target")
+		return result, fmt.Errorf("switch identity, endpoint or target binding changed; restore the original target")
 	}
 	if err := r.checkNetworkClaims(ctx, obj, sw, target); err != nil {
 		reason = "ConflictingClaim"

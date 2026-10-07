@@ -76,7 +76,7 @@ func TestFRRMigrationStorageRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	name := "backup-" + strings.Repeat("a", 64) + ".json"
 	// Interrupted write: only a private, unselected temporary file exists.
 	if err := os.WriteFile(filepath.Join(root.Name(), name+".tmp"), []byte("partial"), 0600); err != nil {

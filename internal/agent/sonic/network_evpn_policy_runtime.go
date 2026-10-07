@@ -12,6 +12,8 @@ import (
 // Validate exact definitions and attachments, including the unconditional deny.
 // Unknown commands in an owned map are rejected, rather than treated as harmless
 // formatting differences. Policy evidence must come from the target BGP AF.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnVerifyPeerPolicy(raw []byte, asn, peer string, p *evpnPeerPolicy) error {
 	if p == nil || len(raw) > 1<<20 {
 		return fmt.Errorf("missing or oversized EVPN policy evidence")

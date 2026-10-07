@@ -22,6 +22,8 @@ import (
 // checkMLAGPeer checks reciprocal intent and fresh device preflight. It never
 // requires full peer ConfigurationReady: either side must be able to stage first.
 // It returns a freshness check to repeat immediately before local Ensure.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *NetworkReconciler) checkMLAGPeer(ctx context.Context, obj *api.SwitchMLAG, sw *api.Switch, local *agent.NetworkResult, manage bool) (fresh func() error, retErr error) {
 	request, target, err := networkDesired("MLAG", obj)
 	if err != nil {

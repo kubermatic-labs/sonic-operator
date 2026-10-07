@@ -65,7 +65,7 @@ func evpnOwnedMappings(m *SonicAgent, db vlanChangeDB, refs []agent.EVPNMappingS
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err

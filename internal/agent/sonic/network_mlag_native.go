@@ -106,6 +106,7 @@ func mlagNativeSupport(ctx context.Context) error {
 	return nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func mlagReachability(ctx context.Context, db vlanChangeDB, s mlagSpec) error {
 	sources := mlagSources(db, s.LocalAddress)
 	if len(sources) != 1 {

@@ -61,13 +61,13 @@ func Read(dir string) (*Reservation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	directory, err := root.Open(".")
 	if err != nil {
 		return nil, err
 	}
 	err = directory.Sync()
-	directory.Close()
+	_ = directory.Close()
 	if err != nil {
 		return nil, fmt.Errorf("artifact reservation durability unknown")
 	}
@@ -78,7 +78,7 @@ func Read(dir string) (*Reservation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err = f.Stat()
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func Store(dir string, r Reservation) error {
 		return err
 	}
 	name := f.Name()
-	defer os.Remove(name)
+	defer func() { _ = os.Remove(name) }()
 	if err = f.Chmod(0600); err == nil {
 		_, err = f.Write(data)
 	}
@@ -182,6 +182,6 @@ func Store(dir string, r Reservation) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }

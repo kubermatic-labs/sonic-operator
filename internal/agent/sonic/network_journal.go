@@ -83,6 +83,7 @@ func (m *SonicAgent) lockNetworkJournal(ctx context.Context) (*vlanAuthorityJour
 	return j.lockVLANAuthorityJournal(ctx)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 	dir, err := j.root.Open(".")
 	if err != nil {
@@ -117,7 +118,7 @@ func loadNetworkJournal(j *vlanAuthorityJournal) (*networkJournalState, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return nil, err

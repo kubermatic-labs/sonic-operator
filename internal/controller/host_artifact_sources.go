@@ -95,7 +95,7 @@ func validateHostRetainedSources(ctx context.Context, r client.Reader, switchNam
 			return err
 		}
 		if !retainedManagementMatches(p, *q.Management, sw.Spec.MacAddress) {
-			return fmt.Errorf("Management conflicts with retained MAC artifact")
+			return fmt.Errorf("management conflicts with retained MAC artifact")
 		}
 	}
 	return nil

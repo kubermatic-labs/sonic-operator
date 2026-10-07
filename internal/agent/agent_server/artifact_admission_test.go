@@ -54,13 +54,13 @@ func TestGRPCRejectsConcurrentArtifactBeforeHandlerAndReleasesCanceledRPC(t *tes
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}})
-	go server.Serve(listener)
+	go func() { _ = server.Serve(listener) }()
 	defer server.Stop()
 	connection, err := grpc.NewClient("passthrough:///fixture", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() }))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	client := pb.NewArtifactServiceClient(connection)
 	raw, _ := json.Marshal(artifact.Bundle{Owner: "o", Target: "t", Generation: 1, Baseline: "b", Files: []artifact.File{{Slot: "PlatformJSON", SHA256: artifact.Digest([]byte(`{}`))}}})
 	ctx, cancel := context.WithCancel(context.Background())

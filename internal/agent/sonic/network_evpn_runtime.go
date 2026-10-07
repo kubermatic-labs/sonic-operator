@@ -119,6 +119,7 @@ func evpnNative(ctx context.Context) error {
 	return nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnUnderlay(ctx context.Context, db vlanChangeDB, source, peer string) error {
 	a, err := netip.ParseAddr(source)
 	if err != nil {
@@ -229,6 +230,8 @@ type evpnFRR struct {
 
 // Parse the actual default FRR instance, preserving AF/VNI nesting. Unscoped
 // string matching would accept an RD from another VNI or shutdown from a VRF.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnFRRParse(config []byte, db vlanChangeDB) (*evpnFRR, error) {
 	r := &evpnFRR{global: map[string]bool{}, vnis: map[string][]string{}, af: map[string]bool{}}
 	inside, found, af, vni := false, false, "", ""

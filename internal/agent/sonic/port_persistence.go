@@ -20,7 +20,7 @@ func (m *SonicAgent) savedPortConfig() (vlanChangeDB, error) {
 			if err != nil {
 				return nil, err
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			const maxSize = 32 << 20
 			data, err := io.ReadAll(io.LimitReader(f, maxSize+1))
 			if len(data) > maxSize {

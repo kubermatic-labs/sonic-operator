@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-func syncDirectory(f *os.File, sync func(*os.File) error) error {
-	if sync != nil {
-		return sync(f)
+func syncDirectory(f *os.File, syncFn func(*os.File) error) error {
+	if syncFn != nil {
+		return syncFn(f)
 	}
 	return f.Sync()
 }
@@ -79,14 +79,14 @@ func readRecordSnapshot(root *os.Root) (*record, os.FileInfo, func(), error) {
 func sameRecordIdentity(a, b os.FileInfo) bool {
 	return a != nil && b != nil && os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime()) && a.Mode() == b.Mode()
 }
-func lockRecord(ctx context.Context, dir string, sync func(*os.File) error) (*record, func(), error) {
+func lockRecord(ctx context.Context, dir string, syncFn func(*os.File) error) (*record, func(), error) {
 	root, e := openStore(dir)
 	if e != nil {
 		return nil, nil, e
 	}
 	f, e := root.OpenFile("lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if e != nil {
-		root.Close()
+		_ = root.Close()
 		return nil, nil, ErrStorage
 	}
 	unlock := func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close(); _ = root.Close() }
@@ -120,7 +120,7 @@ func lockRecord(ctx context.Context, dir string, sync func(*os.File) error) (*re
 		unlock()
 		return nil, nil, ErrStorage
 	}
-	e = syncDirectory(d, sync)
+	e = syncDirectory(d, syncFn)
 	_ = d.Close()
 	if e != nil {
 		unlock()

@@ -126,6 +126,7 @@ func (w *hostInstallWriter) reclaim() error {
 	return nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (w *hostInstallWriter) write(dest string, data []byte, mode fs.FileMode) error {
 	e := w.e
 	if e.requestContext != nil {
@@ -170,7 +171,7 @@ func (w *hostInstallWriter) write(dest string, data []byte, mode fs.FileMode) er
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	checkpoint := func(phase string) error {
 		if e.atomicCheckpoint != nil {
 			return e.atomicCheckpoint(dest, phase)
@@ -226,7 +227,7 @@ func (w *hostInstallWriter) syncMatchingDestination(dest string, data []byte, mo
 	if err != nil {
 		return err
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	dirInfo, err := directory.Stat()
 	if err != nil {
 		return err
@@ -239,7 +240,7 @@ func (w *hostInstallWriter) syncMatchingDestination(dest string, data []byte, mo
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil || !trustedHostDestination(info, mode) {
 		return fmt.Errorf("untrusted host destination")

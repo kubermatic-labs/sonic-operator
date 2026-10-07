@@ -88,6 +88,8 @@ func verifyDaemonStatus(raw []byte, names []string) error {
 	}
 	return nil
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) platformHealth(ctx context.Context, j *journal) error {
 	for _, f := range j.Files {
 		p, _, err := Destination(f.Slot)

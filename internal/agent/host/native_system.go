@@ -69,6 +69,8 @@ func systemTables(s System) []string {
 	}
 	return t
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) observeSystem(ctx context.Context, q Request, db, saved Database) (Result, error) {
 	out := Result{GatewayVerified: true}
 	s := *q.System

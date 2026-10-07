@@ -92,6 +92,8 @@ func Destination(slot string) (string, fs.FileMode, error) {
 func SecretSlot(slot string) bool {
 	return slot == "AgentKey" || slot == "AgentCertificate" || slot == "AgentCA"
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (b Bundle) Validate(content bool) error {
 	if b.Agent != nil && b.Agent.HostConfig && (b.Bootstrap == nil || b.Bootstrap.HostRecovery == nil || !b.Agent.HostGuard) {
 		return fmt.Errorf("HostConfig requires immutable host recovery and HostGuard")

@@ -9,7 +9,7 @@ import (
 
 func TestReservationGatesPublicationAndOnlyAdmitsRecoveryAfterAgentRestore(t *testing.T) {
 	dir := t.TempDir()
-	os.Chmod(dir, 0700)
+	_ = os.Chmod(dir, 0700)
 	if err := CheckPending(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestReservationGatesPublicationAndOnlyAdmitsRecoveryAfterAgentRestore(t *te
 	if err := CheckRecovery(dir); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(dir, "reservation.json"), []byte(`{"version":1,"phase":"unknown"}`), 0600)
+	_ = os.WriteFile(filepath.Join(dir, "reservation.json"), []byte(`{"version":1,"phase":"unknown"}`), 0600)
 	if CheckPending(dir) == nil {
 		t.Fatal("corrupt reservation treated as absent")
 	}

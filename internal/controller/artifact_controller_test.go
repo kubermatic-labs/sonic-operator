@@ -31,8 +31,8 @@ func (f *artifactFake) Artifact(_ context.Context, r artifact.Request) (*artifac
 func (f *artifactFake) Close() error { return nil }
 func TestArtifactReconcilerEnforcesAndFreshlyConfirms(t *testing.T) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	api.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	_ = api.AddToScheme(scheme)
 	yes := true
 	data := []byte(`{"ports":[]}`)
 	obj := &api.SwitchArtifact{ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "fleet", UID: "owner", Generation: 1}, Spec: api.SwitchArtifactSpec{SwitchName: "switch", ManagementPolicy: "Manage", Baseline: "base", Files: []api.ArtifactFile{{Slot: "PlatformJSON", SHA256: artifact.Digest(data), Chunks: []api.ArtifactContentRef{{Kind: "ConfigMap", Name: "source", UID: "source-uid", Key: "file"}}}}}}
@@ -60,7 +60,7 @@ func TestArtifactReconcilerEnforcesAndFreshlyConfirms(t *testing.T) {
 		t.Fatalf("did not enforce: %v", calls)
 	}
 	current := &api.SwitchArtifact{}
-	c.Get(context.Background(), req.NamespacedName, current)
+	_ = c.Get(context.Background(), req.NamespacedName, current)
 	b, err := resolveArtifactSources(context.Background(), c, current, current.Status.Target)
 	if err != nil {
 		t.Fatal(err)
@@ -96,9 +96,9 @@ func TestArtifactReconcilerEnforcesAndFreshlyConfirms(t *testing.T) {
 		t.Fatalf("stale generation staged: %v %v", calls, err)
 	}
 	// An endpoint change may never move the recorded lifecycle to another target.
-	c.Get(context.Background(), client.ObjectKeyFromObject(sw), sw)
+	_ = c.Get(context.Background(), client.ObjectKeyFromObject(sw), sw)
 	sw.Spec.Management.Host = "10.1.2.4"
-	c.Update(context.Background(), sw)
+	_ = c.Update(context.Background(), sw)
 	calls = nil
 	if _, err := r.Reconcile(context.Background(), req); err == nil || len(calls) > 0 {
 		t.Fatalf("target change not blocked: %v %v", calls, err)

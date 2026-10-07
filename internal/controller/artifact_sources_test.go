@@ -20,7 +20,7 @@ func TestArtifactSourcesRequireImmutableUIDAndDigest(t *testing.T) {
 	data := []byte(`{"ports":[]}`)
 	source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "revision", Namespace: "fleet", UID: "content-uid"}, Immutable: &yes, BinaryData: map[string][]byte{"file": data}}
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 	obj := &api.SwitchArtifact{ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "fleet", UID: "owner", Generation: 1}, Spec: api.SwitchArtifactSpec{Baseline: "baseline", Files: []api.ArtifactFile{{Slot: "PlatformJSON", SHA256: artifact.Digest(data), Chunks: []api.ArtifactContentRef{{Kind: "ConfigMap", Name: "revision", UID: "content-uid", Key: "file"}}}}}}
 	tests := []struct {
 		name      string

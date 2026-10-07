@@ -21,6 +21,18 @@ linters:
     - unparam
     - unused
   settings:
+    staticcheck:
+      checks:
+        - all
+        # Negated conjunctions intentionally mirror the documented safety rules.
+        - -QF1001
+        # Defaults of golangci-lint's staticcheck that stay disabled.
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
     revive:
       rules:
         - name: comment-spacings
@@ -35,6 +47,16 @@ linters:
           - dupl
           - lll
         path: internal/*
+      - linters:
+          - goconst
+          - gocyclo
+          - prealloc
+        path: _test\.go
+      # These packages repeat many SONiC table, field and state names as
+      # literals. goconst stays enabled for all other packages.
+      - linters:
+          - goconst
+        path: ^(internal/agent/agent_client/client|internal/agent/artifactstate|internal/agent/host|internal/agent/sonic|internal/artifact|internal/controller)/
     paths:
       - third_party$
       - builtin$

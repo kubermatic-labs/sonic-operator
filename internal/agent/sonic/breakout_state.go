@@ -133,6 +133,8 @@ func breakoutConfigMatches(db vlanChangeDB, p *breakoutPlatform, mode string) er
 // Unknown tables fail closed even for opaque selectors ("all", aliases, ranges).
 // This allowlist covers non-port system configuration only; it is not a blanket
 // dependency deletion list. Explicit references are checked even in known tables.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func breakoutDependencies(db vlanChangeDB, p *breakoutPlatform) error {
 	names := breakoutNames(p)
 	refs := []string{}

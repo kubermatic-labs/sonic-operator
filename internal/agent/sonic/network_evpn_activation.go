@@ -27,7 +27,7 @@ func evpnParentActivation(ctx context.Context, m *SonicAgent, db vlanChangeDB, p
 		return err
 	}
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
-	root.Close()
+	_ = root.Close()
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func evpnOwnedGlobal(m *SonicAgent, db vlanChangeDB, mappings []agent.EVPNMappin
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func evpnOwnedPolicy(m *SonicAgent, db vlanChangeDB, peer string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err

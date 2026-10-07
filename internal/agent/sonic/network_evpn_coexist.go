@@ -19,6 +19,8 @@ type evpnCoexistVerifiedKey struct{}
 // to coexist with EVPN. Merely skipping BGP_GLOBALS_EVPN_VNI would permit inert
 // or unsafe foreign fields, missing RTs, orphan RTs, and active AFs. Reuse the
 // mapping planner's dependency/uniqueness validation without claiming its fields.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnIsolatedConfig(db vlanChangeDB) (bool, []evpnMapSpec, error) {
 	present := false
 	for key := range db {

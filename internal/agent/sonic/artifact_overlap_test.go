@@ -28,8 +28,8 @@ func TestArtifactRestartBoundaryAndForeignRecoveryDependency(t *testing.T) {
 	dir := filepath.Join(root, "host/sonic-operator-artifacts")
 	m := &SonicAgent{journalDir: filepath.Join(root, "vlan"), breakoutJournalDir: filepath.Join(root, "breakout"), networkJournalDir: filepath.Join(root, "network"), artifactStateDir: dir}
 	for _, p := range []string{m.journalDir, m.breakoutJournalDir, m.networkJournalDir} {
-		os.MkdirAll(p, 0700)
-		os.WriteFile(filepath.Join(p, ".lock"), nil, 0600)
+		_ = os.MkdirAll(p, 0700)
+		_ = os.WriteFile(filepath.Join(p, ".lock"), nil, 0600)
 	}
 	fence := &ArtifactWriterFence{agent: m}
 	fields := vlanChangeDB{"VRF|VrfTest": {"NULL": "NULL"}}
@@ -42,7 +42,7 @@ func TestArtifactRestartBoundaryAndForeignRecoveryDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 	foreign, _ := os.ReadFile(filepath.Join(m.networkJournalDir, "network.json"))
-	storeNetworkJournal(j, &networkJournalState{Version: 1, Records: map[string]*networkRecord{}})
+	_ = storeNetworkJournal(j, &networkJournalState{Version: 1, Records: map[string]*networkRecord{}})
 	j.close()
 	elf := make([]byte, 120)
 	copy(elf, []byte{'\x7f', 'E', 'L', 'F', 2, 1, 1})
@@ -57,8 +57,8 @@ func TestArtifactRestartBoundaryAndForeignRecoveryDependency(t *testing.T) {
 	old := append([]byte(nil), elf...)
 	old = append(old, []byte("old-working")...)
 	binaryPath := filepath.Join(root, "usr/local/sbin/sonic-operator-agent")
-	os.MkdirAll(filepath.Dir(binaryPath), 0700)
-	os.WriteFile(binaryPath, old, 0755)
+	_ = os.MkdirAll(filepath.Dir(binaryPath), 0700)
+	_ = os.WriteFile(binaryPath, old, 0755)
 	health := func() error {
 		data, _ := os.ReadFile(binaryPath)
 		if artifact.Digest(data) != artifact.Digest(old) {
@@ -108,7 +108,7 @@ func TestArtifactRestartBoundaryAndForeignRecoveryDependency(t *testing.T) {
 	}
 	j.close()
 	// Simulate an already-published legacy foreign record, which must be preserved.
-	os.WriteFile(filepath.Join(m.networkJournalDir, "network.json"), foreign, 0600)
+	_ = os.WriteFile(filepath.Join(m.networkJournalDir, "network.json"), foreign, 0600)
 	e.Close()
 	e = open()
 	defer e.Close() // supervisor restart and controller loss

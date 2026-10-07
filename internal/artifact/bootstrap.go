@@ -83,6 +83,8 @@ type bootstrapRecord struct {
 // immutable owner/content binding is saved before writes. An interrupted first
 // installation is resumed from the same Kubernetes-owned inputs on the next RPC.
 // It never changes the main agent binary, networking or running platform daemons.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func EnsureBootstrap(ctx context.Context, root string, b Bundle, activate func(context.Context) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -245,7 +247,7 @@ func bootstrapRunning(ctx context.Context, b Bundle) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(io.LimitReader(f, MaxBundleBytes+1))
 	if err != nil || Digest(data) != b.Bootstrap.SupervisorSHA256 {
 		return fmt.Errorf("running supervisor differs from immutable declaration")

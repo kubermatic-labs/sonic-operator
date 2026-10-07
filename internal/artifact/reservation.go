@@ -35,6 +35,8 @@ func (e *Engine) release(j *journal) error {
 // Dependency restoration never changes a platform input, CONFIG_DB or a foreign
 // journal. Its authority is the already-published reservation and validated old
 // Agent* content. The restored agent may then finish existing foreign recovery.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e *Engine) restoreAgentDependency(now time.Time) error {
 	e.mu.Lock()
 	j, err := e.load()

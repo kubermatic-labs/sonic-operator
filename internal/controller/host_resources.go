@@ -18,6 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// hostKindManagement is the agent host request kind for SwitchManagement.
+const hostKindManagement = "Management"
+
 func hostObjects(kind string) (client.Object, client.ObjectList, error) {
 	switch kind {
 	case "Management":
@@ -46,7 +49,7 @@ func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, tar
 	}
 	switch o := obj.(type) {
 	case *api.SwitchManagement:
-		q.Kind = "Management"
+		q.Kind = hostKindManagement
 		q.Management = &host.Management{Interface: o.Spec.Interface, MAC: o.Spec.MAC}
 		if q.Management.Interface == "" {
 			q.Management.Interface = "eth0"

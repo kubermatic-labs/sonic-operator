@@ -43,13 +43,14 @@ func (c *defaultSwitchAgentClient) networkResource(ctx context.Context, r *agent
 	var resp *pb.NetworkResponse
 	var err error
 	method := "GetNetworkResource"
-	if operation == "recover" {
+	switch operation {
+	case "recover":
 		method = "RecoverNetworkResource"
 		resp, err = c.client.RecoverNetworkResource(ctx, wire)
-	} else if operation == "ensure" {
+	case "ensure":
 		method = "EnsureNetworkResource"
 		resp, err = c.client.EnsureNetworkResource(ctx, wire)
-	} else {
+	default:
 		resp, err = c.client.GetNetworkResource(ctx, wire)
 	}
 	if err != nil {

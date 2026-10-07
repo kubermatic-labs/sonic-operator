@@ -34,13 +34,13 @@ func retirementFixture(t *testing.T) (*Engine, string, Bundle) {
 		}
 		e.Policy.Platform[f.Slot] = p
 		full := filepath.Join(root, p)
-		os.MkdirAll(filepath.Dir(full), 0700)
-		os.WriteFile(full, f.Data, 0644)
+		_ = os.MkdirAll(filepath.Dir(full), 0700)
+		_ = os.WriteFile(full, f.Data, 0644)
 	}
 	for _, p := range []string{legacyHookPath, legacyScriptPath} {
 		full := filepath.Join(root, p)
-		os.MkdirAll(filepath.Dir(full), 0700)
-		os.WriteFile(full, []byte("original working recovery"), 0644)
+		_ = os.MkdirAll(filepath.Dir(full), 0700)
+		_ = os.WriteFile(full, []byte("original working recovery"), 0644)
 	}
 	b.RetireLegacyHook = true
 	return e, root, b
@@ -52,7 +52,7 @@ func TestLegacyRetirementOccursOnlyAfterConfirmation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	p := filepath.Join(root, legacyHookPath)
 	got, _ := os.ReadFile(p)
 	if string(got) != "original working recovery" {
@@ -84,7 +84,7 @@ func TestInterruptedLegacyRetirementRestoresWorkingHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	e.Finalize = func() error { return os.ErrInvalid }
 	if _, err := e.Confirm(b, r.Token, now); err == nil {
 		t.Fatal("failed systemd reload accepted")

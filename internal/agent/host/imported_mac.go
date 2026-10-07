@@ -57,6 +57,7 @@ func validateImportedIdentity(h LegacyMACHook) error {
 	return nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) importedState(ctx context.Context, p NativeProfile, boot bool, adoption ...bool) (LegacyMACHook, error) {
 	if len(p.LegacyMACHooks) != 1 || n.BaseMAC == nil {
 		return LegacyMACHook{}, ErrNative

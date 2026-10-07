@@ -123,6 +123,8 @@ var (
 
 // networkDesired validates even fake/admission-bypassing objects, and fills only
 // documented defaults on a copy. Never use a normalized copy for freshness CAS.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, string, error) {
 	copy := obj.DeepCopyObject().(client.Object)
 	spec, _, common := networkFields(copy)

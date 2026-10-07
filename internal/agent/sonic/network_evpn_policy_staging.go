@@ -14,6 +14,8 @@ import (
 
 // Policy staging remains separate from activation. Only this peer's exact
 // disabled AF may be normalized while validating its existing mapping inputs.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkEVPNPolicyPeer(db vlanChangeDB, r *agent.NetworkRequest, s evpnPeerSpec) (*networkPlan, error) {
 	if s.AdminState == "" {
 		s.AdminState = "Down"
