@@ -92,6 +92,8 @@ func main() {
 	engine.PauseRuntime = false
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	bootLog := &busyLog{interval: time.Minute, now: time.Now}
+	tickLog := &busyLog{interval: time.Minute, now: time.Now}
 	for {
 		select {
 		case <-ctx.Done():
@@ -104,11 +106,11 @@ func main() {
 				log.Print("artifact image baseline changed; recovery blocked")
 				continue
 			}
-			if err := engine.RestoreBoot(); err != nil {
-				log.Printf("artifact boot restoration pending: %s", artifact.SafeReason(err))
+			if line := bootLog.observe(engine.RestoreBoot(), "artifact boot restoration pending", artifact.SafeReason); line != "" {
+				log.Print(line)
 			}
-			if err := engine.Tick(time.Now()); err != nil {
-				log.Printf("artifact recovery pending; health or persistence check failed: %s", artifact.SafeReason(err))
+			if line := tickLog.observe(engine.Tick(time.Now()), "artifact recovery pending; health or persistence check failed", artifact.SafeReason); line != "" {
+				log.Print(line)
 			}
 		}
 	}
