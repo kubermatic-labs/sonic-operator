@@ -309,7 +309,7 @@ func TestArtifactHostSourcesFreshAfterActualFinalBlob(t *testing.T) {
 				server := grpc.NewServer(grpc.Creds(credentials.NewTLS(hostFreshnessTLS(t))))
 				pb.RegisterArtifactServiceServer(server, wire)
 				t.Cleanup(server.Stop)
-				go server.Serve(listener)
+				go func() { _ = server.Serve(listener) }()
 				r := &ArtifactReconciler{Client: kube, APIReader: kube, AllowArtifacts: true, NewClient: func(context.Context, client.Reader, *api.Switch) (artifactRPC, io.Closer, error) {
 					c, err := agentclient.NewDefaultSwitchAgentClient(listener.Addr().String(), time.Second)
 					if err != nil {

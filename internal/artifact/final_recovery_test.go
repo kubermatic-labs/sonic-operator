@@ -143,9 +143,9 @@ func TestLegacyPartialPackageReceiptResumesOriginalAuthority(t *testing.T) {
 					hash := entry.Before
 					if which == "candidate" {
 						hash = entry.Candidate
-						json.Unmarshal(raw, &candidate)
+						_ = json.Unmarshal(raw, &candidate)
 					} else {
-						json.Unmarshal(raw, &before)
+						_ = json.Unmarshal(raw, &before)
 					}
 					if err := h.e.root.Remove(h.e.packagePath(j, entry.Target, which, hash)); err != nil {
 						t.Fatal(err)
@@ -162,7 +162,7 @@ func TestLegacyPartialPackageReceiptResumesOriginalAuthority(t *testing.T) {
 						t.Fatal(err)
 					}
 					var receipt map[string]any
-					json.Unmarshal(raw, &receipt)
+					_ = json.Unmarshal(raw, &receipt)
 					delete(receipt, "observed")
 					raw, _ = json.Marshal(receipt)
 					if err := os.WriteFile(receiptPath, raw, 0600); err != nil {
@@ -173,7 +173,7 @@ func TestLegacyPartialPackageReceiptResumesOriginalAuthority(t *testing.T) {
 			}
 			raw, _ := json.Marshal(j)
 			var legacy map[string]any
-			json.Unmarshal(raw, &legacy)
+			_ = json.Unmarshal(raw, &legacy)
 			delete(legacy, "packagesPrepared")
 			raw, _ = json.Marshal(legacy)
 			if err := h.e.atomic(filepath.Join(h.e.state, "journal.json"), raw, 0600); err != nil {

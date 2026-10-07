@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func resolveArtifactSources(ctx context.Context, r client.Reader, obj *api.SwitchArtifact, target string) (artifact.Bundle, error) {
 	b := artifact.Bundle{RetireLegacyHook: obj.Spec.RetireLegacyHook, Activation: obj.Spec.Activation, Owner: string(obj.UID), Target: target, Generation: obj.Generation, Baseline: obj.Spec.Baseline}
 	if obj.Spec.Agent != nil {
@@ -60,7 +61,7 @@ func resolveArtifactSources(ctx context.Context, r client.Reader, obj *api.Switc
 				content = data
 			case "Secret":
 				if !artifact.SecretSlot(f.Slot) {
-					return out, fmt.Errorf("Secret content is restricted to certificate slots")
+					return out, fmt.Errorf("secret content is restricted to certificate slots")
 				}
 				source := &corev1.Secret{}
 				if err := r.Get(ctx, key, source); err != nil {

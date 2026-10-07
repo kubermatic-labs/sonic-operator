@@ -193,6 +193,8 @@ func (n *Native) verifyRestoredScope(ctx context.Context, scope RecoveryScope) e
 	}
 	return nil
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) applyManagement(ctx context.Context, before Snapshot, m Management, activeMAC string, manageMAC ...bool) error {
 	db, e := n.Load(ctx)
 	if e != nil {

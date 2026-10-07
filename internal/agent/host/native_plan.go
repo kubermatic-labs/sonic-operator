@@ -133,6 +133,8 @@ func scopedEqual(a, b Database, tables ...string) bool {
 	}
 	return true
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func managementRuntimeMatches(m Management, addresses, routes []byte) bool {
 	var links []struct {
 		IfName  string   `json:"ifname"`

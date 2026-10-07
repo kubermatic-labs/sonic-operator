@@ -79,12 +79,12 @@ func (m *SonicAgent) ConfigureVLANAuthorityJournal(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	f, err := root.OpenFile(".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err = f.Stat()
 	if err != nil {
 		return err
@@ -99,7 +99,7 @@ func (m *SonicAgent) ConfigureVLANAuthorityJournal(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := d.Sync(); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (m *SonicAgent) ConfigureVLANAuthorityJournal(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer parent.Close()
+	defer func() { _ = parent.Close() }()
 	if err := parent.Sync(); err != nil {
 		return err
 	}
@@ -201,6 +201,7 @@ func (m *SonicAgent) lockVLANAuthorityJournal(ctx context.Context) (*vlanAuthori
 
 func vlanAuthorityFile(id uint32) string { return fmt.Sprintf("vlan-%d.json", id) }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (j *vlanAuthorityJournal) load(id uint32) (*vlanAuthorityRecord, error) {
 	f, err := j.root.OpenFile(vlanAuthorityFile(id), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if errors.Is(err, os.ErrNotExist) {
@@ -209,7 +210,7 @@ func (j *vlanAuthorityJournal) load(id uint32) (*vlanAuthorityRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return nil, err
@@ -329,7 +330,7 @@ func (j *vlanAuthorityJournal) sync() error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if j.syncDir != nil {
 		return j.syncDir(d)
 	}

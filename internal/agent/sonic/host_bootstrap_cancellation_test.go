@@ -69,7 +69,7 @@ func stalledQualificationRedis(t *testing.T, stallAt int32) (string, <-chan stru
 				return
 			}
 			go func() {
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 				reader := bufio.NewReader(conn)
 				for {
 					line, err := reader.ReadString('\n')

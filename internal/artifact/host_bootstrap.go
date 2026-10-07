@@ -44,7 +44,8 @@ func (h *HostRecoveryBootstrap) identity() string {
 }
 func (h *HostRecoveryBootstrap) files() []hostInstallFile {
 	cfg, _ := host.EncodeRecoveryConfig(host.FleetRecoveryConfig())
-	out := []hostInstallFile{{host.RecoveryBinaryFile, h.Binary, 0755, ""}, {host.RecoveryProfileFile, h.Profile, 0600, ""}, {host.RecoveryConfigFile, cfg, 0600, ""}}
+	out := make([]hostInstallFile, 0, 5+2*len(h.MACHooks))
+	out = append(out, hostInstallFile{host.RecoveryBinaryFile, h.Binary, 0755, ""}, hostInstallFile{host.RecoveryProfileFile, h.Profile, 0600, ""}, hostInstallFile{host.RecoveryConfigFile, cfg, 0600, ""})
 	// Protected helper and profile precede the activation adapter. Never restart
 	// interfaces-config or execute the imported helper during adoption.
 	for _, m := range h.MACHooks {
@@ -63,6 +64,7 @@ func EnsureHostBootstrap(ctx context.Context, root string, b Bundle, fence Write
 	return ensureHostBootstrap(ctx, root, b, fence, activate, nil)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func ensureHostBootstrap(ctx context.Context, root string, b Bundle, fence WriterFence, activate func(context.Context) error, fault func(string) error) error {
 	if b.Bootstrap == nil || b.Bootstrap.HostRecovery == nil || fence == nil || activate == nil {
 		return fmt.Errorf("complete host bootstrap and exclusion required")

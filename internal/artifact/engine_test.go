@@ -95,7 +95,7 @@ func TestHealthAndOwnershipConfirmation(t *testing.T) {
 		t.Fatal("stole ownership")
 	}
 	path := filepath.Join(root, "usr/share/sonic/device/test/platform.json")
-	os.WriteFile(path, []byte("drift"), 0644)
+	_ = os.WriteFile(path, []byte("drift"), 0644)
 	drift, err := e.Observe(b)
 	if err != nil || drift.Configuration {
 		t.Fatalf("missed drift %+v %v", drift, err)
@@ -117,7 +117,7 @@ func TestSymlinksHashValidationAndSecretPrivacy(t *testing.T) {
 	if _, err := e.Ensure(b, time.Now()); err == nil {
 		t.Fatal("accepted symlink destination")
 	}
-	os.Remove(path)
+	_ = os.Remove(path)
 	b.Files[0].Data = []byte("bad hash")
 	if _, err := e.Ensure(b, time.Now()); err == nil {
 		t.Fatal("accepted candidate validation failure")
@@ -126,14 +126,14 @@ func TestSymlinksHashValidationAndSecretPrivacy(t *testing.T) {
 func TestEqualAdoptionDoesNotRestart(t *testing.T) {
 	e, root := testEngine(t)
 	b := testBundle()
-	os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test/platform.json"), b.Files[0].Data, 0644)
+	_ = os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test/platform.json"), b.Files[0].Data, 0644)
 	calls := 0
 	e.Activate = func() error { calls++; return nil }
 	r, err := e.Ensure(b, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(time.Now())
+	_ = e.Tick(time.Now())
 	if _, err := e.Confirm(b, r.Token, time.Now()); err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestNextBootActivationAndBootRestoration(t *testing.T) {
 	if _, err := e.Confirm(b, r.Token, now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(p, []byte("image reset"), 0644)
+	_ = os.WriteFile(p, []byte("image reset"), 0644)
 	boot = "boot-three"
 	if err := e.RestoreBoot(); err != nil {
 		t.Fatal(err)
@@ -190,11 +190,11 @@ func TestStagingConflictPreservesLocalEdit(t *testing.T) {
 	b := testBundle()
 	now := time.Now()
 	p := filepath.Join(root, "usr/share/sonic/device/test/platform.json")
-	os.WriteFile(p, []byte("old"), 0644)
+	_ = os.WriteFile(p, []byte("old"), 0644)
 	if _, err := e.Ensure(b, now); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(p, []byte("local-change"), 0644)
+	_ = os.WriteFile(p, []byte("local-change"), 0644)
 	if err := e.Tick(now); err == nil {
 		t.Fatal("CAS conflict not reported")
 	}
@@ -209,11 +209,11 @@ func TestExpiredUninstalledStagePreservesLocalEdit(t *testing.T) {
 	b := testBundle()
 	now := time.Now()
 	p := filepath.Join(root, "usr/share/sonic/device/test/platform.json")
-	os.WriteFile(p, []byte("old"), 0644)
+	_ = os.WriteFile(p, []byte("old"), 0644)
 	if _, err := e.Ensure(b, now); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(p, []byte("local-change"), 0644)
+	_ = os.WriteFile(p, []byte("local-change"), 0644)
 	if err := e.Tick(now.Add(6 * time.Minute)); err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestInterruptedPartialInstallRollsBack(t *testing.T) {
 	b.Files = append(b.Files, File{Slot: "HWSKUJSON", Data: []byte(`{"hwsku":1}`), SHA256: Digest([]byte(`{"hwsku":1}`))})
 	e.Policy.Platform["HWSKUJSON"] = "/usr/share/sonic/device/test/hwsku.json"
 	for _, name := range []string{"platform.json", "hwsku.json"} {
-		os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test", name), []byte("old"), 0644)
+		_ = os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test", name), []byte("old"), 0644)
 	}
 	if _, err := e.Ensure(b, time.Now()); err != nil {
 		t.Fatal(err)
@@ -252,7 +252,7 @@ func TestInterruptedPartialInstallRollsBack(t *testing.T) {
 	if err := e.save(j); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test/platform.json"), b.Files[0].Data, 0644)
+	_ = os.WriteFile(filepath.Join(root, "usr/share/sonic/device/test/platform.json"), b.Files[0].Data, 0644)
 	e.Close()
 	next, err := Open(root, "/host/artifacts", e.Policy, func() error { return nil }, func() error { return nil })
 	if err != nil {
@@ -278,7 +278,7 @@ func TestCorruptActiveManifestCannotEscapeAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	if _, err := e.Confirm(b, r.Token, now); err != nil {
 		t.Fatal(err)
 	}
@@ -303,12 +303,12 @@ func TestDriftCorrectionRetainsLastConfirmedRecoveryContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	if _, err := e.Confirm(b, r.Token, now); err != nil {
 		t.Fatal(err)
 	}
 	p := filepath.Join(root, "usr/share/sonic/device/test/platform.json")
-	os.WriteFile(p, []byte("broken-drift"), 0644)
+	_ = os.WriteFile(p, []byte("broken-drift"), 0644)
 	if _, err := e.Ensure(b, now); err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +332,7 @@ func TestConfirmedUpdatePrunesUnreferencedPrivateContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	if _, err := e.Confirm(b, first.Token, now); err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestConfirmedUpdatePrunesUnreferencedPrivateContent(t *testing.T) {
 	if _, err := os.Stat(old); err != nil {
 		t.Fatal("working content removed before health confirmation")
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	if _, err := e.Confirm(b, second.Token, now); err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +363,7 @@ func TestWallClockStepCannotExtendAgentRecovery(t *testing.T) {
 	b := testBundle()
 	now := time.Now()
 	p := filepath.Join(root, "usr/share/sonic/device/test/platform.json")
-	os.WriteFile(p, []byte("old"), 0644)
+	_ = os.WriteFile(p, []byte("old"), 0644)
 	if _, err := e.Ensure(b, now); err != nil {
 		t.Fatal(err)
 	}

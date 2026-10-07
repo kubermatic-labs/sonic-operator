@@ -104,6 +104,7 @@ func planNetworkVXLANTunnel(db vlanChangeDB, r *agent.NetworkRequest) (*networkP
 	return p, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkVLANVNI(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s evpnMapSpec
 	if err := routingDecode(r, "VLANVNI", &s, "tunnel vlanID vni routeDistinguisher importRouteTargets exportRouteTargets"); err != nil {
@@ -230,6 +231,7 @@ func planNetworkVLANVNI(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 	return p, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkEVPNPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s evpnPeerSpec
 	if r == nil {
@@ -383,6 +385,7 @@ func evpnLocalInterface(db vlanChangeDB, address netip.Addr) (string, error) {
 	return found, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnSafeConfig(db vlanChangeDB) error {
 	if err := routingUnified(db); err != nil {
 		return err
@@ -447,7 +450,7 @@ func evpnOwnedPeer(m *SonicAgent, db vlanChangeDB, key string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err

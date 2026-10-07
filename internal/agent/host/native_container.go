@@ -95,9 +95,9 @@ func (n *Native) renderStoppedSNMP(ctx context.Context, template string, input [
 	if e != nil {
 		return nil, ErrStorage
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, e = f.Write(data); e != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, ErrStorage
 	}
 	if e = f.Close(); e != nil {

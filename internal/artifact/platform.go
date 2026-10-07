@@ -91,7 +91,7 @@ func wheelMembers(data []byte) (map[string][]byte, error) {
 			return nil, fmt.Errorf("unreadable wheel member")
 		}
 		b, err := io.ReadAll(io.LimitReader(r, (1<<20)+1))
-		r.Close()
+		_ = r.Close()
 		if err != nil || len(b) > 1<<20 {
 			return nil, fmt.Errorf("invalid wheel member")
 		}

@@ -312,6 +312,7 @@ func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 	return evpnGuardUnicastPlan(plan, db), nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s routingPeerSpec
 	if err := routingDecode(r, "BGPPeer", &s, "vrf address remoteASN localAddress addressFamilies adminState maxPrefixes"); err != nil {
@@ -539,6 +540,7 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 	return guarded, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkDHCPRelay(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s routingRelaySpec
 	if err := routingDecode(r, "DHCPRelay", &s, "vlanID vrf ipv4Servers ipv6Servers"); err != nil {

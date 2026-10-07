@@ -86,7 +86,7 @@ func (r *NetworkReconciler) checkNetworkCurrent(ctx context.Context, obj client.
 		return err
 	}
 	if !current.DeletionTimestamp.IsZero() || networkBinding(obj, current, r.Kind, target) != networkBinding(obj, sw, r.Kind, target) {
-		return fmt.Errorf("Switch identity or endpoint changed; retry without writing")
+		return fmt.Errorf("switch identity or endpoint changed; retry without writing")
 	}
 	return nil
 }

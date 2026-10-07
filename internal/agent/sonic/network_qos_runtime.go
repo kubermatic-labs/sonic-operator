@@ -20,7 +20,7 @@ type qosRead interface {
 	configSnapshot(context.Context) (vlanChangeDB, error)
 }
 
-var qosUnavailable = errors.New("QoS evidence unavailable")
+var errQoSUnavailable = errors.New("QoS evidence unavailable")
 
 type qosRedisRead struct{ agent *SonicAgent }
 
@@ -402,9 +402,10 @@ func qosBindingPlan(port string, desired vlanChangeDB) *networkPlan {
 	return p
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func qosBindingProof(ctx context.Context, read qosRead, port string, desired vlanChangeDB, runtime bool) (bool, json.RawMessage, error) {
 	fail := func(reason string, err error) (bool, json.RawMessage, error) {
-		if errors.Is(err, qosUnavailable) {
+		if errors.Is(err, errQoSUnavailable) {
 			err = nil
 		}
 		if !runtime && err == nil {
@@ -559,7 +560,7 @@ func qosQueueOID(ctx context.Context, read qosRead, port, portOID, index string,
 	count, err := qosNumber(caps["SWITCH|NUMBER_OF_UNICAST_QUEUES"], 256)
 	n, numErr := qosNumber(index, 255)
 	if err != nil || numErr != nil || count == 0 || n >= count {
-		return "", fmt.Errorf("%w: queue exceeds actual unicast capability", qosUnavailable)
+		return "", fmt.Errorf("%w: queue exceeds actual unicast capability", errQoSUnavailable)
 	}
 	queues, err := read.hash(ctx, "COUNTERS_DB", "COUNTERS_QUEUE_NAME_MAP")
 	if err != nil {
@@ -571,17 +572,17 @@ func qosQueueOID(ctx context.Context, read qosRead, port, portOID, index string,
 		return "", err
 	}
 	if !ok {
-		return "", fmt.Errorf("%w: queue OID missing or untranslated", qosUnavailable)
+		return "", fmt.Errorf("%w: queue OID missing or untranslated", errQoSUnavailable)
 	}
 	attrs, err := read.hash(ctx, "ASIC_DB", "ASIC_STATE:SAI_OBJECT_TYPE_QUEUE:"+oid)
 	if err != nil {
 		return "", err
 	}
 	if attrs["SAI_QUEUE_ATTR_TYPE"] != "SAI_QUEUE_TYPE_UNICAST" || attrs["SAI_QUEUE_ATTR_INDEX"] != index {
-		return "", fmt.Errorf("%w: queue OID type/index mismatch", qosUnavailable)
+		return "", fmt.Errorf("%w: queue OID type/index mismatch", errQoSUnavailable)
 	}
 	if owner := attrs["SAI_QUEUE_ATTR_PORT"]; owner != "" && owner != portOID {
-		return "", fmt.Errorf("%w: queue OID belongs to another port", qosUnavailable)
+		return "", fmt.Errorf("%w: queue OID belongs to another port", errQoSUnavailable)
 	}
 	return oid, nil
 }

@@ -70,7 +70,7 @@ func TestAddressedOutputsReproducible(t *testing.T) {
 	if !bytes.Equal(got, data) {
 		t.Fatal("output changed")
 	}
-	os.WriteFile(a, []byte("drift"), 0600)
+	_ = os.WriteFile(a, []byte("drift"), 0600)
 	if _, err := WriteAddressed(dir, data); err == nil {
 		t.Fatal("overwrote content-addressed conflict")
 	}

@@ -88,7 +88,7 @@ func TestArtifactDispatchFreshnessAndCompatibility(t *testing.T) {
 				server := grpc.NewServer()
 				pb.RegisterArtifactServiceServer(server, s)
 				t.Cleanup(server.Stop)
-				go server.Serve(listener)
+				go func() { _ = server.Serve(listener) }()
 				conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					t.Fatal(err)

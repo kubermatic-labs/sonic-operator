@@ -49,6 +49,7 @@ func validRouteIdentifier(value api.RouteIdentifier) bool {
 	return err == nil && strconv.FormatUint(asn, 10) == a && (asn <= 65535 || n <= 65535)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func redundancyDesired(spec any) (string, error) {
 	switch s := spec.(type) {
 	case *api.SwitchMLAGSpec:

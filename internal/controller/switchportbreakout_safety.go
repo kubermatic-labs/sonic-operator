@@ -27,6 +27,7 @@ func breakoutTargetIdentity(b *api.SwitchPortBreakout, s *api.Switch) string {
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild, adoptOnly bool) error {
 	latest := &api.SwitchPortBreakout{}
 	if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(b), latest); err != nil {
@@ -40,7 +41,7 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 		return err
 	}
 	if !sw.DeletionTimestamp.IsZero() || breakoutTargetIdentity(b, sw) != breakoutTargetIdentity(b, s) {
-		return fmt.Errorf("Switch identity or endpoint changed; no breakout operations allowed")
+		return fmt.Errorf("switch identity or endpoint changed; no breakout operations allowed")
 	}
 	switches := &api.SwitchList{}
 	if err := r.APIReader.List(ctx, switches); err != nil {
@@ -159,7 +160,7 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 		for _, p := range sw.Status.Ports {
 			for _, ref := range p.InterfaceRefs {
 				if ref.Name == iface.Name {
-					return fmt.Errorf("Switch port %q has an owned/routed reference to %q", p.Name, iface.Name)
+					return fmt.Errorf("switch port %q has an owned/routed reference to %q", p.Name, iface.Name)
 				}
 			}
 		}
@@ -176,7 +177,7 @@ func (r *SwitchPortBreakoutReconciler) checkBreakoutCurrent(ctx context.Context,
 		return err
 	}
 	if !sw.DeletionTimestamp.IsZero() || breakoutTargetIdentity(b, sw) != breakoutTargetIdentity(b, s) {
-		return fmt.Errorf("Switch target changed during preflight")
+		return fmt.Errorf("switch target changed during preflight")
 	}
 	return nil
 }
@@ -195,6 +196,7 @@ func breakoutGeneratedInterface(i *api.SwitchInterface, s *api.Switch) bool {
 		i.Spec.SwitchRef != nil && i.Spec.SwitchRef.Name == s.Name && i.Spec.Handle != "" && i.Name == strings.ToLower(s.Name+"-"+i.Spec.Handle)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchPortBreakoutReconciler) reconcileBreakoutInventory(ctx context.Context, b *api.SwitchPortBreakout, s *api.Switch, a agentclient.SwitchAgentClient, bc agentclient.PortBreakoutClient, previous []api.SwitchPortBreakoutChild, adoptOnly bool) error {
 	list, err := a.ListInterfaces(ctx)
 	if err != nil {

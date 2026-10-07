@@ -45,7 +45,7 @@ func packageGeneratedSlot(j *journal, slot string) bool {
 	return module
 }
 
-func candidatePackage(members map[string][]byte, wheelHash, target string) packageSnapshot {
+func candidatePackage(members map[string][]byte, wheelHash string) packageSnapshot {
 	s := packageSnapshot{Version: 1, Entries: map[string]packageEntry{}}
 	for name, data := range members {
 		if strings.HasSuffix(name, "/RECORD") {
@@ -67,9 +67,9 @@ func candidatePackage(members map[string][]byte, wheelHash, target string) packa
 	writer := csv.NewWriter(&record)
 	for _, name := range names {
 		entry := s.Entries[name]
-		writer.Write([]string{name, "sha256=" + wheelHashBase64(entry.Data), strconv.Itoa(len(entry.Data))})
+		_ = writer.Write([]string{name, "sha256=" + wheelHashBase64(entry.Data), strconv.Itoa(len(entry.Data))})
 	}
-	writer.Write([]string{prefix + "RECORD", "", ""})
+	_ = writer.Write([]string{prefix + "RECORD", "", ""})
 	writer.Flush()
 	s.Entries[prefix+"RECORD"] = packageEntry{Data: record.Bytes(), Mode: 0644}
 	return s
@@ -94,14 +94,15 @@ func validateBeforePackage(s packageSnapshot, members map[string][]byte) error {
 }
 func (n *Native) packageCommand(ctx context.Context, target string, input []byte) ([]byte, error) {
 	args := []string{"-I", "-B", "-c", packageTransactionScript + "\nmain()"}
-	command := "/usr/bin/python3"
-	if target == "pmon" {
+	var command string
+	switch target {
+	case "pmon":
 		command = "/usr/bin/docker"
 		args = append([]string{"exec", "-i", "pmon", "/usr/bin/timeout", "--signal=KILL", "30s", "python3"}, args...)
-	} else if target == "host" {
+	case "host":
 		command = "/usr/bin/timeout"
 		args = append([]string{"--signal=KILL", "30s", "/usr/bin/python3"}, args...)
-	} else {
+	default:
 		return nil, fmt.Errorf("unqualified package target")
 	}
 	if n.RunInput != nil {
@@ -182,7 +183,7 @@ func (n *Native) preparePackages(ctx context.Context, j *journal) error {
 		if err := validateBeforePackage(before, beforeMembers); err != nil {
 			return err
 		}
-		candidate := candidatePackage(candidateMembers, wheel.Hash, target)
+		candidate := candidatePackage(candidateMembers, wheel.Hash)
 		if err := validateObservedPackage(observed, before, candidate); err != nil {
 			return err
 		}

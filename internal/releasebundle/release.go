@@ -50,7 +50,7 @@ func ReadBounded(path string, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("release input unavailable")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	st, err := f.Stat()
 	if err != nil || !st.Mode().IsRegular() || st.Size() <= 0 || st.Size() > limit {
 		return nil, fmt.Errorf("release input outside size bound")
@@ -119,7 +119,7 @@ func inspectBinaryBytes(repo, role string, raw []byte) (Binary, error) {
 	if err != nil {
 		return result, fmt.Errorf("release binary must be ELF")
 	}
-	defer image.Close()
+	defer func() { _ = image.Close() }()
 	if image.Machine != elf.EM_X86_64 || image.Class != elf.ELFCLASS64 || (image.Type != elf.ET_EXEC && image.Type != elf.ET_DYN) {
 		return result, fmt.Errorf("release binary must be Linux amd64")
 	}

@@ -34,6 +34,7 @@ const (
 
 var vlanAuthorityDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchVLANReconciler) reconcileVLANAuthority(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
 		return ctrl.Result{}, fmt.Errorf("authoritative VLANs require an uncached APIReader")
@@ -323,7 +324,7 @@ func (r *SwitchVLANReconciler) checkVLANAuthorityCurrent(ctx context.Context, v 
 		return err
 	}
 	if !sw.DeletionTimestamp.IsZero() || vlanAuthorityTargetIdentity(v, sw) != vlanAuthorityTargetIdentity(v, s) {
-		return fmt.Errorf("Switch identity or endpoint changed; no authority operations allowed")
+		return fmt.Errorf("switch identity or endpoint changed; no authority operations allowed")
 	}
 	// Duplicate Switch objects pointing at one endpoint are also ambiguous.
 	switches := &api.SwitchList{}

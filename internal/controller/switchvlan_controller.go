@@ -44,6 +44,7 @@ type SwitchVLANReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchvlans/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches,verbs=get;list;watch
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *SwitchVLANReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	v := &api.SwitchVLAN{}
 	if err := r.Get(ctx, req.NamespacedName, v); err != nil {

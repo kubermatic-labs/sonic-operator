@@ -125,9 +125,9 @@ func TestMaximumAdmittedStageMemoryBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Write(header)
-	f.Truncate(96 << 20)
-	f.Close()
+	_, _ = f.Write(header)
+	_ = f.Truncate(96 << 20)
+	_ = f.Close()
 	runtime.GC()
 	var initial runtime.MemStats
 	runtime.ReadMemStats(&initial)

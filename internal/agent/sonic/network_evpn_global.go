@@ -32,6 +32,7 @@ func evpnGlobalFields(up bool) map[string]string {
 	return map[string]string{"advertise-all-vni": value, "advertise-svi-ip": "false", "advertise-default-gw": "false", "advertise-ipv4-unicast": "false", "advertise-ipv6-unicast": "false"}
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkEVPN(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s evpnGlobalSpec
 	if r == nil {

@@ -142,7 +142,7 @@ func frrMigrationRecord(m *SonicAgent) (*networkRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("FRR migration journal unavailable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return nil, fmt.Errorf("FRR migration journal invalid")

@@ -19,12 +19,12 @@ func checkPending(dir string, sync func(*os.File) error) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	d, err := root.Open(".")
 	if err != nil {
 		return ErrStorage
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if syncDirectory(d, sync) != nil {
 		return ErrStorage
 	}

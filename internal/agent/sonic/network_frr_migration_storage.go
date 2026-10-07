@@ -52,7 +52,7 @@ func frrMigrationReadFile(root *os.Root, name string, limit int64) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func frrMigrationValidateStorage(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	d, err := root.Open(".")
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func frrMigrationSyncDir(root *os.Root) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }
 
@@ -164,7 +164,7 @@ func frrMigrationPrepareStorage(journal string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if err := frrMigrationAtomicFile(root, ".probe", []byte("storage preflight")); err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func frrMigrationPrepareStorage(journal string) error {
 	if err != nil {
 		return err
 	}
-	defer parent.Close()
+	defer func() { _ = parent.Close() }()
 	return parent.Sync()
 }
 
@@ -245,6 +245,7 @@ func frrMigrationPendingReceipt(m *SonicAgent, owner, mode string) (frrMigration
 	return receipt, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func frrMigrationReceiptFile(journal string, write *frrMigrationReceipt, digest ...string) (frrMigrationReceipt, error) {
 	var receipt frrMigrationReceipt
 	if journal == "" {
@@ -254,7 +255,7 @@ func frrMigrationReceiptFile(journal string, write *frrMigrationReceipt, digest 
 	if err != nil {
 		return receipt, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	name, backupName := "launch.json", "backup.json"
 	if len(digest) > 0 {
 		if !vlanAuthorityDigestValid(digest[0]) {
@@ -336,7 +337,7 @@ func frrMigrationBackup(journal string, e frrMigrationEvidence, before vlanChang
 	if err != nil {
 		return "", err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if len(digest) > 0 {
 		if !vlanAuthorityDigestValid(digest[0]) {
 			return "", fmt.Errorf("invalid backup selector")

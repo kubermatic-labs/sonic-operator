@@ -87,13 +87,13 @@ func TestEqualDiskTLSAdoptionCannotCertifyStillLoadedA(t *testing.T) {
 				if err != nil {
 					return
 				}
-				go func(c net.Conn) { defer c.Close(); c.(*tls.Conn).Handshake() }(connection)
+				go func(c net.Conn) { defer func() { _ = c.Close() }(); _ = c.(*tls.Conn).Handshake() }(connection)
 			}
 		}()
 		return listener
 	}
 	listener := start(cfgA)
-	defer func() { listener.Close() }()
+	defer func() { _ = listener.Close() }()
 	write(b)
 	proofA.PID = 1
 	proofA.BootID = "boot"
@@ -117,7 +117,7 @@ func TestEqualDiskTLSAdoptionCannotCertifyStillLoadedA(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		defer connection.Close()
+		defer func() { _ = connection.Close() }()
 		if Digest(connection.ConnectionState().PeerCertificates[0].Raw) != Digest(expectedBlock.Bytes) {
 			return os.ErrInvalid
 		}
@@ -141,7 +141,7 @@ func TestEqualDiskTLSAdoptionCannotCertifyStillLoadedA(t *testing.T) {
 	}
 	cfgB.ClientCAs = cfgB.RootCAs
 	cfgB.ClientAuth = tls.RequireAndVerifyClientCert
-	listener.Close()
+	_ = listener.Close()
 	listener = start(cfgB)
 	activeClient = client(clientCertB, clientKeyB)
 	proofB.PID = 2

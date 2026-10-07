@@ -161,7 +161,7 @@ func (n *Native) read(path string) ([]byte, error) {
 	if e != nil {
 		return nil, e
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	i, e := f.Stat()
 	limit := int64(4 << 20)
 	if path == RecoveryBinaryFile {
@@ -186,7 +186,7 @@ func (n *Native) write(path string, data []byte, mode os.FileMode) error {
 	if e != nil {
 		return ErrNative
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if e = f.Chmod(mode); e == nil {
 		_, e = f.Write(data)
 	}
@@ -204,7 +204,7 @@ func (n *Native) write(path string, data []byte, mode os.FileMode) error {
 	if e != nil {
 		return ErrNative
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if d.Sync() != nil {
 		return ErrNative
 	}

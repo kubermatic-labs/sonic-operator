@@ -17,6 +17,8 @@ type frrMigrationHostEvidence map[string][]netip.Prefix
 // Dynamic management addresses need not appear in CONFIG_DB. Read them from
 // the kernel, but only use eth0 globals and link-local addresses on known SONiC
 // interfaces. Never turn this evidence into persisted configuration.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func frrMigrationHostAddresses(raw []byte, db vlanChangeDB) (frrMigrationHostEvidence, error) {
 	var rows []map[string]json.RawMessage
 	// Reject duplicate keys everywhere, while tolerating null in unconsumed
@@ -116,6 +118,7 @@ func (e frrMigrationHostEvidence) semantic() string {
 	return strings.Join(values, ";")
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e frrMigrationHostEvidence) routeAllowed(dst, dev, protocol, kind, gateway string, kernel bool) bool {
 	addresses := e[dev]
 	if len(addresses) == 0 {

@@ -15,6 +15,8 @@ import (
 // and buffer/map references, independent of VLAN membership. This is deliberately
 // a subset: grouped/VOQ keys, NULL profiles and other QoS fields need separate
 // qualification. It permits coexistence, never writes or claims buffer ownership.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func vlanAuthorityBufferDependency(db vlanChangeDB, key string, fields map[string]string) error {
 	parts := strings.Split(key, "|")
 	if len(parts) < 2 {

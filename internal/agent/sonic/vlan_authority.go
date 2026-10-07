@@ -166,6 +166,8 @@ func (m *SonicAgent) ReconcileVLANAuthority(ctx context.Context, request *agent.
 // Recovery always completes the recorded request, never the new caller's target.
 // An uncertain CAS reply remains pending. A definite CAS rejection is safe to
 // abandon, allowing a fresh snapshot/reapproval rather than a permanent wedge.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (m *SonicAgent) recoverVLANAuthority(ctx context.Context, j *vlanAuthorityJournal, r *vlanAuthorityRecord, db vlanChangeDB, raw string) (*agent.VLANAuthorityResult, *agent.Status) {
 	p := r.Pending
 	runtimeVerified := false
@@ -340,7 +342,7 @@ func (j *vlanAuthorityJournal) checkPendingMode(id uint32, allowRecovery bool) e
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	files, err := d.ReadDir(-1)
 	if err != nil {
 		return err

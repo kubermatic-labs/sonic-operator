@@ -50,6 +50,8 @@ func evpnInitializationMappings(db vlanChangeDB, refs []agent.EVPNMappingSnapsho
 
 // Local advertise-all-vni initialization is safe only with CONFIG and actual
 // FRR shutdown, including native-only neighbors. It never authorizes a session.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func evpnInitializationShutdown(config []byte, db vlanChangeDB) error {
 	view := maps.Clone(db)
 	for _, line := range strings.Split(string(config), "\n") {
@@ -119,7 +121,7 @@ func evpnInitializedMappingPreflight(ctx context.Context, m *SonicAgent, r *agen
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err

@@ -396,7 +396,7 @@ func aclPolicyCompleted(m *SonicAgent, name string, desired vlanChangeDB) error 
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	state, err := loadNetworkJournal(&vlanAuthorityJournal{root: root})
 	if err != nil {
 		return err

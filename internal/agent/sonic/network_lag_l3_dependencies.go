@@ -16,6 +16,8 @@ var lagL3LoopbackName = regexp.MustCompile(`^Loopback(0|[1-9][0-9]*)$`)
 // Exact installed sonic-routing-policy-sets/sonic-dhcpv4-relay/sonic-dhcpv6-relay
 // grammars. Prefix lists cannot refer to ports; relay source_interface can. The
 // caller still checks references after this function validates the typed fields.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func lagL3CrossFeatureGrammar(db vlanChangeDB, key string, fields map[string]string) error {
 	parts := strings.Split(key, "|")
 	if len(parts) < 2 || len(fields) == 0 {

@@ -15,7 +15,7 @@ func TestRepeatedLatePathFailureDoesNotAccumulatePayloads(t *testing.T) {
 	// A large valid first artifact preceded the later failing key destination.
 	data := []byte(`{"padding":"` + strings.Repeat("x", 4<<20) + `"}`)
 	b.Files = append([]File{{Slot: "PlatformJSON", Data: data, SHA256: Digest(data)}}, b.Files...)
-	os.Symlink("/etc/passwd", filepath.Join(root, "etc/sonic-operator-agent/tls.key"))
+	_ = os.Symlink("/etc/passwd", filepath.Join(root, "etc/sonic-operator-agent/tls.key"))
 	for range 4 {
 		if _, err := e.Ensure(b, time.Now()); err == nil {
 			t.Fatal("late symlink accepted")

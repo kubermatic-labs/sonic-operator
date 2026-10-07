@@ -50,6 +50,8 @@ func routingPeerPreflight(ctx context.Context, run routingRead, asn uint32, rout
 
 // A Redis shutdown is only intent. Check every actual neighbor in the target
 // instance, including neighbors absent from CONFIG_DB, before global edits.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func routingShutdownPreflight(ctx context.Context, run routingRead, vrf string, asn uint32, peer string) error {
 	daemons, err := run(ctx, routingBGPDaemons)
 	if err != nil {
@@ -200,6 +202,7 @@ func (w *routingBoundedOutput) Write(p []byte) (int, error) {
 	return w.buffer.Write(p)
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func observeRoutingBGP(ctx context.Context, run routingRead, vrf string, asn uint32, routerID string, prefixes []string, peer *routingPeerSpec) (bool, json.RawMessage, error) {
 	daemons, err := run(ctx, routingBGPDaemons)
 	if err != nil {

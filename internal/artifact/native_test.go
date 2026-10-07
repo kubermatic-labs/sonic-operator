@@ -9,8 +9,8 @@ import (
 
 func TestNativeBaselineAndRuntimeAllowlist(t *testing.T) {
 	e, root := testEngine(t)
-	os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
-	os.WriteFile(filepath.Join(root, "etc/sonic/sonic_version.yml"), []byte("image-1"), 0644)
+	_ = os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
+	_ = os.WriteFile(filepath.Join(root, "etc/sonic/sonic_version.yml"), []byte("image-1"), 0644)
 	e.Policy.ImageSHA256 = Digest([]byte("image-1"))
 	e.Policy.Runtime = map[string]RuntimeFile{"PlatformJSON": {Container: "syncd", Path: "/usr/share/sonic/platform/platform.json"}}
 	n := &Native{Engine: e}

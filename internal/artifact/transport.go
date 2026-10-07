@@ -115,7 +115,7 @@ func SupervisorRequest(ctx context.Context, r Request) (*Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("external artifact supervisor unavailable")
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("external artifact supervisor rejected operation")
 	}

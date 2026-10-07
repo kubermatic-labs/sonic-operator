@@ -169,6 +169,8 @@ func aclTableMatches(table map[string]string, desired vlanChangeDB) bool {
 // Correlation is rule name -> ACL_COUNTER_RULE_MAP -> counter TABLE_ID ->
 // exact entry ACTION_COUNTER. Never infer table identity from global CRM totals
 // or from an arbitrary table that happens to contain similar rules.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func aclRuntime(ctx context.Context, name string, desired vlanChangeDB, ports []string, read aclReader, scan aclScanner) (bool, json.RawMessage, error) {
 	o := aclObserved{Policy: name, ExpectedRules: len(desired) - 1, Rules: map[string]aclRuleObserved{}, Bindings: map[string]string{}}
 	finish := func(ok bool, reason string, err error) (bool, json.RawMessage, error) {

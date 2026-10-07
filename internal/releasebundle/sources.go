@@ -38,6 +38,8 @@ type Sources struct {
 
 // BuildSources finishes all validation and sizing before its caller writes any
 // output. Returned ConfigMaps deliberately have no UID; publication is separate.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profileRaw []byte, baseline string, input *SwitchInput, additional int64) (Sources, []ConfigMap, error) {
 	s := Sources{Format: "host-artifact-sources-v1", ReleaseSHA256: artifact.Digest(releaseRaw), Coverage: "unverified: source-only; native installation, timers, boot and forwarding are not verified", Baseline: baseline, Sources: map[string]Source{}, GeneratedSHA256: map[string]string{}, PrivateReserveBytes: 3 * (64 << 10), AdditionalBytes: additional}
 	var r Release

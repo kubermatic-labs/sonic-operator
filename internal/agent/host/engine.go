@@ -148,6 +148,8 @@ func (e *Engine) Get(ctx context.Context, q Request, conn string) (out Result, e
 	err = e.withRecord(ctx, func(r *record) error { var er error; out, er = e.observe(ctx, q, r, conn); return er })
 	return
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (e *Engine) Ensure(ctx context.Context, q Request, conn string) (out Result, err error) {
 	if ValidateRequest(q) != nil || conn == "" {
 		return out, ErrInvalid
@@ -264,7 +266,7 @@ func (e *Engine) Ensure(ctx context.Context, q Request, conn string) (out Result
 			return er
 		})
 	})
-	return
+	return out, err
 }
 
 func (e *Engine) Confirm(ctx context.Context, c Confirmation, conn string) (out Result, err error) {

@@ -14,9 +14,9 @@ func bootstrapFixture(t *testing.T) (Bundle, string) {
 	t.Helper()
 	b := testBundle()
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
+	_ = os.MkdirAll(filepath.Join(root, "etc/sonic"), 0700)
 	image := []byte("image")
-	os.WriteFile(filepath.Join(root, "etc/sonic/sonic_version.yml"), image, 0644)
+	_ = os.WriteFile(filepath.Join(root, "etc/sonic/sonic_version.yml"), image, 0644)
 	policy, _ := json.Marshal(Policy{Baseline: b.Baseline, ImageSHA256: Digest(image)})
 	// Structurally valid ELF input; the injected activator never executes it.
 	elf := make([]byte, 120)
@@ -50,7 +50,7 @@ func TestIndependentBootstrapEnforcesImmutableClusterInputs(t *testing.T) {
 	if calls != 1 {
 		t.Fatal("equal bootstrap restarted")
 	}
-	os.WriteFile(path, []byte("drift"), 0755)
+	_ = os.WriteFile(path, []byte("drift"), 0755)
 	if err := EnsureBootstrap(context.Background(), root, b, activate); err != nil {
 		t.Fatal(err)
 	}

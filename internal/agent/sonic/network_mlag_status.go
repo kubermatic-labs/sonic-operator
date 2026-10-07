@@ -168,6 +168,7 @@ func mlagNativeStatus(ctx context.Context, s mlagSpec) (*mlagNativeEvidence, err
 	return e, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func mlagVerifyNative(s mlagSpec, e *mlagNativeEvidence, state vlanChangeDB) error {
 	if e == nil {
 		return fmt.Errorf("missing native evidence")

@@ -136,7 +136,7 @@ func TestFailedRenewalRetainsPreviousBootManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := filepath.Join(root, "etc/sonic-operator-agent/tls.key")
-	os.Remove(p)
+	_ = os.Remove(p)
 	boot = "two"
 	if err := e.RestoreBoot(); err != nil {
 		t.Fatal(err)

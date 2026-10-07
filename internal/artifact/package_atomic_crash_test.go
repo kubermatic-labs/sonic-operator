@@ -21,13 +21,13 @@ func TestPackageAtomicCrashIsRecoveredByFreshProcess(t *testing.T) {
 				root, _ = filepath.EvalSymlinks(root)
 				pkg := filepath.Join(root, "lib")
 				state := filepath.Join(root, "state")
-				os.MkdirAll(pkg, 0700)
+				_ = os.MkdirAll(pkg, 0700)
 				before := packageSnapshot{Version: 1, Entries: map[string]packageEntry{"sonic_platform/chassis.py": {Data: []byte("old code"), Mode: 0644}, "sonic_platform-1.0.dist-info/METADATA": {Data: []byte("old metadata"), Mode: 0644}, "sonic_platform-1.0.dist-info/RECORD": {Data: []byte("old receipt"), Mode: 0644}}}
 				candidate := packageSnapshot{Version: 1, Entries: map[string]packageEntry{}}
 				for name, entry := range before.Entries {
 					p := filepath.Join(pkg, name)
-					os.MkdirAll(filepath.Dir(p), 0700)
-					os.WriteFile(p, entry.Data, 0644)
+					_ = os.MkdirAll(filepath.Dir(p), 0700)
+					_ = os.WriteFile(p, entry.Data, 0644)
 					candidate.Entries[name] = packageEntry{Data: append([]byte("new "), entry.Data...), Mode: 0644}
 				}
 				packet, _ := json.Marshal(map[string]any{"root": pkg, "state": state, "before": before, "candidate": candidate, "phase": phase, "member": member})
@@ -69,7 +69,7 @@ transaction(r['root'],r['state'],'d'*32,'apply',r['before'],r['candidate'])
 						t.Fatalf("unrestored %s", name)
 					}
 				}
-				filepath.WalkDir(pkg, func(p string, d os.DirEntry, err error) error {
+				_ = filepath.WalkDir(pkg, func(p string, d os.DirEntry, err error) error {
 					if err == nil && !d.IsDir() && filepath.Ext(p) == ".tmp" {
 						t.Errorf("owned temporary left behind: %s", p)
 					}
@@ -77,7 +77,7 @@ transaction(r['root'],r['state'],'d'*32,'apply',r['before'],r['candidate'])
 				})
 				if phase == "synced" && member == "sonic_platform/chassis.py" {
 					foreign := filepath.Join(pkg, "sonic_platform/.package-foreign")
-					os.WriteFile(foreign, []byte("unowned"), 0600)
+					_ = os.WriteFile(foreign, []byte("unowned"), 0600)
 					cmd = exec.Command("python3", "-I", "-B", "-c", restore)
 					cmd.Stdin = bytes.NewReader(packet)
 					if err := cmd.Run(); err == nil {
@@ -87,14 +87,14 @@ transaction(r['root'],r['state'],'d'*32,'apply',r['before'],r['candidate'])
 					if string(got) != "unowned" {
 						t.Fatal("foreign package file removed")
 					}
-					os.Remove(foreign)
+					_ = os.Remove(foreign)
 					staging := filepath.Join(pkg, ".sonic-operator-package-staging", strings.Repeat("d", 32))
-					os.MkdirAll(staging, 0700)
+					_ = os.MkdirAll(staging, 0700)
 					sum := sha256.Sum256([]byte(member))
 					link := filepath.Join(staging, hex.EncodeToString(sum[:])+".tmp")
 					outside := filepath.Join(root, "outside")
-					os.WriteFile(outside, []byte("preserve"), 0600)
-					os.Symlink(outside, link)
+					_ = os.WriteFile(outside, []byte("preserve"), 0600)
+					_ = os.Symlink(outside, link)
 					cmd = exec.Command("python3", "-I", "-B", "-c", restore)
 					cmd.Stdin = bytes.NewReader(packet)
 					if err := cmd.Run(); err == nil {

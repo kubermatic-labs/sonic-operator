@@ -26,6 +26,8 @@ func isTrafficKind(kind string) bool {
 
 // trafficDesired mirrors admission checks for fake/admission-bypassing callers.
 // Device-dependent bounds and applied dependency evidence belong to agent preflight.
+//
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func trafficDesired(spec any) (string, error) {
 	validName := func(name api.TrafficPolicyName) bool { return trafficName.MatchString(string(name)) }
 	validQoSName := func(name api.QoSPolicyName) bool { return trafficQoSName.MatchString(string(name)) }

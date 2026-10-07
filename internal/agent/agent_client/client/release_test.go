@@ -67,13 +67,13 @@ func TestReleaseCapabilitiesClientGRPCBounds(t *testing.T) {
 			}
 			s := grpc.NewServer()
 			pb.RegisterArtifactServiceServer(s, &releaseReplyServer{info: i})
-			go s.Serve(l)
+			go func() { _ = s.Serve(l) }()
 			defer s.Stop()
 			conn, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			c := &defaultSwitchAgentClient{conn: conn}
 			got, err := c.ArtifactCapabilities(t.Context())
 			if kind == "valid" {

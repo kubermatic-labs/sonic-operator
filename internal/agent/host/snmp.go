@@ -34,7 +34,7 @@ func probeSNMP(ctx context.Context, s SNMP, address string) error {
 		if e != nil {
 			return nil, ErrNative
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		deadline := time.Now().Add(2 * time.Second)
 		if dl, ok := ctx.Deadline(); ok && dl.Before(deadline) {
 			deadline = dl

@@ -20,11 +20,6 @@ type Native struct {
 	RunInput func(context.Context, []byte, string, ...string) ([]byte, error)
 }
 
-func nativeCommand(name string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-	return nativeCommandContext(ctx, name, args...)
-}
 func nativeCommandContext(ctx context.Context, name string, args ...string) ([]byte, error) {
 	// Command output is never returned as an error or logged: a consumer could
 	// print credentials or artifact bytes on startup failure.
@@ -57,9 +52,11 @@ func runtimePath(slot string, r RuntimeFile) bool {
 	}
 	return validPlatformPath(slot, p)
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) Preflight(b Bundle) error {
 	if b.Bootstrap == nil {
-		return fmt.Errorf("Kubernetes-owned bootstrap declaration required")
+		return fmt.Errorf("bootstrap declaration must be Kubernetes-owned")
 	}
 	if err := n.Engine.verifyBootstrap(b.Owner, b.Target, b.Bootstrap); err != nil {
 		return err
@@ -223,6 +220,8 @@ func (n *Native) Health() error {
 	return n.health(false)
 }
 func (n *Native) AgentRecoveryHealth() error { return n.health(true) }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (n *Native) health(agentOnly bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -276,7 +275,7 @@ func (n *Native) health(agentOnly bool) error {
 		return fmt.Errorf("running agent executable unavailable")
 	}
 	data, err := io.ReadAll(io.LimitReader(running, MaxBundleBytes+1))
-	running.Close()
+	_ = running.Close()
 	if err != nil || len(data) > MaxBundleBytes {
 		return fmt.Errorf("running agent executable unreadable")
 	}
@@ -308,7 +307,7 @@ func (n *Native) health(agentOnly bool) error {
 				return fmt.Errorf("agent namespace TLS file unavailable")
 			}
 			data, err := io.ReadAll(io.LimitReader(file, MaxBundleBytes+1))
-			file.Close()
+			_ = file.Close()
 			hash := f.Hash
 			if j.Phase == "RollingBack" {
 				hash = f.PreviousHash

@@ -36,28 +36,28 @@ func syntheticWheelSources(t *testing.T, extra, suffix string) ([]byte, []File) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		w.Write(data)
+		_, _ = w.Write(data)
 		entries["sonic_platform/"+name] = data
 		files = append(files, File{Slot: slot, Data: data, SHA256: Digest(data)})
 	}
 	for name, data := range map[string]string{"METADATA": "Metadata-Version: 2.1\nName: sonic-platform\nVersion: 1.0\n", "WHEEL": "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n", "top_level.txt": "sonic_platform\n"} {
 		w, _ := z.Create("sonic_platform-1.0.dist-info/" + name)
-		w.Write([]byte(data))
+		_, _ = w.Write([]byte(data))
 		entries["sonic_platform-1.0.dist-info/"+name] = []byte(data)
 	}
 	var record bytes.Buffer
 	csvWriter := csv.NewWriter(&record)
 	for name, data := range entries {
 		sum := sha256.Sum256(data)
-		csvWriter.Write([]string{name, "sha256=" + base64.RawURLEncoding.EncodeToString(sum[:]), strconv.Itoa(len(data))})
+		_ = csvWriter.Write([]string{name, "sha256=" + base64.RawURLEncoding.EncodeToString(sum[:]), strconv.Itoa(len(data))})
 	}
-	csvWriter.Write([]string{"sonic_platform-1.0.dist-info/RECORD", "", ""})
+	_ = csvWriter.Write([]string{"sonic_platform-1.0.dist-info/RECORD", "", ""})
 	csvWriter.Flush()
 	w, _ := z.Create("sonic_platform-1.0.dist-info/RECORD")
-	w.Write(record.Bytes())
+	_, _ = w.Write(record.Bytes())
 	if extra != "" {
 		w, _ := z.Create(extra)
-		w.Write([]byte("unsafe"))
+		_, _ = w.Write([]byte("unsafe"))
 	}
 	if err := z.Close(); err != nil {
 		t.Fatal(err)
@@ -97,14 +97,14 @@ func TestWheelRejectsUnconfinedRecord(t *testing.T) {
 	for _, f := range z.File {
 		r, _ := f.Open()
 		content, _ := io.ReadAll(r)
-		r.Close()
+		_ = r.Close()
 		if strings.HasSuffix(f.Name, "/RECORD") {
 			content = []byte("../../../../etc/passwd,,\n")
 		}
 		w, _ := out.Create(f.Name)
-		w.Write(content)
+		_, _ = w.Write(content)
 	}
-	out.Close()
+	_ = out.Close()
 	if _, err := wheelMembers(buf.Bytes()); err == nil {
 		t.Fatal("wheel RECORD permitted an unconfined uninstall destination")
 	}
@@ -139,18 +139,18 @@ func TestNativeWheelActivationUsesExistingContainerAndProtectedRollback(t *testi
 	e.Policy.Platform["PlatformWheel"] = coreWheel
 	n.RunInput = func(_ context.Context, input []byte, _ string, _ ...string) ([]byte, error) {
 		var packet struct{ Target, Mode string }
-		json.Unmarshal(input, &packet)
+		_ = json.Unmarshal(input, &packet)
 		calls = append(calls, "package "+packet.Mode+" "+packet.Target)
 		if packet.Mode == "snapshot" {
-			return json.Marshal(candidatePackage(members, Digest(data), packet.Target))
+			return json.Marshal(candidatePackage(members, Digest(data)))
 		}
 		return []byte(`{"ok":true}`), nil
 	}
 	j.Files[0].Hash = Digest(data)
 	j.Files[0].PreviousHash = Digest(data)
 	p := filepath.Join(root, j.Files[0].Path)
-	os.MkdirAll(filepath.Dir(p), 0700)
-	os.WriteFile(p, data, 0644)
+	_ = os.MkdirAll(filepath.Dir(p), 0700)
+	_ = os.WriteFile(p, data, 0644)
 	if err := e.atomic(e.storage(j, "old", 0), data, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -239,18 +239,18 @@ func TestInstalledPackageRecordSafetyProbe(t *testing.T) {
 	root := t.TempDir()
 	root, _ = filepath.EvalSymlinks(root)
 	metadata := filepath.Join(root, "sonic_platform-1.0.dist-info")
-	os.MkdirAll(metadata, 0700)
-	os.WriteFile(filepath.Join(metadata, "METADATA"), []byte("Name: sonic-platform\nVersion: 1.0\n"), 0644)
+	_ = os.MkdirAll(metadata, 0700)
+	_ = os.WriteFile(filepath.Join(metadata, "METADATA"), []byte("Name: sonic-platform\nVersion: 1.0\n"), 0644)
 	run := func() error {
 		cmd := exec.Command("python3", "-B", "-c", packageSafetyProbe, root)
 		cmd.Env = append(os.Environ(), "PYTHONPATH="+root)
 		return cmd.Run()
 	}
-	os.WriteFile(filepath.Join(metadata, "RECORD"), []byte("sonic_platform/chassis.py,,\n"), 0644)
+	_ = os.WriteFile(filepath.Join(metadata, "RECORD"), []byte("sonic_platform/chassis.py,,\n"), 0644)
 	if err := run(); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(metadata, "RECORD"), []byte("../../../../etc/passwd,,\n"), 0644)
+	_ = os.WriteFile(filepath.Join(metadata, "RECORD"), []byte("../../../../etc/passwd,,\n"), 0644)
 	if err := run(); err == nil {
 		t.Fatal("pip uninstall could escape approved package files")
 	}
@@ -264,7 +264,7 @@ func TestRuntimeOnlyDriftTriggersNativeActivation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Tick(now)
+	_ = e.Tick(now)
 	if _, err := e.Confirm(b, r.Token, now); err != nil {
 		t.Fatal(err)
 	}
@@ -325,13 +325,13 @@ func TestRuntimeSAISelectionMustUseGeneratedInput(t *testing.T) {
 func TestPlatformProgrammingRejectsWarmBootReuse(t *testing.T) {
 	e, root := testEngine(t)
 	n := &Native{Engine: e}
-	os.MkdirAll(filepath.Join(root, "proc"), 0700)
+	_ = os.MkdirAll(filepath.Join(root, "proc"), 0700)
 	p := filepath.Join(root, "proc/cmdline")
-	os.WriteFile(p, []byte("quiet SONIC_BOOT_TYPE=fast"), 0644)
+	_ = os.WriteFile(p, []byte("quiet SONIC_BOOT_TYPE=fast"), 0644)
 	if err := n.ColdPlatformBoot(); err == nil {
 		t.Fatal("fast-boot ASIC reuse accepted for changed platform input")
 	}
-	os.WriteFile(p, []byte("quiet"), 0644)
+	_ = os.WriteFile(p, []byte("quiet"), 0644)
 	if err := n.ColdPlatformBoot(); err != nil {
 		t.Fatal(err)
 	}

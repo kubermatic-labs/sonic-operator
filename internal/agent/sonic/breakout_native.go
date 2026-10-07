@@ -185,7 +185,7 @@ func (m *SonicAgent) nativeBreakout(ctx context.Context, port, mode string) erro
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	cmd := exec.CommandContext(ctx, "config", "interface", "breakout", port, mode, "-y")
 	cmd.Dir = dir
 	cmd.WaitDelay = time.Second

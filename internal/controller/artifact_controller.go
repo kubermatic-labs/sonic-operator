@@ -40,6 +40,8 @@ type ArtifactReconciler struct {
 func (r *ArtifactReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).For(&api.SwitchArtifact{}).Complete(r)
 }
+
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
 		return result, fmt.Errorf("artifacts require uncached API reader")
@@ -127,7 +129,7 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 	if connection == nil || closer == nil {
 		return result, fmt.Errorf("artifact client unavailable")
 	}
-	defer closer.Close()
+	defer func() { _ = closer.Close() }()
 	// Capture the original declaration and Switch; status updates and reconnects
 	// must not advance the authority used by the final admission callback.
 	freshInputs := func(ctx context.Context) error {
@@ -179,7 +181,7 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		if fresh == nil || freshCloser == nil {
 			return result, fmt.Errorf("fresh artifact client unavailable")
 		}
-		defer freshCloser.Close()
+		defer func() { _ = freshCloser.Close() }()
 		freshRPC, ok := fresh.(agentclient.FreshArtifactClient)
 		if !ok {
 			return result, fmt.Errorf("artifact dispatch freshness capability unavailable")

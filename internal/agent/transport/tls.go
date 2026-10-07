@@ -58,7 +58,7 @@ func readTLSFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bounded TLS input unavailable")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	st, err := f.Stat()
 	if err != nil || !st.Mode().IsRegular() || st.Size() > 64<<10 {
 		return nil, fmt.Errorf("bounded TLS input required")

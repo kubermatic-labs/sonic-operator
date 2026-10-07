@@ -73,7 +73,7 @@ func (n *Native) writeRuntime(name string, v any) error {
 	if err != nil {
 		return ErrStorage
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, err = f.Write(data); err == nil {
 		err = f.Sync()
 	}
@@ -88,7 +88,7 @@ func (n *Native) writeRuntime(name string, v any) error {
 	if err != nil {
 		return ErrStorage
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if d.Sync() != nil {
 		return ErrStorage
 	}
@@ -102,13 +102,13 @@ func (n *Native) readDaemonReceipt(mode string) (*daemonReceipt, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	d, err := root.Open(".")
 	if err != nil {
 		return nil, ErrStorage
 	}
 	err = d.Sync()
-	d.Close()
+	_ = d.Close()
 	if err != nil {
 		return nil, ErrStorage
 	}
@@ -116,7 +116,7 @@ func (n *Native) readDaemonReceipt(mode string) (*daemonReceipt, error) {
 	if err != nil {
 		return nil, ErrStorage
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil || secureFile(info, false) != nil || info.Size() > 64<<10 {
 		return nil, ErrStorage

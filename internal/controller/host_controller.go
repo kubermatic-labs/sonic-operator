@@ -36,6 +36,7 @@ type HostReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (result ctrl.Result, retErr error) {
 	if r.APIReader == nil {
 		return result, fmt.Errorf("host resources require uncached APIReader")
@@ -146,13 +147,13 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 		return inputs.fresh(ctx)
 	}
 	a, nc, err := r.hostClient(ctx, inputs, sw, sw.Spec.Management.Host)
-	if err != nil && q.Kind == "Management" && candidateHost(q, sw.Spec.Management.Host) != sw.Spec.Management.Host {
+	if err != nil && q.Kind == hostKindManagement && candidateHost(q, sw.Spec.Management.Host) != sw.Spec.Management.Host {
 		a, nc, err = r.hostClient(ctx, inputs, sw, candidateHost(q, sw.Spec.Management.Host))
 	}
 	if err != nil {
 		return result, err
 	}
-	defer closeAgentClient(a)
+	defer func() { _ = closeAgentClient(a) }()
 	observed, err = nc.GetHost(ctx, q)
 	if err != nil {
 		return result, err
@@ -177,7 +178,7 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 		if e != nil {
 			return result, e
 		}
-		defer closeAgentClient(freshAgent)
+		defer func() { _ = closeAgentClient(freshAgent) }()
 		observed, e = freshHost.GetHost(ctx, q)
 		if e != nil {
 			return result, e
@@ -194,7 +195,7 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 		}
 	}
 	managed = observed.Owner == q.Owner && observed.Ready()
-	if managed && q.Kind == "Management" && candidateHost(q, sw.Spec.Management.Host) != sw.Spec.Management.Host {
+	if managed && q.Kind == hostKindManagement && candidateHost(q, sw.Spec.Management.Host) != sw.Spec.Management.Host {
 		if err = fresh(); err != nil {
 			return result, err
 		}
@@ -204,7 +205,7 @@ func (r *HostReconciler) Reconcile(ctx context.Context, key ctrl.Request) (resul
 			return result, err
 		}
 	}
-	if managed && q.Kind == "Management" && obj.GetAnnotations()[hostBindingAnnotation] != encodeHostBinding(bindingForHost(sw)) {
+	if managed && q.Kind == hostKindManagement && obj.GetAnnotations()[hostBindingAnnotation] != encodeHostBinding(bindingForHost(sw)) {
 		patch := client.MergeFromWithOptions(obj.DeepCopyObject().(client.Object), client.MergeFromWithOptimisticLock{})
 		annotations := obj.GetAnnotations()
 		annotations[hostBindingAnnotation] = encodeHostBinding(bindingForHost(sw))

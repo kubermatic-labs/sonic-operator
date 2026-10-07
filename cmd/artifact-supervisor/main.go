@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 )
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func main() {
 	if releaseinfo.PrintRequested() {
 		return
@@ -72,7 +73,7 @@ func main() {
 	if err != nil {
 		log.Fatal("cannot listen on supervisor socket")
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	if err := os.Chmod(artifact.SocketPath, 0600); err != nil {
 		log.Fatal("cannot protect supervisor socket")
 	}
@@ -125,7 +126,7 @@ func notifyReady() error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_, err = c.Write([]byte("READY=1"))
 	return err
 }

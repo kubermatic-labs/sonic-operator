@@ -83,7 +83,7 @@ func routingRelayValidateStorage(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	d, err := root.Open(".")
 	if err != nil {
 		return err
@@ -137,14 +137,14 @@ func routingRelayPrepareStorage(journal string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	// Reuse the recognized temporary filename, but refuse an existing file: a
 	// previous interrupted receipt write requires inspection, not silent erasure.
 	f, err := root.OpenFile("launch.json.tmp", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
-	defer root.Remove("launch.json.tmp")
+	defer func() { _ = root.Remove("launch.json.tmp") }()
 	_, err = f.Write([]byte("receipt storage preflight\n"))
 	if err == nil {
 		err = f.Sync()
@@ -161,7 +161,7 @@ func routingRelayPrepareStorage(journal string) error {
 	if err := root.Rename("launch.json.tmp", probe); err != nil {
 		return err
 	}
-	defer root.Remove(probe)
+	defer func() { _ = root.Remove(probe) }()
 	if err := root.Remove(probe); err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func routingRelayPrepareStorage(journal string) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := d.Sync(); err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func routingRelayPrepareStorage(journal string) error {
 	if err != nil {
 		return err
 	}
-	defer parent.Close()
+	defer func() { _ = parent.Close() }()
 	return parent.Sync()
 }
 
@@ -258,13 +258,13 @@ func routingRelayReceiptFile(journal string, write *routingRelayReceipt) (routin
 	if err != nil {
 		return receipt, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if write == nil {
 		f, err := root.OpenFile("launch.json", os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 		if err != nil {
 			return receipt, err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		info, err := f.Stat()
 		if err != nil {
 			return receipt, err
@@ -307,7 +307,7 @@ func routingRelayReceiptFile(journal string, write *routingRelayReceipt) (routin
 	if err != nil {
 		return receipt, err
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	if err := directory.Sync(); err != nil {
 		return receipt, err
 	}
@@ -315,13 +315,14 @@ func routingRelayReceiptFile(journal string, write *routingRelayReceipt) (routin
 	if err != nil {
 		return receipt, err
 	}
-	defer parent.Close()
+	defer func() { _ = parent.Close() }()
 	if err := parent.Sync(); err != nil {
 		return receipt, err
 	}
 	return *write, nil
 }
 
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func routingRelayEvidence(ctx context.Context, ops routingRelayOps, desired vlanChangeDB, vlan string, native bool, v4, v6 []string) (routingRelayReceipt, bool, error) {
 	var evidence routingRelayReceipt
 	db, err := ops.snapshot(ctx)

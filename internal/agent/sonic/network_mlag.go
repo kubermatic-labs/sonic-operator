@@ -92,7 +92,8 @@ func mlagJSON(data []byte, out any, spec bool) error {
 
 func mlagID(id uint32) string { return strconv.FormatUint(uint64(id), 10) }
 
-func planNetworkMLAG(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
+//nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
+func planNetworkMLAG(_ vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	if err := agent.ValidateNetworkRequest(r, false); err != nil {
 		return nil, err
 	}

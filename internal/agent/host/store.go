@@ -85,7 +85,7 @@ func (e *Engine) save(r *record) error {
 		return ErrStorage
 	}
 	name := f.Name()
-	defer os.Remove(name)
+	defer func() { _ = os.Remove(name) }()
 	if _, err = f.Write(b); err == nil {
 		err = f.Sync()
 	}
@@ -100,7 +100,7 @@ func (e *Engine) save(r *record) error {
 	if err != nil {
 		return ErrStorage
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if syncDirectory(d, e.syncDir) != nil {
 		return ErrStorage
 	}
