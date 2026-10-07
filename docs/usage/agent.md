@@ -33,7 +33,7 @@ state.
 | `--tls-cert-file` | | Required PEM server certificate file. |
 | `--tls-key-file` | | Required PEM server private key file. |
 | `--tls-client-ca-file` | | Required PEM CA bundle trusted to issue client certificates. |
-| `--read-only` | `true` | Only allow read RPCs. All write features require `--read-only=false`. |
+| `--read-only` | `true` | Serve only read RPCs; writes, streaming and unknown RPCs are rejected. Every write feature also needs `--read-only=false` plus its own `--allow-*` flag. |
 | `--allow-authoritative-vlans` | `false` | Allow authoritative VLAN reconciliation and ownership release. |
 | `--vlan-authority-journal-dir` | | Persistent, root-only VLAN authority journal directory. Required for authoritative writes. |
 | `--allow-breakout` | `false` | Allow port breakout reconciliation. |
