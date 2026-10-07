@@ -50,21 +50,9 @@ func ValidateBufferSpec(spec any) (string, error) {
 	}
 	switch s := spec.(type) {
 	case *SwitchBufferPoolSpec:
-		if !name(s.Name) || (s.Type != "ingress" && s.Type != "egress") || (s.Mode != "static" && s.Mode != "dynamic") || s.Size == nil || *s.Size == 0 || !bytes(s.Size, s.Xoff) {
-			return "", fmt.Errorf("invalid buffer pool")
-		}
-		if s.Xoff != nil && (s.Type != "ingress" || *s.Xoff > *s.Size) {
-			return "", fmt.Errorf("shared headroom requires ingress pool and cannot exceed size")
-		}
-		return string(s.Name), nil
+		return validateBufferPool(s, name, bytes)
 	case *SwitchBufferProfileSpec:
-		if !name(s.Name) || !name(s.Pool) || s.Size == nil || !bytes(s.Size, s.StaticThreshold, s.Xon, s.Xoff, s.XonOffset) || (s.DynamicThreshold == nil) == (s.StaticThreshold == nil) {
-			return "", fmt.Errorf("profile requires pool, size and exactly one threshold")
-		}
-		if s.DynamicThreshold != nil && (*s.DynamicThreshold < -8 || *s.DynamicThreshold > 7) {
-			return "", fmt.Errorf("dynamic threshold must be -8..7")
-		}
-		return string(s.Name), nil
+		return validateBufferProfile(s, name, bytes)
 	case *SwitchBufferPGSpec:
 		return binding(s.InterfaceName, s.Range, s.Profile, 7)
 	case *SwitchBufferQueueSpec:
@@ -72,4 +60,24 @@ func ValidateBufferSpec(spec any) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported buffer spec")
 	}
+}
+
+func validateBufferPool(s *SwitchBufferPoolSpec, name func(BufferName) bool, bytes func(...*uint64) bool) (string, error) {
+	if !name(s.Name) || (s.Type != "ingress" && s.Type != "egress") || (s.Mode != "static" && s.Mode != "dynamic") || s.Size == nil || *s.Size == 0 || !bytes(s.Size, s.Xoff) {
+		return "", fmt.Errorf("invalid buffer pool")
+	}
+	if s.Xoff != nil && (s.Type != "ingress" || *s.Xoff > *s.Size) {
+		return "", fmt.Errorf("shared headroom requires ingress pool and cannot exceed size")
+	}
+	return string(s.Name), nil
+}
+
+func validateBufferProfile(s *SwitchBufferProfileSpec, name func(BufferName) bool, bytes func(...*uint64) bool) (string, error) {
+	if !name(s.Name) || !name(s.Pool) || s.Size == nil || !bytes(s.Size, s.StaticThreshold, s.Xon, s.Xoff, s.XonOffset) || (s.DynamicThreshold == nil) == (s.StaticThreshold == nil) {
+		return "", fmt.Errorf("profile requires pool, size and exactly one threshold")
+	}
+	if s.DynamicThreshold != nil && (*s.DynamicThreshold < -8 || *s.DynamicThreshold > 7) {
+		return "", fmt.Errorf("dynamic threshold must be -8..7")
+	}
+	return string(s.Name), nil
 }

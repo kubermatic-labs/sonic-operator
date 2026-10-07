@@ -53,21 +53,12 @@ func (p *bufferNativeProof) validate(desired vlanChangeDB) error {
 	}
 	acknowledged := map[string]bool{}
 	for _, c := range p.Checks {
-		if !bufferProofKey(c.DB, c.Key) || (len(c.Fields) == 0 && !c.Presence) || len(c.Fields) > 512 || (c.Presence && (c.DB != "ASIC_DB" || len(c.RepairFields) > 0)) {
-			return fmt.Errorf("invalid buffer native evidence target")
+		ack, err := c.validate(p.Desired)
+		if err != nil {
+			return err
 		}
-		for _, field := range c.RepairFields {
-			if _, ok := c.Fields[field]; !ok || !bufferRepairField(c.DB, c.Key, field, p.Desired) {
-				return fmt.Errorf("invalid buffer repair field")
-			}
-		}
-		if c.DB == "NATIVE" {
-			if table, name, ok := bufferObjectKey(c.Key); ok {
-				if !c.Exact || len(c.RepairFields) != 0 || len(c.Fields) != 3 || !qosValidOID(c.Fields["oid"]) || c.Fields["pending_remove"] != "false" || c.Fields["lifecycle"] == "" {
-					return fmt.Errorf("invalid independent consumer acknowledgement")
-				}
-				acknowledged[table+"|"+name] = true
-			}
+		if ack != "" {
+			acknowledged[ack] = true
 		}
 	}
 	for _, c := range p.Checks {
@@ -248,4 +239,28 @@ func bufferVerify(ctx context.Context, read qosRead, p *bufferNativeProof, repai
 		}
 	}
 	return nil
+}
+
+// validate checks one evidence entry. For an independent consumer
+// acknowledgement it returns the acknowledged CONFIG_DB key.
+func (c bufferNativeCheck) validate(desired vlanChangeDB) (string, error) {
+	if !bufferProofKey(c.DB, c.Key) || (len(c.Fields) == 0 && !c.Presence) || len(c.Fields) > 512 || (c.Presence && (c.DB != "ASIC_DB" || len(c.RepairFields) > 0)) {
+		return "", fmt.Errorf("invalid buffer native evidence target")
+	}
+	for _, field := range c.RepairFields {
+		if _, ok := c.Fields[field]; !ok || !bufferRepairField(c.DB, c.Key, field, desired) {
+			return "", fmt.Errorf("invalid buffer repair field")
+		}
+	}
+	if c.DB != "NATIVE" {
+		return "", nil
+	}
+	table, name, ok := bufferObjectKey(c.Key)
+	if !ok {
+		return "", nil
+	}
+	if !c.Exact || len(c.RepairFields) != 0 || len(c.Fields) != 3 || !qosValidOID(c.Fields["oid"]) || c.Fields["pending_remove"] != "false" || c.Fields["lifecycle"] == "" {
+		return "", fmt.Errorf("invalid independent consumer acknowledgement")
+	}
+	return table + "|" + name, nil
 }
