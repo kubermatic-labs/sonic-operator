@@ -57,7 +57,19 @@ The first reachable main agent that supports `ArtifactService` is the deployment
 - The agent's separate `Bootstrap` RPC enforces these three fixed paths and their running/boot state before the controller attempts any artifact writes.
 - The durable owner/hash record is `/host/sonic-operator-artifact-bootstrap/owner.json`. It contains no binary or policy bytes.
 - An interrupted bootstrap installation resumes from the same cluster inputs.
-- Changing the bootstrap identity requires an explicit baseline migration. Normal agent updates preserve the independent recovery baseline.
+- Changing the bootstrap identity requires an explicit baseline migration. Normal agent updates preserve the independent recovery baseline. See [Migrating the bootstrap baseline](#migrating-the-bootstrap-baseline).
+
+### Migrating the bootstrap baseline
+
+`spec.bootstrap` is immutable, with one exception: to accept a new agent build you can replace the supervisor and policy on the **existing** SwitchArtifact. Never delete and recreate the resource; the switch records its UID as the owner of the bootstrap, the artifact journal and the host recovery suite.
+
+1. Build the new agent and supervisor and compose a policy whose `agentBuilds` contains both the currently running build (for rollback) and the new one. Keep `baseline`, the image hash and platform fields unchanged.
+2. Publish the new supervisor chunks and policy as immutable ConfigMaps.
+3. On the switch, move `/host/sonic-operator-artifact-bootstrap/owner.json` aside. The running agent rejects a different bootstrap identity while that record exists.
+4. Update the SwitchArtifact: set the new `supervisorSHA256`, `supervisorChunks`, `policySHA256` and `policyRef`, and set `spec.bootstrapMigrationFrom` to the **previous** `policySHA256`. The API rejects the change otherwise, and also if `hostRecovery` or `unitSHA256` differ.
+5. Wait until the agent has installed and activated the new bootstrap and the resource is Verified again. Then update the `AgentBinary` slot to the new build through the normal guarded update; the supervisor rolls back automatically if the controller doesn't confirm it within five minutes.
+
+The running agent must understand the new policy. An agent that does not support every capability declared in the new policy cannot install it and has to be replaced out of band first.
 
 ### Journal and content store
 
@@ -215,7 +227,7 @@ The immutable `bootstrap.policyRef` contains `agentBuilds`, keyed by the **actua
 - Native health independently hashes `/proc/PID/exe` against the installed executable and the accepted policy. Self-reported metadata cannot authorize unlisted code.
 - Observe mode also accepts a capability declaration matching a previously accepted older release, so it can report `Unowned`, confirmed-old, `Staged` or `RolledBack` lifecycle state while a different candidate is desired. Phase, token, identity and reason remain visible, but `RuntimeVerified` is false for the candidate.
 - Confirmation still requires the exact candidate declaration before the final freshness check. Staging still verifies the actual candidate and fallback hashes.
-- Adding new accepted builds requires migrating the immutable baseline.
+- Adding new accepted builds requires migrating the immutable baseline (see [Migrating the bootstrap baseline](#migrating-the-bootstrap-baseline)).
 
 ### Agent recovery set
 

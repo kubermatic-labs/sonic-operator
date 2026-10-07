@@ -87,6 +87,7 @@ spec:
                 description: |-
                   ArtifactBootstrapSpec declares the immutable recovery baseline. The main
                   agent independently enforces it so recovery never depends on replacing itself.
+                  Changes are governed by SwitchArtifactSpec.BootstrapMigrationFrom.
                 properties:
                   hostRecovery:
                     description: |-
@@ -338,11 +339,17 @@ spec:
                 - unitSHA256
                 type: object
                 x-kubernetes-validations:
-                - message: bootstrap baseline is immutable
-                  rule: self == oldSelf
                 - message: bootstrap inputs require immutable ConfigMap references
                   rule: self.supervisorChunks.all(c, c.kind == 'ConfigMap') && self.policyRef.kind
                     == 'ConfigMap'
+              bootstrapMigrationFrom:
+                description: |-
+                  BootstrapMigrationFrom explicitly approves replacing the bootstrap
+                  supervisor and policy. It must equal the policySHA256 being replaced;
+                  hostRecovery and unitSHA256 must stay unchanged. The switch still rejects
+                  the new identity until its recorded bootstrap owner is migrated.
+                pattern: ^[a-f0-9]{64}$
+                type: string
               files:
                 items:
                   properties:
@@ -455,6 +462,15 @@ spec:
             - message: host bootstrap requires retained HostGuard
               rule: '!has(self.bootstrap) || !has(self.bootstrap.hostRecovery) ||
                 (has(self.agent) && has(self.agent.hostGuard) && self.agent.hostGuard)'
+            - message: bootstrap baseline is immutable; supervisor and policy may
+                only change with bootstrapMigrationFrom set to the replaced policySHA256,
+                and hostRecovery and unitSHA256 unchanged
+              rule: '!has(oldSelf.bootstrap) || (has(self.bootstrap) && (self.bootstrap
+                == oldSelf.bootstrap || (has(self.bootstrapMigrationFrom) && self.bootstrapMigrationFrom
+                == oldSelf.bootstrap.policySHA256 && self.bootstrap.unitSHA256 ==
+                oldSelf.bootstrap.unitSHA256 && has(self.bootstrap.hostRecovery) ==
+                has(oldSelf.bootstrap.hostRecovery) && (!has(self.bootstrap.hostRecovery)
+                || self.bootstrap.hostRecovery == oldSelf.bootstrap.hostRecovery))))'
           status:
             properties:
               conditions:

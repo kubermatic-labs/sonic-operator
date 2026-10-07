@@ -9,6 +9,11 @@ package v1alpha1
 // with apply.
 type SwitchArtifactSpecApplyConfiguration struct {
 	Bootstrap *ArtifactBootstrapSpecApplyConfiguration `json:"bootstrap,omitempty"`
+	// BootstrapMigrationFrom explicitly approves replacing the bootstrap
+	// supervisor and policy. It must equal the policySHA256 being replaced;
+	// hostRecovery and unitSHA256 must stay unchanged. The switch still rejects
+	// the new identity until its recorded bootstrap owner is migrated.
+	BootstrapMigrationFrom *string `json:"bootstrapMigrationFrom,omitempty"`
 	// Retire the existing legacy site hook only after full site content health and
 	// protected persistence are proven by the confirming controller connection.
 	RetireLegacyHook *bool   `json:"retireLegacyHook,omitempty"`
@@ -32,6 +37,14 @@ func SwitchArtifactSpec() *SwitchArtifactSpecApplyConfiguration {
 // If called multiple times, the Bootstrap field is set to the value of the last call.
 func (b *SwitchArtifactSpecApplyConfiguration) WithBootstrap(value *ArtifactBootstrapSpecApplyConfiguration) *SwitchArtifactSpecApplyConfiguration {
 	b.Bootstrap = value
+	return b
+}
+
+// WithBootstrapMigrationFrom sets the BootstrapMigrationFrom field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BootstrapMigrationFrom field is set to the value of the last call.
+func (b *SwitchArtifactSpecApplyConfiguration) WithBootstrapMigrationFrom(value string) *SwitchArtifactSpecApplyConfiguration {
+	b.BootstrapMigrationFrom = &value
 	return b
 }
 

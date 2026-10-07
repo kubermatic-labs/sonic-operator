@@ -476,6 +476,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bootstrap
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.ArtifactBootstrapSpec
+    - name: bootstrapMigrationFrom
+      type:
+        scalar: string
     - name: files
       type:
         list:

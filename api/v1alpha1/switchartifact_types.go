@@ -53,7 +53,7 @@ type ArtifactAgentOptions struct {
 
 // ArtifactBootstrapSpec declares the immutable recovery baseline. The main
 // agent independently enforces it so recovery never depends on replacing itself.
-// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bootstrap baseline is immutable"
+// Changes are governed by SwitchArtifactSpec.BootstrapMigrationFrom.
 // +kubebuilder:validation:XValidation:rule="self.supervisorChunks.all(c, c.kind == 'ConfigMap') && self.policyRef.kind == 'ConfigMap'",message="bootstrap inputs require immutable ConfigMap references"
 type ArtifactBootstrapSpec struct {
 	// +optional
@@ -115,9 +115,17 @@ type ArtifactMACHookSpec struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.managementPolicy) || self.managementPolicy != 'Manage' || has(self.bootstrap)",message="Manage requires a declared immutable bootstrap baseline"
 // +kubebuilder:validation:XValidation:rule="!has(self.agent) || !has(self.agent.hostConfig) || !self.agent.hostConfig || (has(self.bootstrap) && has(self.bootstrap.hostRecovery) && has(self.agent.hostGuard) && self.agent.hostGuard)",message="HostConfig requires a complete host baseline and HostGuard"
 // +kubebuilder:validation:XValidation:rule="!has(self.bootstrap) || !has(self.bootstrap.hostRecovery) || (has(self.agent) && has(self.agent.hostGuard) && self.agent.hostGuard)",message="host bootstrap requires retained HostGuard"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.bootstrap) || (has(self.bootstrap) && (self.bootstrap == oldSelf.bootstrap || (has(self.bootstrapMigrationFrom) && self.bootstrapMigrationFrom == oldSelf.bootstrap.policySHA256 && self.bootstrap.unitSHA256 == oldSelf.bootstrap.unitSHA256 && has(self.bootstrap.hostRecovery) == has(oldSelf.bootstrap.hostRecovery) && (!has(self.bootstrap.hostRecovery) || self.bootstrap.hostRecovery == oldSelf.bootstrap.hostRecovery))))",message="bootstrap baseline is immutable; supervisor and policy may only change with bootstrapMigrationFrom set to the replaced policySHA256, and hostRecovery and unitSHA256 unchanged"
 type SwitchArtifactSpec struct {
 	// +optional
 	Bootstrap *ArtifactBootstrapSpec `json:"bootstrap,omitempty"`
+	// BootstrapMigrationFrom explicitly approves replacing the bootstrap
+	// supervisor and policy. It must equal the policySHA256 being replaced;
+	// hostRecovery and unitSHA256 must stay unchanged. The switch still rejects
+	// the new identity until its recorded bootstrap owner is migrated.
+	// +kubebuilder:validation:Pattern=`^[a-f0-9]{64}$`
+	// +optional
+	BootstrapMigrationFrom string `json:"bootstrapMigrationFrom,omitempty"`
 	// Retire the existing legacy site hook only after full site content health and
 	// protected persistence are proven by the confirming controller connection.
 	// +optional
