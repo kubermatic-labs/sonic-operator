@@ -24,6 +24,7 @@ This directory contains the documentation for sonic-operator.
 - `usage/bgp-relay.md`: BGP and DHCP relay.
 - `usage/frr-migration.md`: FRR mode migration.
 - `usage/traffic-policy.md`: ACL and QoS.
+- `usage/buffers.md`: buffer pools, profiles, PG/queue bindings and TC-to-PG maps.
 - `usage/redundancy.md`: redundancy.
 - `usage/mlag.md`: MLAG.
 - `usage/evpn-vxlan.md`: EVPN/VXLAN.

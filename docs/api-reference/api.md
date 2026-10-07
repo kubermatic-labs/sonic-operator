@@ -21,6 +21,10 @@ SPDX-License-Identifier: Apache-2.0
 - [SwitchArtifact](#switchartifact)
 - [SwitchBGP](#switchbgp)
 - [SwitchBGPPeer](#switchbgppeer)
+- [SwitchBufferPG](#switchbufferpg)
+- [SwitchBufferPool](#switchbufferpool)
+- [SwitchBufferProfile](#switchbufferprofile)
+- [SwitchBufferQueue](#switchbufferqueue)
 - [SwitchCredentials](#switchcredentials)
 - [SwitchDHCPRelay](#switchdhcprelay)
 - [SwitchEVPN](#switchevpn)
@@ -261,6 +265,24 @@ _Appears in:_
 | `Manage` |  |
 
 
+#### BufferName
+
+_Underlying type:_ _string_
+
+BufferName is a literal native buffer name, not a Kubernetes object reference.
+
+_Validation:_
+- MaxLength: 32
+- Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]{0,31}$`
+
+_Appears in:_
+- [SwitchBufferPGSpec](#switchbufferpgspec)
+- [SwitchBufferPoolSpec](#switchbufferpoolspec)
+- [SwitchBufferProfileSpec](#switchbufferprofilespec)
+- [SwitchBufferQueueSpec](#switchbufferqueuespec)
+
+
+
 #### Container
 
 
@@ -478,6 +500,10 @@ _Appears in:_
 - [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
+- [SwitchBufferPGSpec](#switchbufferpgspec)
+- [SwitchBufferPoolSpec](#switchbufferpoolspec)
+- [SwitchBufferProfileSpec](#switchbufferprofilespec)
+- [SwitchBufferQueueSpec](#switchbufferqueuespec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 - [SwitchEVPNSpec](#switchevpnspec)
@@ -531,6 +557,10 @@ _Appears in:_
 - [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
+- [SwitchBufferPGSpec](#switchbufferpgspec)
+- [SwitchBufferPoolSpec](#switchbufferpoolspec)
+- [SwitchBufferProfileSpec](#switchbufferprofilespec)
+- [SwitchBufferQueueSpec](#switchbufferqueuespec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 - [SwitchEVPNSpec](#switchevpnspec)
@@ -567,6 +597,10 @@ _Appears in:_
 - [SwitchACLPolicy](#switchaclpolicy)
 - [SwitchBGP](#switchbgp)
 - [SwitchBGPPeer](#switchbgppeer)
+- [SwitchBufferPG](#switchbufferpg)
+- [SwitchBufferPool](#switchbufferpool)
+- [SwitchBufferProfile](#switchbufferprofile)
+- [SwitchBufferQueue](#switchbufferqueue)
 - [SwitchDHCPRelay](#switchdhcprelay)
 - [SwitchEVPN](#switchevpn)
 - [SwitchEVPNPeer](#switchevpnpeer)
@@ -608,6 +642,10 @@ _Appears in:_
 - [SwitchACLPolicySpec](#switchaclpolicyspec)
 - [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
+- [SwitchBufferPGSpec](#switchbufferpgspec)
+- [SwitchBufferPoolSpec](#switchbufferpoolspec)
+- [SwitchBufferProfileSpec](#switchbufferprofilespec)
+- [SwitchBufferQueueSpec](#switchbufferqueuespec)
 - [SwitchDHCPRelaySpec](#switchdhcprelayspec)
 - [SwitchEVPNPeerSpec](#switchevpnpeerspec)
 - [SwitchEVPNSpec](#switchevpnspec)
@@ -1084,6 +1122,169 @@ _Appears in:_
 | `localASN` _integer_ |  |  | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 1 <br /> |
 | `routerID` _string_ |  |  | MaxLength: 15 <br /> |
 | `prefixes` _[NetworkPrefix](#networkprefix) array_ | Prefixes is an explicit allowlist; empty means no advertisements. | \{  \} | MaxItems: 256 <br />MaxLength: 49 <br /> |
+
+
+#### SwitchBufferPG
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchBufferPG` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchBufferPGSpec](#switchbufferpgspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchBufferPGSpec
+
+
+
+SwitchBufferPGSpec binds an ingress profile to an exact native PG selector.
+
+
+
+_Appears in:_
+- [SwitchBufferPG](#switchbufferpg)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `interfaceName` _string_ |  |  | MaxLength: 32 <br />Pattern: `^Ethernet(0\|[1-9][0-9]*)$` <br /> |
+| `range` _string_ | Range is one index or an inclusive ascending range, e.g. 3-4. |  | MaxLength: 3 <br />Pattern: `^[0-7](-[0-7])?$` <br /> |
+| `profile` _[BufferName](#buffername)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+
+
+#### SwitchBufferPool
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchBufferPool` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchBufferPoolSpec](#switchbufferpoolspec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchBufferPoolSpec
+
+
+
+SwitchBufferPoolSpec owns explicitly declared BUFFER_POOL fields.
+
+
+
+_Appears in:_
+- [SwitchBufferPool](#switchbufferpool)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[BufferName](#buffername)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `type` _string_ |  |  | Enum: [ingress egress] <br /> |
+| `mode` _string_ |  |  | Enum: [static dynamic] <br /> |
+| `size` _integer_ | Size is the pool size in bytes. Actual capacity requires native qualification.<br />CEL retains the exact integer bound; OpenAPI maximum is float64 and rounds it. |  | Minimum: 1 <br /> |
+| `xoff` _integer_ | Xoff is shared headroom in bytes. |  | Minimum: 0 <br /> |
+
+
+#### SwitchBufferProfile
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchBufferProfile` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchBufferProfileSpec](#switchbufferprofilespec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchBufferProfileSpec
+
+
+
+SwitchBufferProfileSpec owns BUFFER_PROFILE fields. Threshold mode must match the pool.
+
+
+
+_Appears in:_
+- [SwitchBufferProfile](#switchbufferprofile)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `name` _[BufferName](#buffername)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `pool` _[BufferName](#buffername)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `size` _integer_ | Size is reserved buffer bytes, including an explicit zero. |  | Minimum: 0 <br /> |
+| `dynamicThreshold` _integer_ |  |  | Maximum: 7 <br />Minimum: -8 <br /> |
+| `staticThreshold` _integer_ |  |  | Minimum: 0 <br /> |
+| `xon` _integer_ |  |  | Minimum: 0 <br /> |
+| `xoff` _integer_ |  |  | Minimum: 0 <br /> |
+| `xonOffset` _integer_ |  |  | Minimum: 0 <br /> |
+
+
+#### SwitchBufferQueue
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `sonic.networking.metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `SwitchBufferQueue` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[SwitchBufferQueueSpec](#switchbufferqueuespec)_ |  |  |  |
+| `status` _[NetworkResourceStatus](#networkresourcestatus)_ |  |  |  |
+
+
+#### SwitchBufferQueueSpec
+
+
+
+SwitchBufferQueueSpec binds an egress profile to an exact native queue selector.
+
+
+
+_Appears in:_
+- [SwitchBufferQueue](#switchbufferqueue)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
+| `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
+| `interfaceName` _string_ |  |  | MaxLength: 32 <br />Pattern: `^Ethernet(0\|[1-9][0-9]*)$` <br /> |
+| `range` _string_ | Range preserves the native selector. Actual queue limits require device evidence. |  | MaxLength: 7 <br />Pattern: `^(0\|[1-9][0-9]\{0,2\})(-(0\|[1-9][0-9]\{0,2\}))?$` <br /> |
+| `profile` _[BufferName](#buffername)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
 
 
 #### SwitchCredentials
@@ -1665,6 +1866,7 @@ _Appears in:_
 | `dscpToTC` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
 | `dot1pToTC` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
 | `tcToQueue` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
+| `tcToPriorityGroup` _[QoSPolicyName](#qospolicyname)_ | TCToPriorityGroup references TC_TO_PRIORITY_GROUP_MAP through PORT_QOS_MAP.tc_to_pg_map. |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
 | `queues` _[QoSQueueBinding](#qosqueuebinding) array_ |  |  | MaxItems: 256 <br /> |
 
 
@@ -1703,7 +1905,7 @@ _Appears in:_
 | `switchRef` _[NetworkSwitchReference](#networkswitchreference)_ |  |  |  |
 | `managementPolicy` _[NetworkManagementPolicy](#networkmanagementpolicy)_ |  | Observe | Enum: [Observe Manage] <br /> |
 | `name` _[QoSPolicyName](#qospolicyname)_ |  |  | MaxLength: 32 <br />Pattern: `^[A-Za-z0-9][-A-Za-z0-9_]\{0,31\}$` <br /> |
-| `type` _string_ |  |  | Enum: [DSCPToTC Dot1pToTC TCToQueue] <br /> |
+| `type` _string_ |  |  | Enum: [DSCPToTC Dot1pToTC TCToQueue TCToPriorityGroup] <br /> |
 | `entries` _[QoSMapEntry](#qosmapentry) array_ |  |  | MaxItems: 256 <br />MinItems: 1 <br /> |
 
 

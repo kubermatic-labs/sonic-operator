@@ -16,7 +16,7 @@ type QoSQueueBinding struct {
 }
 
 // SwitchQoSBindingSpec references existing, applied maps and schedulers on one data port.
-// +kubebuilder:validation:XValidation:rule="has(self.dscpToTC) || has(self.dot1pToTC) || has(self.tcToQueue) || (has(self.queues) && size(self.queues) > 0)",message="at least one map or queue binding is required"
+// +kubebuilder:validation:XValidation:rule="has(self.dscpToTC) || has(self.dot1pToTC) || has(self.tcToQueue) || has(self.tcToPriorityGroup) || (has(self.queues) && size(self.queues) > 0)",message="at least one map or queue binding is required"
 type SwitchQoSBindingSpec struct {
 	NetworkResourceSpec `json:",inline"`
 	// +required
@@ -30,6 +30,9 @@ type SwitchQoSBindingSpec struct {
 	Dot1pToTC QoSPolicyName `json:"dot1pToTC,omitempty"`
 	// +optional
 	TCToQueue QoSPolicyName `json:"tcToQueue,omitempty"`
+	// TCToPriorityGroup references TC_TO_PRIORITY_GROUP_MAP through PORT_QOS_MAP.tc_to_pg_map.
+	// +optional
+	TCToPriorityGroup QoSPolicyName `json:"tcToPriorityGroup,omitempty"`
 	// +optional
 	// +kubebuilder:validation:MaxItems=256
 	// +listType=map

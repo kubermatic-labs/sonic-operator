@@ -79,11 +79,13 @@ func TestTrafficPolicyMTLS(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = base.(interface{ Close() error }).Close() })
 			c := base.(agentclient.NetworkClient)
-			for _, kind := range []string{"ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "VRF", "FRRMigration"} {
+			for _, kind := range []string{"BufferPool", "BufferProfile", "BufferPG", "BufferQueue", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding", "VRF", "FRRMigration"} {
 				t.Run(kind, func(t *testing.T) {
+					b.result.BufferRepairEligible = kind == "BufferProfile"
+					b.result.Exists = kind == "BufferProfile"
 					r := &agent.NetworkRequest{Kind: kind, Spec: json.RawMessage(`{}`)}
 					before := b.calls.Load()
-					if out, err := c.GetNetworkResource(t.Context(), r); err != nil || out == nil || out.RuntimeVerified || b.calls.Load() != before+1 {
+					if out, err := c.GetNetworkResource(t.Context(), r); err != nil || out == nil || out.RuntimeVerified || out.BufferRepairEligible != (kind == "BufferProfile") || b.calls.Load() != before+1 {
 						t.Fatalf("observation: %+v %v calls=%d", out, err, b.calls.Load())
 					}
 					r.OwnerID = "uid"

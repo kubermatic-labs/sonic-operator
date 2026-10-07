@@ -75,6 +75,22 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SwitchBGPPeerSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBGPSpec"):
 		return &apiv1alpha1.SwitchBGPSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferPG"):
+		return &apiv1alpha1.SwitchBufferPGApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferPGSpec"):
+		return &apiv1alpha1.SwitchBufferPGSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferPool"):
+		return &apiv1alpha1.SwitchBufferPoolApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferPoolSpec"):
+		return &apiv1alpha1.SwitchBufferPoolSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferProfile"):
+		return &apiv1alpha1.SwitchBufferProfileApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferProfileSpec"):
+		return &apiv1alpha1.SwitchBufferProfileSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferQueue"):
+		return &apiv1alpha1.SwitchBufferQueueApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SwitchBufferQueueSpec"):
+		return &apiv1alpha1.SwitchBufferQueueSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchCredentials"):
 		return &apiv1alpha1.SwitchCredentialsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SwitchDHCPRelay"):

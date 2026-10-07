@@ -106,6 +106,7 @@ spec:
                 - DSCPToTC
                 - Dot1pToTC
                 - TCToQueue
+                - TCToPriorityGroup
                 type: string
                 x-kubernetes-validations:
                 - message: type is immutable
@@ -120,6 +121,10 @@ spec:
             - message: DSCP inputs must be 0..63 and dot1p inputs 0..7
               rule: 'self.entries.all(e, self.type == ''DSCPToTC'' ? e.from <= 63
                 : (self.type == ''Dot1pToTC'' ? e.from <= 7 : true))'
+            - message: TC-to-PG schema ceilings are TC 15 and PG 7; hardware bounds
+                require native evidence
+              rule: self.type != 'TCToPriorityGroup' || self.entries.all(e, e.from
+                <= 15 && e.to <= 7)
           status:
             description: NetworkResourceStatus reports independent proof, not inferred
               forwarding health.

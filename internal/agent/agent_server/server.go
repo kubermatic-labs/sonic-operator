@@ -375,7 +375,7 @@ func newGRPCServerWithTLSProof(certFile, keyFile, clientCAFile string, readOnly,
 				if !allowRedundancy {
 					return nil, grpcstatus.Error(codes.PermissionDenied, "redundancy requires --allow-redundancy=true")
 				}
-			case "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
+			case "BufferPool", "BufferProfile", "BufferPG", "BufferQueue", "ACLPolicy", "ACLBinding", "QoSMap", "Scheduler", "QoSBinding":
 				if !allowTraffic {
 					return nil, grpcstatus.Error(codes.PermissionDenied, "traffic policy requires --allow-traffic-policy=true")
 				}

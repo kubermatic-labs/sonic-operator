@@ -54,6 +54,9 @@ type NetworkReconciler struct {
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchportchannels/status;switchvrfs/status;switchl3interfaces/status;switchstaticroutes/status;switchbgps/status;switchbgppeers/status;switchdhcprelays/status;switchfrrmigrations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchportchannels/finalizers;switchvrfs/finalizers;switchl3interfaces/finalizers;switchstaticroutes/finalizers;switchbgps/finalizers;switchbgppeers/finalizers;switchdhcprelays/finalizers;switchfrrmigrations/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switches,verbs=get;list;watch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchbufferpools;switchbufferprofiles;switchbufferpgs;switchbufferqueues,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchbufferpools/status;switchbufferprofiles/status;switchbufferpgs/status;switchbufferqueues/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchbufferpools/finalizers;switchbufferprofiles/finalizers;switchbufferpgs/finalizers;switchbufferqueues/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies;switchaclbindings;switchqosmaps;switchschedulers;switchqosbindings,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies/status;switchaclbindings/status;switchqosmaps/status;switchschedulers/status;switchqosbindings/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchaclpolicies/finalizers;switchaclbindings/finalizers;switchqosmaps/finalizers;switchschedulers/finalizers;switchqosbindings/finalizers,verbs=update;patch
@@ -195,6 +198,10 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return result, err
 	}
 	observed = true
+	bufferRepair, err := networkBufferRepairEligible(obj, current)
+	if err != nil {
+		return result, err
+	}
 	reason, message = "Observed", current.Message
 	if message == "" {
 		message = "Configuration, runtime and persistence are reported independently"
@@ -218,13 +225,14 @@ func (r *NetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	}
 	// A matching running config without durable save proof still needs Ensure.
 	// Traditional BGP owns native regeneration; its agent journals dispatch and
-	// never blindly repeats an uncertain restart. Other backends retain no-op
-	// behavior when only operational runtime has not converged.
+	// never blindly repeats an uncertain restart. Only the explicit fresh buffer
+	// repair contract can otherwise authorize a runtime-only repair; unknown
+	// failures and other resource kinds retain the no-write rule.
 	runtimeManaged := false
 	if bgp, ok := obj.(*api.SwitchBGP); ok {
 		runtimeManaged = bgp.Spec.Mode == "Traditional"
 	}
-	if current.Exists && current.ConfigurationVerified && current.PersistenceVerified && (!runtimeManaged || current.RuntimeVerified) {
+	if !bufferRepair && current.Exists && current.ConfigurationVerified && current.PersistenceVerified && (!runtimeManaged || current.RuntimeVerified) {
 		return result, nil
 	}
 	if evpn, ok := obj.(*api.SwitchEVPNPeer); ok {

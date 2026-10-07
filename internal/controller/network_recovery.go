@@ -84,7 +84,12 @@ func (r *NetworkReconciler) recoverNetwork(ctx context.Context, obj client.Objec
 	}
 	// FRR mode is mutable intent, not a target selector. Always recover the
 	// saved mode and approval before considering a transition in either direction.
-	for _, field := range []string{"switchRef", "name", "nativeName", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "domainID", "peerSwitchRef", "tunnel"} {
+	for _, field := range []string{"switchRef", "name", "nativeName", "vrf", "prefix", "address", "vlanID", "policy", "type", "interfaceName", "range", "domainID", "peerSwitchRef", "tunnel"} {
+		// Buffer pool direction is mutable intent; the durable name is its
+		// identity. QoSMap type remains an immutable selector.
+		if field == "type" && r.Kind == "BufferPool" {
+			continue
+		}
 		current, previous := currentFields[field], savedFields[field]
 		if field == "address" && r.Kind == "EVPNPeer" {
 			canonical := func(value any) any {

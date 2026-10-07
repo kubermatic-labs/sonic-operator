@@ -1,0 +1,14 @@
+{
+  "BUFFER_PG": {
+    "Ethernet10|0": {"profile": "ingress_lossy_profile"},
+    "Ethernet11|0": {"profile": "ingress_lossy_profile"},
+    "Ethernet120|0": {"profile": "ingress_lossy_profile"},
+    "Ethernet8|0": {"profile": "ingress_lossy_profile"},
+    "Ethernet9|0": {"profile": "ingress_lossy_profile"}
+  },
+  "BUFFER_PROFILE": {
+    "egress_lossless_profile": {"pool": "egress_lossless_pool", "size": "1518", "static_th": "15982720"},
+    "egress_lossy_profile": {"dynamic_th": "3", "pool": "egress_lossy_pool", "size": "1518"},
+    "ingress_lossy_profile": {"dynamic_th": "3", "pool": "ingress_lossless_pool", "size": "0"}
+  }
+}

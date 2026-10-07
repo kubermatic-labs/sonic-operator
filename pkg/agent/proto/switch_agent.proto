@@ -228,6 +228,7 @@ message NetworkResult {
   bool persistence_verified = 4;
   bytes observed_json = 5;
   string message = 6;
+  bool buffer_repair_eligible = 7;
 }
 
 message NetworkResponse {

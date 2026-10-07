@@ -86,6 +86,7 @@ export default withMermaid({
           { text: 'BGP and DHCP relay', link: '/usage/bgp-relay' },
           { text: 'FRR mode migration', link: '/usage/frr-migration' },
           { text: 'ACL and QoS', link: '/usage/traffic-policy' },
+          { text: 'Buffers', link: '/usage/buffers' },
           { text: 'Redundancy', link: '/usage/redundancy' },
           { text: 'MLAG', link: '/usage/mlag' },
           { text: 'EVPN/VXLAN', link: '/usage/evpn-vxlan' },

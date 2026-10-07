@@ -109,6 +109,12 @@ spec:
                 x-kubernetes-validations:
                 - message: switchRef is immutable
                   rule: self == oldSelf
+              tcToPriorityGroup:
+                description: TCToPriorityGroup references TC_TO_PRIORITY_GROUP_MAP
+                  through PORT_QOS_MAP.tc_to_pg_map.
+                maxLength: 32
+                pattern: ^[A-Za-z0-9][-A-Za-z0-9_]{0,31}$
+                type: string
               tcToQueue:
                 description: QoSPolicyName is the native map or scheduler identifier.
                 maxLength: 32
@@ -121,7 +127,8 @@ spec:
             x-kubernetes-validations:
             - message: at least one map or queue binding is required
               rule: has(self.dscpToTC) || has(self.dot1pToTC) || has(self.tcToQueue)
-                || (has(self.queues) && size(self.queues) > 0)
+                || has(self.tcToPriorityGroup) || (has(self.queues) && size(self.queues)
+                > 0)
           status:
             description: NetworkResourceStatus reports independent proof, not inferred
               forwarding health.

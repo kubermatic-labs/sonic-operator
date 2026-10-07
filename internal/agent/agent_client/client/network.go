@@ -67,5 +67,5 @@ func (c *defaultSwitchAgentClient) networkResource(ctx context.Context, r *agent
 	if len(w.GetObservedJson()) != 0 && !json.Valid(w.GetObservedJson()) {
 		return nil, fmt.Errorf("%s: invalid observed JSON", method)
 	}
-	return &agent.NetworkResult{Exists: w.Exists, ConfigurationVerified: w.ConfigurationVerified, RuntimeVerified: w.RuntimeVerified, PersistenceVerified: w.PersistenceVerified, Observed: w.ObservedJson, Message: w.Message}, err
+	return &agent.NetworkResult{Exists: w.Exists, ConfigurationVerified: w.ConfigurationVerified, RuntimeVerified: w.RuntimeVerified, PersistenceVerified: w.PersistenceVerified, Observed: w.ObservedJson, Message: w.Message, BufferRepairEligible: w.BufferRepairEligible}, err
 }

@@ -76,6 +76,10 @@ Credentials for accessing switches. The schema mirrors `core/v1.Secret`:
 | `SwitchQoSMap` | QoS map | [ACL and QoS](/usage/traffic-policy) |
 | `SwitchQoSBinding` | Binding of QoS settings to interfaces | [ACL and QoS](/usage/traffic-policy) |
 | `SwitchScheduler` | QoS scheduler | [ACL and QoS](/usage/traffic-policy) |
+| `SwitchBufferPool` | Buffer pool | [Buffers](/usage/buffers) |
+| `SwitchBufferProfile` | Buffer profile | [Buffers](/usage/buffers) |
+| `SwitchBufferPG` | Priority-group buffer binding | [Buffers](/usage/buffers) |
+| `SwitchBufferQueue` | Queue buffer binding | [Buffers](/usage/buffers) |
 | `SwitchMLAG` | MLAG pairing | [Redundancy](/usage/redundancy), [MLAG](/usage/mlag) |
 | `SwitchEVPN` | EVPN instance | [EVPN/VXLAN](/usage/evpn-vxlan) |
 | `SwitchEVPNPeer` | EVPN peer | [EVPN/VXLAN](/usage/evpn-vxlan) |

@@ -22,6 +22,14 @@ func networkObjects(kind string) (client.Object, client.ObjectList, error) {
 	switch kind {
 	case "Port":
 		return &api.SwitchInterface{}, &api.SwitchInterfaceList{}, nil
+	case "BufferPool":
+		return &api.SwitchBufferPool{}, &api.SwitchBufferPoolList{}, nil
+	case "BufferProfile":
+		return &api.SwitchBufferProfile{}, &api.SwitchBufferProfileList{}, nil
+	case "BufferPG":
+		return &api.SwitchBufferPG{}, &api.SwitchBufferPGList{}, nil
+	case "BufferQueue":
+		return &api.SwitchBufferQueue{}, &api.SwitchBufferQueueList{}, nil
 	case "EVPN":
 		return &api.SwitchEVPN{}, &api.SwitchEVPNList{}, nil
 	case "MLAG":
@@ -71,6 +79,14 @@ func networkFields(obj client.Object) (any, *api.NetworkResourceStatus, *api.Net
 			common.SwitchRef.Name = o.Spec.SwitchRef.Name
 		}
 		return &o.Spec, &o.Status.PortConfiguration, common
+	case *api.SwitchBufferPool:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchBufferProfile:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchBufferPG:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
+	case *api.SwitchBufferQueue:
+		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchEVPN:
 		return &o.Spec, &o.Status, &o.Spec.NetworkResourceSpec
 	case *api.SwitchMLAG:
@@ -190,6 +206,12 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 		}
 		s.ManagementPolicy = common.ManagementPolicy
 		target = s.NativeName
+	case *api.SwitchBufferPoolSpec, *api.SwitchBufferProfileSpec, *api.SwitchBufferPGSpec, *api.SwitchBufferQueueSpec:
+		var err error
+		target, err = api.ValidateBufferSpec(spec)
+		if err != nil {
+			return nil, "", err
+		}
 	case *api.SwitchEVPNSpec:
 		if !redundancyName.MatchString(string(s.Tunnel)) || len(s.MappingRefs) > 64 {
 			return nil, "", fmt.Errorf("invalid EVPN tunnel or mapping references")
