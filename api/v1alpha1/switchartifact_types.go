@@ -100,7 +100,9 @@ type ArtifactHostRecoverySpec struct {
 
 // +kubebuilder:validation:XValidation:rule="self.sourceHookRef.kind == 'ConfigMap' && self.helperRef.kind == 'ConfigMap'",message="MAC imports require immutable ConfigMap references"
 type ArtifactMACHookSpec struct {
-	// +kubebuilder:validation:Enum=management-mac-python;management-mac-shell
+	// dc-management-only and set-management are deprecated legacy names for the
+	// same helpers, accepted for hooks installed by earlier releases.
+	// +kubebuilder:validation:Enum=management-mac-python;management-mac-shell;dc-management-only;set-management
 	Kind string `json:"kind"`
 	// +kubebuilder:validation:Pattern=`^[a-f0-9]{64}$`
 	SourceHookSHA256 string             `json:"sourceHookSHA256"`

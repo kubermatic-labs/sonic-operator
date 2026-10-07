@@ -240,7 +240,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `kind` _string_ |  |  | Enum: [management-mac-python management-mac-shell] <br /> |
+| `kind` _string_ | dc-management-only and set-management are deprecated legacy names for the<br />same helpers, accepted for hooks installed by earlier releases. |  | Enum: [management-mac-python management-mac-shell dc-management-only set-management] <br /> |
 | `sourceHookSHA256` _string_ |  |  | Pattern: `^[a-f0-9]\{64\}$` <br /> |
 | `sourceHookRef` _[ArtifactContentRef](#artifactcontentref)_ |  |  |  |
 | `helperSHA256` _string_ |  |  | Pattern: `^[a-f0-9]\{64\}$` <br /> |

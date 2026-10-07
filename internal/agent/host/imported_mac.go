@@ -12,15 +12,33 @@ import (
 const (
 	ImportedKindPython = "management-mac-python"
 	ImportedKindShell  = "management-mac-shell"
+
+	// Deprecated: legacy names of the same helpers. Hooks installed by earlier
+	// releases embed the kind in their adapter unit and immutable profile, so
+	// these names stay accepted with identical paths, hashes and behavior.
+	ImportedKindPythonLegacy = "dc-management-only"
+	ImportedKindShellLegacy  = "set-management"
 )
+
+// IsImportedPythonKind reports whether kind names the hostname-selecting
+// Python helper, under its current or legacy name.
+func IsImportedPythonKind(kind string) bool {
+	return kind == ImportedKindPython || kind == ImportedKindPythonLegacy
+}
+
+// IsImportedShellKind reports whether kind names the shell helper, under its
+// current or legacy name.
+func IsImportedShellKind(kind string) bool {
+	return kind == ImportedKindShell || kind == ImportedKindShellLegacy
+}
 
 var hostnamePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 func ImportedMACPaths(kind string) (string, string, error) {
-	switch kind {
-	case ImportedKindPython:
+	switch {
+	case IsImportedPythonKind(kind):
 		return "/etc/systemd/system/interfaces-config.service.d/dc-management-mac.conf", "/usr/local/sbin/dc-management-only-mac.py", nil
-	case ImportedKindShell:
+	case IsImportedShellKind(kind):
 		return "/etc/systemd/system/interfaces-config.service.d/management-mac.conf", "/usr/local/sbin/set-management-mac", nil
 	default:
 		return "", "", ErrInvalid
@@ -33,10 +51,10 @@ func ImportedMACUnit(kind string) []byte {
 	return []byte("[Service]\nExecStartPost=" + RecoveryBinaryFile + " --apply-imported-boot-mac=" + kind + "\n")
 }
 func ImportedHelperSHA256(kind string) string {
-	switch kind {
-	case ImportedKindPython:
+	switch {
+	case IsImportedPythonKind(kind):
 		return "5d020956ceea96e17c8691fea273018c990261daffe0323946820a4c396ddfbd"
-	case ImportedKindShell:
+	case IsImportedShellKind(kind):
 		return "a4a14aa61e99f369426bf7e23514442bd38128686ef9aad1499c09ad9b847d7d"
 	}
 	return ""
@@ -51,7 +69,15 @@ func validateImportedIdentity(h LegacyMACHook) error {
 	}
 	// The Python helper selects its MAC by hostname, so the profile must name the
 	// switch it was qualified on; the shell helper has no hostname selector.
-	if (h.Kind == ImportedKindPython) != (h.Hostname != "") || (h.Hostname != "" && !hostnamePattern.MatchString(h.Hostname)) {
+	// Profiles installed under the legacy Python name predate the field, so it
+	// is optional there; when absent, the pinned helper's own hostname table and
+	// the live MAC/address checks remain the only selector guards.
+	switch {
+	case h.Kind == ImportedKindPython && h.Hostname == "":
+		return ErrInvalid
+	case IsImportedShellKind(h.Kind) && h.Hostname != "":
+		return ErrInvalid
+	case h.Hostname != "" && !hostnamePattern.MatchString(h.Hostname):
 		return ErrInvalid
 	}
 	return nil
@@ -90,11 +116,13 @@ func (n *Native) importedState(ctx context.Context, p NativeProfile, boot bool, 
 		return h, ErrConflict
 	}
 	interpreter, key := "/bin/sh", "imported-shell"
-	if h.Kind == ImportedKindPython {
+	if IsImportedPythonKind(h.Kind) {
 		interpreter, key = "/usr/bin/python3", "imported-python"
-		name, err := n.read("/proc/sys/kernel/hostname")
-		if err != nil || h.Hostname == "" || strings.TrimSpace(string(name)) != h.Hostname {
-			return h, ErrConflict
+		if h.Hostname != "" || h.Kind == ImportedKindPython {
+			name, err := n.read("/proc/sys/kernel/hostname")
+			if err != nil || h.Hostname == "" || strings.TrimSpace(string(name)) != h.Hostname {
+				return h, ErrConflict
+			}
 		}
 	}
 	b, err = n.read(interpreter)
@@ -255,7 +283,7 @@ func (n *Native) ApplyImportedBootMAC(ctx context.Context, kind string) error {
 				return ErrConflict
 			}
 			args := []string{helper}
-			if kind == ImportedKindPython {
+			if IsImportedPythonKind(kind) {
 				args = []string{"/usr/bin/python3", helper, "boot"}
 			}
 			if _, err = n.run(locked, args...); err != nil {

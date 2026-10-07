@@ -164,9 +164,14 @@ spec:
                               pattern: ^[a-f0-9]{64}$
                               type: string
                             kind:
+                              description: |-
+                                dc-management-only and set-management are deprecated legacy names for the
+                                same helpers, accepted for hooks installed by earlier releases.
                               enum:
                               - management-mac-python
                               - management-mac-shell
+                              - dc-management-only
+                              - set-management
                               type: string
                             sourceHookRef:
                               description: |-

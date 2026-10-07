@@ -35,7 +35,7 @@ func (n *Native) validateLegacyMACHooks(desired Management, p NativeProfile, db 
 		}
 		qualified := false
 		for _, imported := range p.LegacyMACHooks {
-			if imported.Kind != known.kind {
+			if IsImportedPythonKind(imported.Kind) != IsImportedPythonKind(known.kind) {
 				continue
 			}
 			if !hashMatches(ImportedMACUnit(imported.Kind), imported.HookSHA256) || imported.HelperSHA256 != ImportedHelperSHA256(imported.Kind) {

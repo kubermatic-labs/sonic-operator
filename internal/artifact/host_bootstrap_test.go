@@ -297,9 +297,9 @@ func TestHostBootstrapEveryPayloadIsStrippedAndHydrated(t *testing.T) {
 }
 
 func TestHostBootstrapImportedInstallPrefixesRetainOriginalEvidence(t *testing.T) {
-	for _, kind := range []string{"management-mac-python", "management-mac-shell"} {
+	for _, kind := range []string{host.ImportedKindPython, host.ImportedKindShell, host.ImportedKindPythonLegacy, host.ImportedKindShellLegacy} { //nolint:staticcheck // Legacy names are covered on purpose.
 		helperName := "set-management-mac.sh"
-		if kind == "management-mac-python" {
+		if host.IsImportedPythonKind(kind) {
 			helperName = "management-only-mac.py"
 		}
 		dir := os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR")
@@ -322,7 +322,7 @@ func TestHostBootstrapImportedInstallPrefixesRetainOriginalEvidence(t *testing.T
 				original := []byte("[Service]\nExecStartPost=" + helperPath + "\n")
 				interpreter := "imported-shell"
 				ph := host.LegacyMACHook{Kind: kind, BaseMAC: "00:00:5e:00:53:01", MAC: "02:00:5e:00:53:01", Addresses: []host.Address{{Prefix: "10.0.0.22/24", Gateway: "10.0.0.1"}}, HelperSHA256: host.ImportedHelperSHA256(kind), HookSHA256: Digest(host.ImportedMACUnit(kind))}
-				if kind == "management-mac-python" {
+				if host.IsImportedPythonKind(kind) {
 					original = []byte("[Service]\nExecStartPost=/usr/bin/python3 " + helperPath + " boot\n")
 					interpreter = "imported-python"
 					ph.BaseMAC = "00:00:5e:00:53:02"
