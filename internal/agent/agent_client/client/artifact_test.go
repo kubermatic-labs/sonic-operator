@@ -14,7 +14,9 @@ import (
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type artifactWireFixture struct {
@@ -171,6 +173,22 @@ func TestArtifactDispatchFreshnessAndCompatibility(t *testing.T) {
 					t.Fatal("token lost")
 				}
 			})
+		}
+	}
+}
+
+func TestArtifactRPCErrorKeepsFilteredReason(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{status.Error(codes.FailedPrecondition, "artifact supervisor rejected operation: running and installed agent executables differ"), "artifact confirm RPC failed: FailedPrecondition: artifact supervisor rejected operation: running and installed agent executables differ"},
+		{status.Error(codes.Unavailable, "connection error: desc = \"transport: secret\""), "artifact confirm RPC failed: Unavailable: unclassified"},
+		{context.DeadlineExceeded, "artifact confirm RPC failed: deadline exceeded"},
+		{errors.New("plain failure"), "artifact confirm RPC failed: plain failure"},
+	} {
+		if got := artifactRPCError("confirm", tc.err).Error(); got != tc.want {
+			t.Errorf("got %q, want %q", got, tc.want)
 		}
 	}
 }

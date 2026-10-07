@@ -4,6 +4,8 @@ package agent_server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/ironcore-dev/sonic-operator/internal/artifact"
@@ -67,5 +69,23 @@ func TestBootstrapRPCIsIndependentAndWriteGated(t *testing.T) {
 	result, err := s.Bootstrap(context.Background(), &pb.ArtifactRequest{BundleJson: raw})
 	if err != nil || calls != 1 || result.RecoveryPhase != "BootstrapReady" {
 		t.Fatalf("independent bootstrap failed: %+v %v", result, err)
+	}
+}
+
+func TestArtifactRejectionCarriesFilteredReason(t *testing.T) {
+	b := artifact.Bundle{Owner: "owner", Target: "target", Generation: 1, Baseline: "base", Files: []artifact.File{{Slot: "PlatformJSON", SHA256: strings.Repeat("a", 64)}}}
+	raw, _ := json.Marshal(b)
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{errors.New("external artifact supervisor rejected operation: agent binary is outside accepted release set"), "artifact supervisor rejected operation: external artifact supervisor rejected operation: agent binary is outside accepted release set"},
+		{errors.New("-----BEGIN PRIVATE KEY-----"), "artifact supervisor rejected operation: unclassified"},
+	} {
+		s := &artifactServer{allow: true, execute: func(context.Context, artifact.Request) (*artifact.Result, error) { return nil, tc.err }}
+		_, err := s.Observe(context.Background(), &pb.ArtifactRequest{BundleJson: raw})
+		if status.Code(err) != codes.FailedPrecondition || status.Convert(err).Message() != tc.want {
+			t.Fatalf("got %v, want %q", err, tc.want)
+		}
 	}
 }
