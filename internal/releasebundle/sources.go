@@ -98,7 +98,7 @@ func BuildSources(repo string, releaseRaw []byte, paths map[string]string, profi
 			}
 			p.LegacyMACHooks = append(p.LegacyMACHooks, decl)
 			key := "imported-shell"
-			if decl.Kind == host.ImportedKindPython {
+			if host.IsImportedPythonKind(decl.Kind) {
 				key = "imported-python"
 			}
 			p.ConsumerSHA256[key] = h.InterpreterSHA256

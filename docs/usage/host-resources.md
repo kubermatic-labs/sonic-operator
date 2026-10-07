@@ -319,13 +319,13 @@ state while the old boot hook stays in place.
 
 | Field | Description |
 | --- | --- |
-| `kind` | `management-mac-python` or `management-mac-shell` |
+| `kind` | `management-mac-python` or `management-mac-shell` (deprecated legacy names: `dc-management-only`, `set-management`) |
 | `hookSHA256` | Exact hook hash |
 | `helperSHA256` | Exact helper hash |
 | `baseMAC` | Switch base MAC |
 | `mac` | Management MAC set by the hook |
 | `addresses` | Original typed address list |
-| `hostname` | Required for `management-mac-python`; must not be set for `management-mac-shell` |
+| `hostname` | Required for `management-mac-python`, optional for the legacy `dc-management-only`; must not be set for the shell helper |
 
 - `management-mac-python` requires `hostname` because that helper selects its MAC by
   hostname. Qualification fails unless the switch reports that hostname.

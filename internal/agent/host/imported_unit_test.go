@@ -36,7 +36,7 @@ func newImportedUnitFixture(t *testing.T, kind, phase string) *importedUnitFixtu
 	}
 	h := LegacyMACHook{Kind: kind, BaseMAC: "00:00:5e:00:53:01", MAC: "02:00:5e:00:53:01", Addresses: []Address{{Prefix: "10.0.0.22/24", Gateway: "10.0.0.1"}}, HelperSHA256: ImportedHelperSHA256(kind), HookSHA256: digestForTest(string(ImportedMACUnit(kind)))}
 	helperName, key, interpreter := "set-management-mac.sh", "imported-shell", "/bin/sh"
-	if kind == ImportedKindPython {
+	if IsImportedPythonKind(kind) {
 		h.BaseMAC, h.MAC, h.Addresses[0].Prefix, h.Hostname = "00:00:5e:00:53:02", "02:00:5e:00:53:02", "10.0.0.21/24", "leaf-01"
 		helperName, key, interpreter = "management-only-mac.py", "imported-python", "/usr/bin/python3"
 	}

@@ -88,7 +88,7 @@ func readNativeUnitFile(path string) ([]byte, os.FileInfo, error) {
 
 func originalImportedCommand(kind string) string {
 	_, helper, _ := ImportedMACPaths(kind)
-	if kind == ImportedKindPython {
+	if IsImportedPythonKind(kind) {
 		return "/usr/bin/python3 " + helper + " boot"
 	}
 	return helper

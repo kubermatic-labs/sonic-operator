@@ -38,14 +38,14 @@ func TestImportedMACFixedCommands(t *testing.T) {
 }
 
 func TestCapturedImportedBootMACGuards(t *testing.T) {
-	for _, kind := range []string{"management-mac-python", "management-mac-shell"} {
+	for _, kind := range []string{ImportedKindPython, ImportedKindShell, ImportedKindPythonLegacy, ImportedKindShellLegacy} {
 		for _, change := range []string{"valid", "bootstrap-newline", "bootstrap-environment", "foreign-mac", "base", "addresses", "foreign-interface", "hostname", "vrf", "gateway", "helper", "interpreter", "typed-boot", "typed-dropin", "rollback-unit", "pending", "reservation"} {
 			t.Run(kind+"/"+change, func(t *testing.T) {
-				if change == "hostname" && kind == "management-mac-shell" {
+				if change == "hostname" && IsImportedShellKind(kind) {
 					t.Skip("shell helper has no hostname selector")
 				}
 				helperName := "set-management-mac.sh"
-				if kind == "management-mac-python" {
+				if IsImportedPythonKind(kind) {
 					helperName = "management-only-mac.py"
 				}
 				dir := os.Getenv("SONIC_TEST_MAC_FIXTURE_DIR")
@@ -60,7 +60,7 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 					t.Fatal("capture differs from approved helper")
 				}
 				h := LegacyMACHook{Kind: kind, BaseMAC: "00:00:5e:00:53:01", MAC: "02:00:5e:00:53:01", Addresses: []Address{{Prefix: "10.0.0.22/24", Gateway: "10.0.0.1"}}, HelperSHA256: ImportedHelperSHA256(kind), HookSHA256: digestForTest(string(ImportedMACUnit(kind)))}
-				if kind == "management-mac-python" {
+				if IsImportedPythonKind(kind) {
 					h.BaseMAC = "00:00:5e:00:53:02"
 					h.MAC = "02:00:5e:00:53:02"
 					h.Addresses[0].Prefix = "10.0.0.21/24"
@@ -76,7 +76,7 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 					}
 				}
 				key := "imported-shell"
-				if kind == "management-mac-python" {
+				if IsImportedPythonKind(kind) {
 					key = "imported-python"
 				}
 				p.ConsumerSHA256[key] = digestForTest("interpreter")
@@ -166,7 +166,7 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 					}
 					if args[0] == helperPath || args[0] == "/usr/bin/python3" {
 						want := helperPath
-						if kind == "management-mac-python" {
+						if IsImportedPythonKind(kind) {
 							want = "/usr/bin/python3 " + helperPath + " boot"
 						}
 						if strings.Join(args, " ") != want {
@@ -194,7 +194,7 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 							case "--property=ExecStartPost":
 								if bootstrap {
 									command := helperPath
-									if kind == "management-mac-python" {
+									if IsImportedPythonKind(kind) {
 										command = "/usr/bin/python3 " + helperPath + " boot"
 									}
 									return []byte("{ path=" + strings.Fields(command)[0] + " ; argv[]=" + command + " ; }"), nil
@@ -211,7 +211,7 @@ func TestCapturedImportedBootMACGuards(t *testing.T) {
 								t.Fatal(err)
 							}
 							text := strings.TrimSuffix(string(b), "\n")
-							if kind == "management-mac-python" {
+							if IsImportedPythonKind(kind) {
 								text = strings.ReplaceAll(text, "path=/usr/local/sbin/set-management-mac", "path=/usr/bin/python3")
 								text = strings.ReplaceAll(text, "argv[]=/usr/local/sbin/set-management-mac", "argv[]=/usr/bin/python3 "+helperPath+" boot")
 							}

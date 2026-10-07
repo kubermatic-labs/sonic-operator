@@ -96,16 +96,16 @@ func ValidateNativeProfile(data []byte) (NativeProfile, error) {
 		return p, ErrInvalid
 	}
 	for _, h := range p.LegacyMACHooks {
-		if h.Kind != ImportedKindPython && h.Kind != ImportedKindShell {
+		if !IsImportedPythonKind(h.Kind) && !IsImportedShellKind(h.Kind) {
 			return p, ErrInvalid
 		}
 		if !nativeSHA.MatchString(h.HookSHA256) || !nativeSHA.MatchString(h.HelperSHA256) || validateActiveMAC(h.MAC) != nil || validateActiveMAC(h.BaseMAC) != nil || ValidateManagement(Management{Interface: "eth0", MAC: h.MAC, Addresses: h.Addresses}) != nil {
 			return p, ErrInvalid
 		}
-		if h.Kind == ImportedKindPython {
+		if IsImportedPythonKind(h.Kind) {
 			expected["imported-python"] = true
 		}
-		if h.Kind == ImportedKindShell {
+		if IsImportedShellKind(h.Kind) {
 			expected["imported-shell"] = true
 		}
 		if validateImportedIdentity(h) != nil {

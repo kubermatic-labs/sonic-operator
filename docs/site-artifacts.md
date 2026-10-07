@@ -173,7 +173,7 @@ Without `--switch-input`, the output is an **unqualified base-profile source set
 - `agent`: typed agent options.
 - `importedMACEnvironment` (optional): set to `sonic-dpu-none-v1` on images whose systemd generator adds a non-DPU `environment.conf` drop-in to `interfaces-config.service`. The tool then qualifies that generated drop-in and the native unit fragment exactly, and remeasures them after regeneration, bootstrap repair and boot. It does not take ownership of the generated file.
 - `hooks`: imported legacy management-MAC hooks. Each hook supplies:
-  - `declaration`: a `LegacyMACHook` with `kind`, observed base/active MAC and address tuple. For `kind: management-mac-python`, `hostname` is **required** (the Python helper selects its MAC by hostname) and must be a lowercase DNS label such as `leaf-01`. For `management-mac-shell`, `hostname` must be omitted.
+  - `declaration`: a `LegacyMACHook` with `kind`, observed base/active MAC and address tuple. For `kind: management-mac-python`, `hostname` is **required** (the Python helper selects its MAC by hostname) and must be a lowercase DNS label such as `leaf-01`. For `management-mac-shell`, `hostname` must be omitted. The legacy kind names `dc-management-only` and `set-management` from earlier releases are still accepted for installed hooks; new declarations should use the current names.
   - `interpreterSHA256`: the measured interpreter hash.
   - `helperFile`, `sourceHookFile` and `sourceHookSHA256`.
 

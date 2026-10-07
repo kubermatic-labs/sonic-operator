@@ -8,6 +8,8 @@ package v1alpha1
 // ArtifactMACHookSpecApplyConfiguration represents a declarative configuration of the ArtifactMACHookSpec type for use
 // with apply.
 type ArtifactMACHookSpecApplyConfiguration struct {
+	// dc-management-only and set-management are deprecated legacy names for the
+	// same helpers, accepted for hooks installed by earlier releases.
 	Kind             *string                               `json:"kind,omitempty"`
 	SourceHookSHA256 *string                               `json:"sourceHookSHA256,omitempty"`
 	SourceHookRef    *ArtifactContentRefApplyConfiguration `json:"sourceHookRef,omitempty"`
