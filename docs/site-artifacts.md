@@ -69,7 +69,7 @@ The first reachable main agent that supports `ArtifactService` is the deployment
 4. Update the SwitchArtifact: set the new `supervisorSHA256`, `supervisorChunks`, `policySHA256` and `policyRef`, and set `spec.bootstrapMigrationFrom` to the **previous** `policySHA256`. The API rejects the change otherwise, and also if `hostRecovery` or `unitSHA256` differ.
 5. Wait until the agent has installed and activated the new bootstrap and the resource is Verified again. Then update the `AgentBinary` slot to the new build through the normal guarded update; the supervisor rolls back automatically if the controller doesn't confirm it within five minutes.
 
-The running agent must understand the new policy. An agent that does not support every capability declared in the new policy cannot install it and has to be replaced out of band first.
+The running agent must understand the new policy. Agents built before the imported MAC unit reader (`host-imported-mac-unit-v1`) reject any policy that declares it. To upgrade such a switch without an out-of-band step, build the release with `make host-artifact-binaries RELEASE_BUILD_TAGS=legacy_release`: the binaries then declare only the eight legacy capabilities, so the old agent can install the new policy and remains a valid rollback target. Switches with imported MAC hooks that need the new reader cannot use legacy builds.
 
 ### Journal and content store
 

@@ -162,12 +162,16 @@ proto: protoc-gen-go protoc-gen-go-grpc goimports
 # Production release bytes are measured after stripping. Keep the source checkout
 # clean/committed: Go's embedded VCS provenance is checked by the release tool.
 .PHONY: host-artifact-binaries
+# Set RELEASE_BUILD_TAGS=legacy_release to declare only the eight legacy
+# capabilities, for releases that must stay readable by agents predating the
+# imported MAC unit reader.
+RELEASE_BUILD_TAGS ?=
 host-artifact-binaries:
 	test -z "$$(git status --porcelain --untracked-files=normal)"
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/agent ./cmd/agent
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/supervisor ./cmd/artifact-supervisor
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/watchdog ./cmd/host-recovery
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags='-s -w' -o bin/host-artifact-release/controller ./cmd
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -tags='$(RELEASE_BUILD_TAGS)' -ldflags='-s -w' -o bin/host-artifact-release/agent ./cmd/agent
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -tags='$(RELEASE_BUILD_TAGS)' -ldflags='-s -w' -o bin/host-artifact-release/supervisor ./cmd/artifact-supervisor
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -tags='$(RELEASE_BUILD_TAGS)' -ldflags='-s -w' -o bin/host-artifact-release/watchdog ./cmd/host-recovery
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -tags='$(RELEASE_BUILD_TAGS)' -ldflags='-s -w' -o bin/host-artifact-release/controller ./cmd
 
 .PHONY: docs
 docs: crd-ref-docs ## Generate API reference documentation.
