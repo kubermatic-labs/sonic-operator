@@ -44,7 +44,7 @@ func TestNativeReadInterpreterAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			// Exact size of the pinned Python 3.13 observed on a reference switch.
 			const size = 6820528
 			if err := f.Truncate(size); err != nil {
@@ -101,7 +101,7 @@ func TestNativeReadConfigAndPathGuards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if err := f.Truncate((4 << 20) + 1); err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestNativeReadBoundedAfterStat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		t.Fatal(err)

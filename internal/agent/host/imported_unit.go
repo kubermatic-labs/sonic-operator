@@ -71,7 +71,7 @@ func readNativeUnitFile(path string) ([]byte, os.FileInfo, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	before, err := f.Stat()
 	if err != nil || !before.Mode().IsRegular() || before.Size() > 64<<10 {
 		return nil, nil, ErrNative
