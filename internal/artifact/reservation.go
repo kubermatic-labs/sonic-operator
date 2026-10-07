@@ -37,12 +37,6 @@ func (e *Engine) release(j *journal) error {
 // Agent* content. The restored agent may then finish existing foreign recovery.
 //
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
-func (e *Engine) restoreAgentDependency(now time.Time) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return e.restoreAgentDependencyContext(ctx, now)
-}
-
 func (e *Engine) restoreAgentDependencyContext(ctx context.Context, now time.Time) error {
 	if err := e.mu.LockContext(ctx); err != nil {
 		return err

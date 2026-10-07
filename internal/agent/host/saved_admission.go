@@ -53,7 +53,7 @@ func readSavedConfigFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, ErrNative
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	before, err := f.Stat()
 	if err != nil || !before.Mode().IsRegular() || before.Size() > savedConfigLimit || before.Mode().Perm()&0022 != 0 {
 		return nil, ErrNative
