@@ -374,7 +374,13 @@ func (j *vlanAuthorityJournal) checkPendingMode(id uint32, allowRecovery bool) e
 // VLAN ID zero is for whole-DB saves/interface setters: block all pending work
 // but allow confirmed ownership on unrelated configuration.
 func (m *SonicAgent) lockOrdinaryConfig(ctx context.Context, id uint32) (func(), *agent.Status) {
-	m.configMutex.Lock()
+	for !m.configMutex.TryLock() {
+		select {
+		case <-ctx.Done():
+			return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, ctx.Err().Error())
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		m.configMutex.Unlock()
 		return nil, agenterrors.NewErrorStatus(agenterrors.SERVER_ERROR, err.Error())

@@ -3,8 +3,11 @@ package artifact
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ironcore-dev/sonic-operator/internal/agent/host"
 )
 
 type WriterFence interface {
@@ -32,14 +35,43 @@ func NewNativeEngine(root, state string, policy Policy, fence WriterFence) (*Eng
 	e.MutationGuard = func(ctx context.Context, action func() error) error {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		return fence.WithMutation(ctx, func() error { return n.WithHostFence(ctx, action) })
+		return retryHostBusy(ctx, func(guarded func() error) error {
+			return fence.WithMutation(ctx, func() error { return n.WithHostFence(ctx, guarded) })
+		}, action)
 	}
 	e.AgentRecoveryGuard = func(ctx context.Context, owner, token, manifest string, action func() error) error {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		return fence.WithAgentRecovery(ctx, owner, token, manifest, func() error { return n.WithAgentRecoveryFence(ctx, owner, token, manifest, action) })
+		return retryHostBusy(ctx, func(guarded func() error) error {
+			return fence.WithAgentRecovery(ctx, owner, token, manifest, func() error { return n.WithAgentRecoveryFence(ctx, owner, token, manifest, guarded) })
+		}, action)
 	}
 	e.ActivateAgentRecovery, e.AgentRecoveryHealth = n.ActivateAgentRecovery, n.AgentRecoveryHealth
 	e.RestorePackages, e.BootRuntimeRestore, e.ValidatePlatformBoot = n.RestorePackages, n.RestoreBootRuntime, n.ColdPlatformBoot
 	return e, n, nil
+}
+
+// attempt must unwind every writer lock before returning ErrBusy. The deadline
+// belongs to the whole guard, not each attempt, including reserved recovery.
+// Only acquisition can retry: an entered action may already have mutated state,
+// even if it returns a wrapped ErrBusy. Mark entry inside the innermost fence.
+func retryHostBusy(ctx context.Context, attempt func(func() error) error, action func() error) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		entered := false
+		err := attempt(func() error {
+			entered = true
+			return action()
+		})
+		if entered || !errors.Is(err, host.ErrBusy) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
 }

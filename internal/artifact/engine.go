@@ -716,20 +716,24 @@ func validateCandidates(files []File) error {
 // Tick is invoked only by the external supervisor, never by the agent process.
 // A partially installed transaction is rolled back after any supervisor crash.
 func (e *Engine) Tick(now time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	if e.MutationGuard != nil {
 		entered := false
-		err := e.MutationGuard(context.Background(), func() error { entered = true; return e.tick(now) })
+		err := e.MutationGuard(ctx, func() error { entered = true; return e.tick(ctx, now) })
 		if err != nil && !entered && errors.Is(err, artifactstate.ErrForeignPending) {
-			return errors.Join(err, e.restoreAgentDependency(now))
+			return errors.Join(err, e.restoreAgentDependencyContext(ctx, now))
 		}
 		return err
 	}
-	return e.tick(now)
+	return e.tick(ctx, now)
 }
 
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
-func (e *Engine) tick(now time.Time) error {
-	e.mu.Lock()
+func (e *Engine) tick(ctx context.Context, now time.Time) error {
+	if err := e.mu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer e.mu.Unlock()
 	j, err := e.load()
 	if err != nil || j == nil {

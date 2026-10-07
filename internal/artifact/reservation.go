@@ -37,15 +37,23 @@ func (e *Engine) release(j *journal) error {
 // Agent* content. The restored agent may then finish existing foreign recovery.
 //
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
-func (e *Engine) restoreAgentDependency(now time.Time) error {
-	e.mu.Lock()
+func (e *Engine) restoreAgentDependencyContext(ctx context.Context, now time.Time) error {
+	if err := e.mu.LockContext(ctx); err != nil {
+		return err
+	}
 	j, err := e.load()
 	e.mu.Unlock()
 	if err != nil || j == nil {
 		return err
 	}
 	if j.Reserved && (j.Phase == "Confirmed" || j.Phase == "RolledBack") && e.AgentRecoveryGuard != nil {
-		return e.AgentRecoveryGuard(context.Background(), j.Owner, j.Token, j.Identity, func() error { e.mu.Lock(); defer e.mu.Unlock(); return e.release(j) })
+		return e.AgentRecoveryGuard(ctx, j.Owner, j.Token, j.Identity, func() error {
+			if err := e.mu.LockContext(ctx); err != nil {
+				return err
+			}
+			defer e.mu.Unlock()
+			return e.release(j)
+		})
 	}
 	if !j.Reserved || (!e.expired(j, now) && j.Phase != "WaitingForeign" && j.Phase != "RestoringAgent") {
 		return fmt.Errorf("foreign recovery blocks artifact continuation")
@@ -57,8 +65,10 @@ func (e *Engine) restoreAgentDependency(now time.Time) error {
 	if e.AgentRecoveryGuard == nil || e.ActivateAgentRecovery == nil || e.AgentRecoveryHealth == nil {
 		return fmt.Errorf("agent dependency recovery unavailable")
 	}
-	return e.AgentRecoveryGuard(context.Background(), j.Owner, j.Token, j.Identity, func() error {
-		e.mu.Lock()
+	return e.AgentRecoveryGuard(ctx, j.Owner, j.Token, j.Identity, func() error {
+		if err := e.mu.LockContext(ctx); err != nil {
+			return err
+		}
 		defer e.mu.Unlock()
 		current, err := e.load()
 		if err != nil || current == nil || current.Token != j.Token {

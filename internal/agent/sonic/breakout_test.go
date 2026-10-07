@@ -199,8 +199,8 @@ func TestBreakoutSplitAndNoop(t *testing.T) {
 	}
 	(*db)["PORT|Ethernet0"]["admin_status"] = "up"
 	got, status = m.ReconcilePortBreakout(t.Context(), splitRequest())
-	if status != nil || *calls != 1 || *saves != 2 || !got.PersistenceVerified || (*db)["PORT|Ethernet0"]["admin_status"] != "up" {
-		t.Fatalf("no-op must verify/save, not recreate/reset admin: %+v %+v %d %d", got, status, *calls, *saves)
+	if status != nil || *calls != 1 || *saves != 1 || !got.ConfigurationVerified || !got.RuntimeVerified || !got.PersistenceVerified || (*db)["PORT|Ethernet0"]["admin_status"] != "up" {
+		t.Fatalf("confirmed no-op must freshly verify without resave/reset: %+v %+v %d %d", got, status, *calls, *saves)
 	}
 }
 
