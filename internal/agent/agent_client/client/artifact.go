@@ -12,6 +12,7 @@ import (
 	pb "github.com/ironcore-dev/sonic-operator/pkg/agent/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 type ArtifactClient interface {
@@ -153,7 +154,7 @@ func (c *defaultSwitchAgentClient) ArtifactFresh(ctx context.Context, r artifact
 		out, err = client.Confirm(ctx, request, opts...)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("artifact RPC failed")
+		return nil, artifactRPCError(r.Operation, err)
 	}
 	if out == nil {
 		return nil, fmt.Errorf("missing artifact response")
@@ -180,4 +181,14 @@ func agentReleasePolicy(b artifact.Bundle) (artifact.Policy, string, error) {
 		return artifact.Policy{}, "", fmt.Errorf("immutable accepted agent policy required for health")
 	}
 	return p, hash, nil
+}
+
+// artifactRPCError keeps the gRPC code and the agent's filtered reason, so a
+// rejected operation can be diagnosed from the controller.
+func artifactRPCError(operation string, err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return fmt.Errorf("artifact %s RPC failed: %s", operation, artifact.SafeReason(err))
+	}
+	return fmt.Errorf("artifact %s RPC failed: %s: %s", operation, st.Code(), artifact.SafeText(st.Message()))
 }

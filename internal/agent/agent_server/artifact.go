@@ -73,17 +73,17 @@ func (s *artifactServer) call(ctx context.Context, r *pb.ArtifactRequest, op str
 			var err error
 			b, err = artifact.HydrateContent(ctx, "/", b, op, r.ContentSession)
 			if err != nil {
-				return nil, status.Error(codes.FailedPrecondition, "bootstrap content unavailable")
+				return nil, status.Error(codes.FailedPrecondition, "bootstrap content unavailable: "+artifact.SafeReason(err))
 			}
 		}
 		if err := bootstrap(ctx, b); err != nil {
-			return nil, status.Error(codes.FailedPrecondition, "declared bootstrap ownership or activation failed")
+			return nil, status.Error(codes.FailedPrecondition, "declared bootstrap ownership or activation failed: "+artifact.SafeReason(err))
 		}
 		return &pb.ArtifactResponse{ConfigurationVerified: true, RuntimeVerified: true, PersistenceVerified: true, RecoveryPhase: "BootstrapReady"}, nil
 	}
 	out, err := s.execute(ctx, artifact.Request{Operation: op, Bundle: b, Token: r.ConfirmationToken, ContentSession: r.ContentSession})
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, "artifact supervisor rejected operation")
+		return nil, status.Error(codes.FailedPrecondition, "artifact supervisor rejected operation: "+artifact.SafeReason(err))
 	}
 	if out == nil {
 		return nil, status.Error(codes.Internal, "missing artifact result")

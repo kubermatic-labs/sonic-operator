@@ -9,6 +9,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	api "github.com/ironcore-dev/sonic-operator/api/v1alpha1"
@@ -73,13 +74,13 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 			if c.ok {
 				state = metav1.ConditionTrue
 			}
-			reason := "Reconciling"
+			reason, message := "Reconciling", "Declared artifact lifecycle verification"
 			if retErr != nil {
-				reason = "Blocked"
+				reason, message = "Blocked", artifactBlockedMessage(retErr)
 			} else if c.ok {
 				reason = "Verified"
 			}
-			meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{Type: c.name, Status: state, Reason: reason, Message: "Declared artifact lifecycle verification", ObservedGeneration: obj.Generation})
+			meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{Type: c.name, Status: state, Reason: reason, Message: message, ObservedGeneration: obj.Generation})
 		}
 		retErr = errors.Join(retErr, r.Status().Patch(ctx, obj, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})))
 	}()
@@ -288,4 +289,15 @@ func newArtifactClient(ctx context.Context, reader client.Reader, sw *api.Switch
 		return nil, nil, fmt.Errorf("artifact agent capability unavailable")
 	}
 	return rpc, closer, nil
+}
+
+// artifactBlockedMessage bounds the reconcile error shown in conditions. Agent
+// reasons are already filtered by the client before they reach this point.
+func artifactBlockedMessage(err error) string {
+	const limit = 512
+	message := strings.TrimSpace(err.Error())
+	if len(message) > limit {
+		message = message[:limit] + "..."
+	}
+	return message
 }

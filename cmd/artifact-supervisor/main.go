@@ -54,10 +54,10 @@ func main() {
 		log.Fatal("installed boot/image identity unavailable or changed")
 	}
 	if err := engine.RestoreBoot(); err != nil {
-		log.Print("confirmed artifact boot restoration waits for cooperating recovery")
+		log.Printf("confirmed artifact boot restoration waits for cooperating recovery: %s", artifact.SafeReason(err))
 	}
 	if err := engine.Tick(time.Now()); err != nil {
-		log.Print("artifact boot recovery requires attention")
+		log.Printf("artifact boot recovery requires attention: %s", artifact.SafeReason(err))
 	}
 	socketDir := filepath.Dir(artifact.SocketPath)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
@@ -105,10 +105,10 @@ func main() {
 				continue
 			}
 			if err := engine.RestoreBoot(); err != nil {
-				log.Print("artifact boot restoration pending")
+				log.Printf("artifact boot restoration pending: %s", artifact.SafeReason(err))
 			}
 			if err := engine.Tick(time.Now()); err != nil {
-				log.Print("artifact recovery pending; health or persistence check failed")
+				log.Printf("artifact recovery pending; health or persistence check failed: %s", artifact.SafeReason(err))
 			}
 		}
 	}

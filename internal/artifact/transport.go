@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -85,7 +86,7 @@ func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := e.Execute(r.Context(), req)
 	if err != nil {
-		http.Error(w, "artifact operation rejected; inspect recovery phase", http.StatusConflict)
+		http.Error(w, "artifact operation rejected: "+SafeReason(err), http.StatusConflict)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -117,7 +118,12 @@ func SupervisorRequest(ctx context.Context, r Request) (*Result, error) {
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("external artifact supervisor rejected operation")
+		body, _ := io.ReadAll(io.LimitReader(response.Body, MaxReasonBytes+64))
+		reason := SafeText(strings.TrimPrefix(strings.TrimSpace(string(body)), "artifact operation rejected: "))
+		if reason == "" {
+			reason = http.StatusText(response.StatusCode)
+		}
+		return nil, fmt.Errorf("external artifact supervisor rejected operation: %s", reason)
 	}
 	raw, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
