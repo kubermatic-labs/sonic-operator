@@ -12,3 +12,6 @@
 
 # Re-include template files for go:embed
 !**/*.gotmpl
+
+# Re-include Python scripts embedded with go:embed
+!internal/artifact/*.py
