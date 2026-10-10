@@ -36,6 +36,10 @@ spec:
       name: SNMPLocation
       priority: 1
       type: string
+    - jsonPath: .spec.snmp.users[*].name
+      name: SNMPUsers
+      priority: 1
+      type: string
     - jsonPath: .status.recovery
       name: Recovery
       priority: 1
@@ -142,6 +146,97 @@ spec:
                   location:
                     maxLength: 256
                     type: string
+                  users:
+                    description: |-
+                      Users owns the complete set of read-only SNMPv3 USM users. Omission or an
+                      empty list declares no users. Passwords are referenced, never inlined.
+                    items:
+                      description: |-
+                        SystemSNMPUser is a read-only SNMPv3 user with authentication and, by
+                        default, privacy.
+                      properties:
+                        authPasswordSecretRef:
+                          description: |-
+                            AuthPasswordSecretRef supplies the authentication passphrase: 8 to 64
+                            printable ASCII characters without whitespace, quotes, '\', '#', '@' or ':'.
+                          properties:
+                            key:
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            name:
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        authProtocol:
+                          default: SHA
+                          enum:
+                          - SHA
+                          type: string
+                        name:
+                          description: Name is the USM user (security) name.
+                          maxLength: 32
+                          minLength: 4
+                          pattern: ^[A-Za-z0-9._-]+$
+                          type: string
+                        privPasswordSecretRef:
+                          description: |-
+                            PrivPasswordSecretRef supplies the privacy passphrase for authPriv, with
+                            the same character rules as the authentication passphrase.
+                          properties:
+                            key:
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            name:
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        privProtocol:
+                          description: PrivProtocol defaults to AES (AES-128-CFB)
+                            for authPriv.
+                          enum:
+                          - AES
+                          type: string
+                        securityLevel:
+                          default: authPriv
+                          enum:
+                          - authNoPriv
+                          - authPriv
+                          type: string
+                      required:
+                      - authPasswordSecretRef
+                      - name
+                      type: object
+                      x-kubernetes-validations:
+                      - message: authPriv requires privPasswordSecretRef
+                        rule: self.securityLevel != 'authPriv' || has(self.privPasswordSecretRef)
+                      - message: authNoPriv must not declare privacy settings
+                        rule: self.securityLevel != 'authNoPriv' || (!has(self.privPasswordSecretRef)
+                          && !has(self.privProtocol))
+                    maxItems: 8
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 required:
                 - location
                 type: object

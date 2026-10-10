@@ -33,7 +33,25 @@ type SNMP struct {
 	Location  string     `json:"location"`
 	Contact   string     `json:"contact"`
 	Community Credential `json:"community"`
+	Users     []SNMPUser `json:"users,omitempty"`
 }
+
+// SNMPUser is a read-only USM user. Fields are normalized by the controller;
+// PrivProtocol/PrivPassword are set exactly for SecurityLevel authPriv.
+type SNMPUser struct {
+	Name          string     `json:"name"`
+	SecurityLevel string     `json:"securityLevel"`
+	AuthProtocol  string     `json:"authProtocol"`
+	AuthPassword  Credential `json:"authPassword"`
+	PrivProtocol  string     `json:"privProtocol,omitempty"`
+	PrivPassword  Credential `json:"privPassword,omitempty"`
+}
+
+const (
+	SNMPAuthNoPriv = "authNoPriv"
+	SNMPAuthPriv   = "authPriv"
+)
+
 type System struct {
 	NTP  *NTP  `json:"ntp,omitempty"`
 	SNMP *SNMP `json:"snmp,omitempty"`

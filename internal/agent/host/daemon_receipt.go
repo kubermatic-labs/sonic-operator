@@ -148,12 +148,9 @@ func (n *Native) activateDaemon(ctx context.Context, q Request, p NativeProfile,
 	command := []string{"systemctl", "restart", service}
 	var container snmpContainer
 	if mode == "snmp" {
-		container, err = n.snmpContainer(ctx)
+		container, command, err = n.prepareSNMPActivation(ctx, service)
 		if err != nil {
 			return err
-		}
-		if !container.State.Running {
-			command = []string{"docker", "start", container.ID}
 		}
 	}
 	if _, err = n.run(ctx, command...); err != nil {
@@ -173,7 +170,7 @@ func (n *Native) activateDaemon(ctx context.Context, q Request, p NativeProfile,
 	var observed daemonEvidence
 	for {
 		observed, err = n.daemonEvidence(ready, mode)
-		if err == nil && daemonProcessMatches(mode, observed, expected) && observed.BootID == before.ID && observed.StartUptime >= before.Seconds && (observed.PID != prior.PID || observed.StartUptime != prior.StartUptime) {
+		if err == nil && daemonProcessMatches(mode, observed, expected) && persistedUsersMatch(mode, q, observed) && observed.BootID == before.ID && observed.StartUptime >= before.Seconds && (observed.PID != prior.PID || observed.StartUptime != prior.StartUptime) {
 			break
 		}
 		select {
@@ -184,4 +181,36 @@ func (n *Native) activateDaemon(ctx context.Context, q Request, p NativeProfile,
 	}
 	r := daemonReceipt{Claim: intent.Claim, Profile: profileIdentity(p), BootID: observed.BootID, PID: observed.PID, StartUptime: observed.StartUptime, File: observed.File}
 	return n.writeRuntime(mode+".receipt.json", r)
+}
+
+// prepareSNMPActivation returns the qualified container and its (re)start
+// command. A plain restart would let the stopping daemon re-persist its USM
+// users, so a container with persisted users is stopped, scrubbed and started.
+func (n *Native) prepareSNMPActivation(ctx context.Context, service string) (snmpContainer, []string, error) {
+	container, err := n.snmpContainer(ctx)
+	if err != nil {
+		return container, nil, err
+	}
+	persisted, err := n.snmpPersistentState(ctx, container)
+	if err != nil {
+		return container, nil, err
+	}
+	if !container.State.Running {
+		if persisted.hasUsers() {
+			if err = n.scrubSNMPPersistent(ctx, container); err != nil {
+				return container, nil, err
+			}
+		}
+		return container, []string{"docker", "start", container.ID}, nil
+	}
+	if !persisted.hasUsers() {
+		return container, []string{"systemctl", "restart", service}, nil
+	}
+	if _, err = n.run(ctx, "systemctl", "stop", service); err != nil {
+		return container, nil, err
+	}
+	if err = n.scrubSNMPPersistent(ctx, container); err != nil {
+		return container, nil, err
+	}
+	return container, []string{"systemctl", "start", service}, nil
 }

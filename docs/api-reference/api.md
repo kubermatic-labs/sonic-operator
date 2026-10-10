@@ -378,6 +378,7 @@ _Appears in:_
 
 _Appears in:_
 - [SystemSNMP](#systemsnmp)
+- [SystemSNMPUser](#systemsnmpuser)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -2369,6 +2370,29 @@ _Appears in:_
 | `location` _string_ |  |  | MaxLength: 256 <br /> |
 | `contact` _string_ | Empty Contact leaves the native contact input unowned. |  | MaxLength: 256 <br /> |
 | `communitySecretRef` _[HostSecretKeyReference](#hostsecretkeyreference)_ | CommunitySecretRef supplies the sole read-only community. Omission declares<br />no communities. Plaintext is never allowed in this resource. |  |  |
+| `users` _[SystemSNMPUser](#systemsnmpuser) array_ | Users owns the complete set of read-only SNMPv3 USM users. Omission or an<br />empty list declares no users. Passwords are referenced, never inlined. |  | MaxItems: 8 <br /> |
+
+
+#### SystemSNMPUser
+
+
+
+SystemSNMPUser is a read-only SNMPv3 user with authentication and, by
+default, privacy.
+
+
+
+_Appears in:_
+- [SystemSNMP](#systemsnmp)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the USM user (security) name. |  | MaxLength: 32 <br />MinLength: 4 <br />Pattern: `^[A-Za-z0-9._-]+$` <br /> |
+| `securityLevel` _string_ |  | authPriv | Enum: [authNoPriv authPriv] <br /> |
+| `authProtocol` _string_ |  | SHA | Enum: [SHA] <br /> |
+| `authPasswordSecretRef` _[HostSecretKeyReference](#hostsecretkeyreference)_ | AuthPasswordSecretRef supplies the authentication passphrase: 8 to 64<br />printable ASCII characters without whitespace, quotes, '\', '#', '@' or ':'. |  |  |
+| `privProtocol` _string_ | PrivProtocol defaults to AES (AES-128-CFB) for authPriv. |  | Enum: [AES] <br /> |
+| `privPasswordSecretRef` _[HostSecretKeyReference](#hostsecretkeyreference)_ | PrivPasswordSecretRef supplies the privacy passphrase for authPriv, with<br />the same character rules as the authentication passphrase. |  |  |
 
 
 #### TrafficPolicyName

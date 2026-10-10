@@ -6,9 +6,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/asn1"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -21,17 +26,68 @@ type systemFixture struct {
 	files                map[string][]byte
 	db, loaded           Database
 	running, failRestart bool
-	restarts             int
+	restarts, scrubs     int
 	pid                  int
 	clock, started, wall float64
 	stamp                daemonFile
+	// persistent models /var/lib/snmp/snmpd.conf; usm the daemon's loaded users.
+	persistent []byte
+	usm        map[string]SNMPUser
+}
+
+// persist mirrors Net-SNMP's store at startup and shutdown. The fixture
+// records passphrases where the native file holds localized keys.
+func (f *systemFixture) persist() {
+	var b strings.Builder
+	b.WriteString("engineBoots 1\n")
+	for _, name := range slices.Sorted(maps.Keys(f.usm)) {
+		u := f.usm[name]
+		fmt.Fprintf(&b, "usmUser 1 3 0x80 0x%x 0x%x NULL .1 0x%x .2 0x%x \"\"\n", name, name, string(u.AuthPassword), string(u.PrivPassword))
+	}
+	f.persistent = []byte(b.String())
+}
+
+// startDaemon loads users from the rendered configuration, then lets persisted
+// records override them, exactly as Net-SNMP reads its persistent file last.
+func (f *systemFixture) startDaemon() {
+	f.usm = map[string]SNMPUser{}
+	for name, row := range f.db["SNMP_USER"] {
+		u := SNMPUser{Name: name, SecurityLevel: SNMPAuthNoPriv, AuthProtocol: row["SNMP_USER_AUTH_TYPE"], AuthPassword: Credential(row["SNMP_USER_AUTH_PASSWORD"])}
+		if row["SNMP_USER_TYPE"] == "Priv" {
+			u.SecurityLevel, u.PrivProtocol, u.PrivPassword = SNMPAuthPriv, row["SNMP_USER_ENCRYPTION_TYPE"], Credential(row["SNMP_USER_ENCRYPTION_PASSWORD"])
+		}
+		f.usm[name] = u
+	}
+	for _, line := range strings.Split(string(f.persistent), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 11 || fields[0] != "usmUser" {
+			continue
+		}
+		decode := func(v string) string { b, _ := hex.DecodeString(strings.TrimPrefix(v, "0x")); return string(b) }
+		u := SNMPUser{Name: decode(fields[4]), SecurityLevel: SNMPAuthNoPriv, AuthProtocol: "SHA", AuthPassword: Credential(decode(fields[8]))}
+		if priv := decode(fields[10]); priv != "" {
+			u.SecurityLevel, u.PrivProtocol, u.PrivPassword = SNMPAuthPriv, "AES", Credential(priv)
+		}
+		f.usm[u.Name] = u
+	}
+	f.persist()
+}
+func (f *systemFixture) persistedUsers() []string {
+	names := []string{}
+	for _, line := range strings.Split(string(f.persistent), "\n") {
+		if fields := strings.Fields(line); len(fields) > 4 && fields[0] == "usmUser" {
+			b, _ := hex.DecodeString(strings.TrimPrefix(fields[4], "0x"))
+			names = append(names, string(b))
+		}
+	}
+	return names
 }
 
 func (f *systemFixture) request(s SNMP) Request {
 	return Request{Kind: "System", Owner: "system-owner", Target: "switch", Revision: "1", System: &System{SNMP: &s}}
 }
 func (f *systemFixture) config(db Database) []byte {
-	b, _ := json.Marshal(map[string]any{"SNMP": db["SNMP"], "SNMP_COMMUNITY": db["SNMP_COMMUNITY"]})
+	b, _ := json.Marshal(map[string]any{"SNMP": db["SNMP"], "SNMP_COMMUNITY": db["SNMP_COMMUNITY"], "SNMP_USER": db["SNMP_USER"]})
 	return b
 }
 func (f *systemFixture) evidence() daemonEvidence {
@@ -43,7 +99,32 @@ func (f *systemFixture) evidence() daemonEvidence {
 	v.ObservedWall = f.wall + f.clock
 	v.File = f.stamp
 	v.ConfigDigest = digestForTest(string(f.files["/etc/snmp/snmpd.conf"]))
+	v.PersistedUsers = f.persistedUsers()
 	return v
+}
+func (f *systemFixture) persistentArchive() ([]byte, error) {
+	var out bytes.Buffer
+	w := tar.NewWriter(&out)
+	_ = w.WriteHeader(&tar.Header{Name: "snmp/", Mode: 0755, Typeflag: tar.TypeDir, Uid: 110, Gid: 112})
+	if f.persistent != nil {
+		_ = w.WriteHeader(&tar.Header{Name: "snmp/snmpd.conf", Mode: 0600, Size: int64(len(f.persistent)), Typeflag: tar.TypeReg, Uid: 110, Gid: 112})
+		_, _ = w.Write(f.persistent)
+	}
+	_ = w.Close()
+	return out.Bytes(), nil
+}
+func (f *systemFixture) restorePersistent(input []byte) ([]byte, error) {
+	if f.running {
+		f.t.Fatal("persistent USM state rewritten under a running daemon")
+	}
+	r := tar.NewReader(bytes.NewReader(input))
+	h, err := r.Next()
+	if err != nil || h.Name != "snmpd.conf" || h.Uid != 110 || h.Gid != 112 || h.Mode != 0600 {
+		f.t.Fatal("persistent state archive lost native ownership")
+	}
+	f.persistent, _ = io.ReadAll(r)
+	f.scrubs++
+	return nil, nil
 }
 func (f *systemFixture) run(_ context.Context, args []string, input []byte) ([]byte, error) {
 	joined := strings.Join(args, " ")
@@ -53,6 +134,12 @@ func (f *systemFixture) run(_ context.Context, args []string, input []byte) ([]b
 			status = "running"
 		}
 		return json.Marshal(map[string]any{"Id": strings.Repeat("a", 64), "Image": "sha256:" + strings.Repeat("b", 64), "State": map[string]any{"Running": f.running, "Status": status}, "Config": map[string]any{"Entrypoint": []string{"/usr/bin/docker-snmp-init.sh"}}})
+	}
+	if joined == "docker cp "+strings.Repeat("a", 64)+":"+snmpPersistentDir+" -" {
+		return f.persistentArchive()
+	}
+	if joined == "docker cp -a - "+strings.Repeat("a", 64)+":"+snmpPersistentDir {
+		return f.restorePersistent(input)
 	}
 	if len(args) >= 2 && args[0] == "docker" && args[1] == "cp" {
 		_, path, _ := strings.Cut(args[3], ":")
@@ -115,7 +202,17 @@ func (f *systemFixture) run(_ context.Context, args []string, input []byte) ([]b
 		}
 		return json.Marshal(f.evidence())
 	}
-	if joined == "systemctl restart snmp.service" || (len(args) == 3 && args[0] == "docker" && args[1] == "start") {
+	if joined == "systemctl stop snmp.service" {
+		if f.running {
+			f.persist()
+		}
+		f.running = false
+		return nil, nil
+	}
+	if joined == "systemctl restart snmp.service" || joined == "systemctl start snmp.service" || (len(args) == 3 && args[0] == "docker" && args[1] == "start") {
+		if f.running {
+			f.persist()
+		}
 		f.restarts++
 		f.running = false
 		if f.failRestart {
@@ -136,12 +233,13 @@ func (f *systemFixture) run(_ context.Context, args []string, input []byte) ([]b
 		f.stamp.ChangedNS++
 		f.files["/etc/snmp/snmpd.conf"] = f.config(f.db)
 		f.loaded = cloneDB(f.db)
+		f.startDaemon()
 		return nil, nil
 	}
 	return nil, ErrNative
 }
 func newSystemFixture(t *testing.T) *systemFixture {
-	f := &systemFixture{t: t, dir: t.TempDir(), files: map[string][]byte{}, db: Database{"SNMP": {"LOCATION": {"Location": "public"}}, "SNMP_COMMUNITY": {}}, running: true, pid: 42, clock: 100, started: 50, wall: 1000, stamp: daemonFile{Device: 1, Inode: 2, ModifiedNS: 3, ChangedNS: 4}}
+	f := &systemFixture{t: t, dir: t.TempDir(), files: map[string][]byte{}, db: Database{"SNMP": {"LOCATION": {"Location": "public"}}, "SNMP_COMMUNITY": {}}, running: true, pid: 42, clock: 100, started: 50, wall: 1000, stamp: daemonFile{Device: 1, Inode: 2, ModifiedNS: 3, ChangedNS: 4}, persistent: []byte("engineBoots 1\n"), usm: map[string]SNMPUser{}}
 	_ = os.Chmod(f.dir, 0700)
 	f.loaded = cloneDB(f.db)
 	f.files["/etc/snmp/snmpd.conf"] = f.config(f.db)
@@ -179,7 +277,12 @@ func newSystemFixture(t *testing.T) *systemFixture {
 		}
 		return f.run(ctx, args, input)
 	}
-	n.SNMPExchange = func(_ context.Context, packet []byte) ([]byte, error) {
+	n.SNMPExchange = func(ctx context.Context, packet []byte) ([]byte, error) {
+		var v3 snmpV3Message
+		if _, e := asn1.Unmarshal(packet, &v3); e == nil && v3.Version == 3 {
+			agent := &fakeUSMAgent{engineID: []byte{0x80, 0, 0x1f, 0x88, 0x80, 9}, boots: 1, time: 10, users: f.usm, location: f.loaded["SNMP"]["LOCATION"]["Location"], contact: "contact"}
+			return agent.exchange(ctx, packet)
+		}
 		var req snmpMessage
 		if _, e := asn1.Unmarshal(packet, &req); e != nil {
 			return nil, ErrNative
