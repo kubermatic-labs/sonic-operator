@@ -197,13 +197,13 @@ func TestManagementCandidateFailureAndFailedRecovery(t *testing.T) {
 func TestSystemCredentialsNeverJournaled(t *testing.T) {
 	e, f, _ := newTestEngine(t)
 	f.native = false
-	q := Request{Kind: "System", Owner: "uid", Target: "switch", Revision: "generation-1-secret-rv-7", System: &System{SNMP: &SNMP{Community: Credential("super-secret-marker")}}}
+	q := Request{Kind: "System", Owner: "uid", Target: "switch", Revision: "generation-1-secret-rv-7", System: &System{SNMP: &SNMP{Community: Credential("super-secret-marker"), Users: []SNMPUser{{Name: "monitor", SecurityLevel: SNMPAuthPriv, AuthProtocol: "SHA", AuthPassword: "super-secret-auth", PrivProtocol: "AES", PrivPassword: "super-secret-priv"}}}}}
 	_, _ = e.Ensure(context.Background(), q, "conn")
 	b, err := os.ReadFile(filepath.Join(e.dir, "host.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(b), "super-secret-marker") {
+	if strings.Contains(string(b), "super-secret") {
 		t.Fatal("credential journaled")
 	}
 }

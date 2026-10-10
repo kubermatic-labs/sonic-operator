@@ -70,7 +70,7 @@ func hostChanges(before, after host.Database) (vlanChangeDB, vlanChangeDB, error
 			if reflect.DeepEqual(a, b) {
 				continue
 			}
-			allowed := (t == "NTP" && row == "global") || t == "NTP_SERVER" || t == "SNMP_COMMUNITY" || (t == "SNMP" && (row == "LOCATION" || row == "CONTACT")) || (t == "MGMT_INTERFACE" && strings.HasPrefix(row, "eth0|"))
+			allowed := (t == "NTP" && row == "global") || t == "NTP_SERVER" || t == "SNMP_COMMUNITY" || t == "SNMP_USER" || (t == "SNMP" && (row == "LOCATION" || row == "CONTACT")) || (t == "MGMT_INTERFACE" && strings.HasPrefix(row, "eth0|"))
 			if !allowed {
 				return nil, nil, host.ErrInvalid
 			}

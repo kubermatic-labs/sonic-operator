@@ -79,6 +79,44 @@ type SystemSNMP struct {
 	// no communities. Plaintext is never allowed in this resource.
 	// +optional
 	CommunitySecretRef *HostSecretKeyReference `json:"communitySecretRef,omitempty"`
+	// Users owns the complete set of read-only SNMPv3 USM users. Omission or an
+	// empty list declares no users. Passwords are referenced, never inlined.
+	// +optional
+	// +kubebuilder:validation:MaxItems=8
+	// +listType=map
+	// +listMapKey=name
+	Users []SystemSNMPUser `json:"users,omitempty"`
+}
+
+// SystemSNMPUser is a read-only SNMPv3 user with authentication and, by
+// default, privacy.
+// +kubebuilder:validation:XValidation:rule="self.securityLevel != 'authPriv' || has(self.privPasswordSecretRef)",message="authPriv requires privPasswordSecretRef"
+// +kubebuilder:validation:XValidation:rule="self.securityLevel != 'authNoPriv' || (!has(self.privPasswordSecretRef) && !has(self.privProtocol))",message="authNoPriv must not declare privacy settings"
+type SystemSNMPUser struct {
+	// Name is the USM user (security) name.
+	// +required
+	// +kubebuilder:validation:MinLength=4
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	Name string `json:"name"`
+	// +kubebuilder:default=authPriv
+	// +kubebuilder:validation:Enum=authNoPriv;authPriv
+	SecurityLevel string `json:"securityLevel,omitempty"`
+	// +kubebuilder:default=SHA
+	// +kubebuilder:validation:Enum=SHA
+	AuthProtocol string `json:"authProtocol,omitempty"`
+	// AuthPasswordSecretRef supplies the authentication passphrase: 8 to 64
+	// printable ASCII characters without whitespace, quotes, '\', '#', '@' or ':'.
+	// +required
+	AuthPasswordSecretRef HostSecretKeyReference `json:"authPasswordSecretRef"`
+	// PrivProtocol defaults to AES (AES-128-CFB) for authPriv.
+	// +optional
+	// +kubebuilder:validation:Enum=AES
+	PrivProtocol string `json:"privProtocol,omitempty"`
+	// PrivPasswordSecretRef supplies the privacy passphrase for authPriv, with
+	// the same character rules as the authentication passphrase.
+	// +optional
+	PrivPasswordSecretRef *HostSecretKeyReference `json:"privPasswordSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="has(self.ntp) || has(self.snmp)",message="at least one system setting is required"
@@ -136,6 +174,7 @@ type SwitchManagementList struct {
 // +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
 // +kubebuilder:printcolumn:name="NTPServers",type=string,JSONPath=`.spec.ntp.servers`,priority=1
 // +kubebuilder:printcolumn:name="SNMPLocation",type=string,JSONPath=`.spec.snmp.location`,priority=1
+// +kubebuilder:printcolumn:name="SNMPUsers",type=string,JSONPath=`.spec.snmp.users[*].name`,priority=1
 // +kubebuilder:printcolumn:name="Recovery",type=string,JSONPath=`.status.recovery`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchSystem struct {

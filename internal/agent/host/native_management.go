@@ -66,7 +66,7 @@ func (n *Native) render(ctx context.Context, after Database, template string, co
 	if template == interfacesTemplate {
 		all["ZTP_DHCP_DISABLED"] = json.RawMessage(`"true"`)
 	}
-	for _, table := range []string{"MGMT_INTERFACE", "NTP", "NTP_SERVER", "SNMP", "SNMP_COMMUNITY"} {
+	for _, table := range []string{"MGMT_INTERFACE", "NTP", "NTP_SERVER", "SNMP", "SNMP_COMMUNITY", "SNMP_USER"} {
 		if rows, ok := after[table]; ok {
 			all[table], e = json.Marshal(rows)
 			if e != nil {

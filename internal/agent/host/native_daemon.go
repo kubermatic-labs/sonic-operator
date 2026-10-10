@@ -22,6 +22,21 @@ type daemonEvidence struct {
 	ConfigDigest     string     `json:"configDigest"`
 	EnvironmentClean bool       `json:"environmentClean"`
 	AuxiliaryClean   bool       `json:"auxiliaryClean"`
+	PersistedUsers   []string   `json:"persistedUsers"`
+}
+
+// Net-SNMP rewrites its persistent USM users right after startup, so a running
+// daemon persists exactly its loaded users. A stale or retired name means a
+// removed user is still loaded or would be resurrected by the next restart.
+func persistedUsersMatch(mode string, q Request, v daemonEvidence) bool {
+	want := []string{}
+	if mode == "snmp" && q.System != nil && q.System.SNMP != nil {
+		for _, u := range q.System.SNMP.Users {
+			want = append(want, u.Name)
+		}
+	}
+	slices.Sort(want)
+	return slices.Equal(want, slices.Sorted(slices.Values(v.PersistedUsers)))
 }
 
 func daemonConfigLoaded(mode string, v daemonEvidence, expected []byte, receipts ...*daemonReceipt) bool {
@@ -78,5 +93,5 @@ func (n *Native) daemonLoaded(ctx context.Context, mode string, expected []byte,
 	if err != nil || r.Claim != *requestClaim(q) || r.Profile != profileIdentity(p) {
 		return false
 	}
-	return daemonConfigLoaded(mode, evidence, expected, r)
+	return daemonConfigLoaded(mode, evidence, expected, r) && persistedUsersMatch(mode, q, evidence)
 }

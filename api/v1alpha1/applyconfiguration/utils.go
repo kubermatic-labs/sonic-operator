@@ -189,6 +189,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.SystemNTPApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SystemSNMP"):
 		return &apiv1alpha1.SystemSNMPApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SystemSNMPUser"):
+		return &apiv1alpha1.SystemSNMPUserApplyConfiguration{}
 
 	}
 	return nil

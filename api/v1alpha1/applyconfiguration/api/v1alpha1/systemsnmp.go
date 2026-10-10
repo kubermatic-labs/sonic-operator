@@ -14,6 +14,9 @@ type SystemSNMPApplyConfiguration struct {
 	// CommunitySecretRef supplies the sole read-only community. Omission declares
 	// no communities. Plaintext is never allowed in this resource.
 	CommunitySecretRef *HostSecretKeyReferenceApplyConfiguration `json:"communitySecretRef,omitempty"`
+	// Users owns the complete set of read-only SNMPv3 USM users. Omission or an
+	// empty list declares no users. Passwords are referenced, never inlined.
+	Users []SystemSNMPUserApplyConfiguration `json:"users,omitempty"`
 }
 
 // SystemSNMPApplyConfiguration constructs a declarative configuration of the SystemSNMP type for use with
@@ -43,5 +46,18 @@ func (b *SystemSNMPApplyConfiguration) WithContact(value string) *SystemSNMPAppl
 // If called multiple times, the CommunitySecretRef field is set to the value of the last call.
 func (b *SystemSNMPApplyConfiguration) WithCommunitySecretRef(value *HostSecretKeyReferenceApplyConfiguration) *SystemSNMPApplyConfiguration {
 	b.CommunitySecretRef = value
+	return b
+}
+
+// WithUsers adds the given value to the Users field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Users field.
+func (b *SystemSNMPApplyConfiguration) WithUsers(values ...*SystemSNMPUserApplyConfiguration) *SystemSNMPApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithUsers")
+		}
+		b.Users = append(b.Users, *values[i])
+	}
 	return b
 }

@@ -5,8 +5,8 @@ switch from Kubernetes:
 
 - `SwitchManagement` owns the eth0 management addresses and gateways and, when you
   specify it, a management-only MAC override.
-- `SwitchSystem` owns configured NTP inputs and the SNMP location, contact and
-  read-only community settings.
+- `SwitchSystem` owns configured NTP inputs and the SNMP location, contact,
+  read-only community and read-only SNMPv3 user settings.
 
 Use them when you want management networking, time and SNMP settings declared and
 verified alongside the rest of your switch configuration.
@@ -92,14 +92,75 @@ empty server set is valid.
 - Communities come from namespaced Kubernetes Secret key references. Omitting the
   reference declares an empty community set.
 - An empty contact leaves the native contact input unowned.
-- SNMPv3 or read-write community coexistence is rejected by this profile.
+- Read-write communities, read-write SNMPv3 users and `noAuthNoPriv` users are
+  rejected by this profile.
 - Secret values never appear in status, events, logs, annotations or recovery
   journals. Native command stderr is discarded, and RPC/controller errors use fixed
   messages.
 
 **Runtime proof** compares the generated config, checks a durable causal activation
 receipt and, when a community exists, performs an authenticated SNMP GET for the
-configured location and contact.
+configured location and contact. Each SNMPv3 user gets its own authenticated (and,
+for `authPriv`, encrypted) SNMPv3 GET.
+
+### SNMPv3 users
+
+`spec.snmp.users` owns the complete `SNMP_USER` table: declared users are written,
+and users that are no longer declared are removed. Omitting the list declares no
+users. Every user is read-only.
+
+```yaml
+apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1
+kind: SwitchSystem
+metadata:
+  name: sw-mgmt-001-system
+spec:
+  switchRef:
+    name: sw-mgmt-001
+  managementPolicy: Manage
+  snmp:
+    location: rack-a
+    users:
+      - name: monitor              # securityLevel defaults to authPriv
+        authPasswordSecretRef:
+          namespace: sonic-operator-system
+          name: sw-mgmt-001-snmp-v3
+          key: auth
+        privPasswordSecretRef:
+          namespace: sonic-operator-system
+          name: sw-mgmt-001-snmp-v3
+          key: priv
+```
+
+| Field | Values |
+| --- | --- |
+| `name` | 4–32 characters: `A-Z a-z 0-9 . _ -` |
+| `securityLevel` | `authPriv` (default) or `authNoPriv` |
+| `authProtocol` | `SHA` (HMAC-SHA-96, default) |
+| `privProtocol` | `AES` (AES-128-CFB, default for `authPriv`). Not allowed with `authNoPriv`. |
+| Passphrases | 8–64 printable ASCII characters without whitespace, `"`, `'`, `\`, `#`, `@` or `:` |
+
+SONiC's `snmpd.conf.j2` renders passphrases as unquoted Net-SNMP tokens, so the
+agent rejects anything outside these rules instead of quoting it. Like communities,
+passphrases are stored in plaintext in CONFIG_DB and `/etc/sonic/config_db.json`,
+which is how SONiC stores them natively.
+
+#### Persisted USM users
+
+Net-SNMP writes every loaded user, with its localized keys, to
+`/var/lib/snmp/snmpd.conf` inside the SNMP container when it starts and stops. It
+reads that file *after* the rendered `/etc/snmp/snmpd.conf`. A plain restart would
+therefore keep a rotated user's old key and leave removed users loaded in USM.
+
+- If the persistent file contains `usmUser` records, activation runs
+  `systemctl stop snmp.service`, removes only those records with a bounded
+  `docker cp` round trip that keeps the file's owner and mode, and then runs
+  `systemctl start snmp.service`. Engine ID, boot counter and other persistent state
+  are kept. Without persisted users, activation still uses a plain restart.
+- The daemon probe reports the persisted user *names* (never keys). Runtime proof
+  requires them to match the declared users exactly.
+- Backup (`snmpd.0.conf`) or local (`snmpd.local.conf`) files in the persistent
+  directory are also read by Net-SNMP and fail closed.
 
 ### `/etc/sonic/snmp.yml`
 

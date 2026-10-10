@@ -65,7 +65,7 @@ func systemTables(s System) []string {
 		t = append(t, "NTP", "NTP_SERVER")
 	}
 	if s.SNMP != nil {
-		t = append(t, "SNMP", "SNMP_COMMUNITY")
+		t = append(t, "SNMP", "SNMP_COMMUNITY", "SNMP_USER")
 	}
 	return t
 }
@@ -152,6 +152,15 @@ func (n *Native) observeSystem(ctx context.Context, q Request, db, saved Databas
 			verify := func() error { return probeSNMP(ctx, *s.SNMP, "127.0.0.1:161") }
 			if n.SNMPExchange != nil {
 				verify = func() error { return probeSNMPExchange(ctx, *s.SNMP, n.SNMPExchange) }
+			}
+			out.RuntimeVerified = out.RuntimeVerified && verify() == nil
+		}
+		// Each user must authenticate (and decrypt) with the declared
+		// passphrases; a persisted stale key would fail this exchange.
+		for _, u := range s.SNMP.Users {
+			verify := func() error { return probeSNMPv3(ctx, *s.SNMP, u, "127.0.0.1:161") }
+			if n.SNMPExchange != nil {
+				verify = func() error { return probeSNMPv3Exchange(ctx, *s.SNMP, u, n.SNMPExchange) }
 			}
 			out.RuntimeVerified = out.RuntimeVerified && verify() == nil
 		}

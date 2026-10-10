@@ -1933,6 +1933,37 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: location
       type:
         scalar: string
+    - name: users
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemSNMPUser
+          elementRelationship: associative
+          keys:
+          - name
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.SystemSNMPUser
+  map:
+    fields:
+    - name: authPasswordSecretRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostSecretKeyReference
+    - name: authProtocol
+      type:
+        scalar: string
+      default: SHA
+    - name: name
+      type:
+        scalar: string
+    - name: privPasswordSecretRef
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.HostSecretKeyReference
+    - name: privProtocol
+      type:
+        scalar: string
+    - name: securityLevel
+      type:
+        scalar: string
+      default: authPriv
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.TrafficPolicyName
   scalar: string
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.VLANDeletionPolicy

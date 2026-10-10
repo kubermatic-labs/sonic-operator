@@ -251,8 +251,53 @@ func ValidateSystem(s System) error {
 				return ErrInvalid
 			}
 		}
+		if err := validateSNMPUsers(v.Users); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+var snmpUserName = regexp.MustCompile(`^[A-Za-z0-9._-]{4,32}$`)
+
+// Users are rendered as unquoted Net-SNMP tokens by the qualified template, so
+// passphrases exclude whitespace, quoting/escape characters and comment marks,
+// and additionally follow the SONiC YANG model (8..64, no '@' or ':').
+func validateSNMPUsers(users []SNMPUser) error {
+	if len(users) > 8 {
+		return ErrInvalid
+	}
+	seen := map[string]bool{}
+	for _, u := range users {
+		if !snmpUserName.MatchString(u.Name) || seen[u.Name] || u.AuthProtocol != "SHA" || !snmpPassphrase(u.AuthPassword) {
+			return ErrInvalid
+		}
+		seen[u.Name] = true
+		switch u.SecurityLevel {
+		case SNMPAuthNoPriv:
+			if u.PrivProtocol != "" || u.PrivPassword != "" {
+				return ErrInvalid
+			}
+		case SNMPAuthPriv:
+			if u.PrivProtocol != "AES" || !snmpPassphrase(u.PrivPassword) {
+				return ErrInvalid
+			}
+		default:
+			return ErrInvalid
+		}
+	}
+	return nil
+}
+func snmpPassphrase(p Credential) bool {
+	if len(p) < 8 || len(p) > 64 {
+		return false
+	}
+	for _, c := range string(p) {
+		if c < 33 || c > 126 || strings.ContainsRune(`"'\\#@:`, c) {
+			return false
+		}
+	}
+	return true
 }
 func normalizedNTP(n NTP) NTP {
 	if n.AdminState == "" {

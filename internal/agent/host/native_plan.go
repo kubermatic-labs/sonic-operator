@@ -100,8 +100,10 @@ func systemDatabase(db Database, s System) (Database, error) {
 		}
 	}
 	if s.SNMP != nil {
-		if len(out["SNMP_USER"]) > 0 {
-			return nil, ErrNative
+		for _, fields := range out["SNMP_USER"] {
+			if !snmpUserRowAdoptable(fields) {
+				return nil, ErrNative
+			}
 		}
 		for _, fields := range out["SNMP_COMMUNITY"] {
 			if len(fields) != 1 || fields["TYPE"] != "RO" {
@@ -122,8 +124,38 @@ func systemDatabase(db Database, s System) (Database, error) {
 		if s.SNMP.Community != "" {
 			out["SNMP_COMMUNITY"][string(s.SNMP.Community)] = map[string]string{"TYPE": "RO"}
 		}
+		out["SNMP_USER"] = map[string]map[string]string{}
+		for _, u := range s.SNMP.Users {
+			out["SNMP_USER"][u.Name] = snmpUserRow(u)
+		}
 	}
 	return out, nil
+}
+
+// snmpUserRow uses the SONiC YANG vocabulary consumed by snmpd.conf.j2. Net-SNMP
+// parses "AuthNoPriv"/"Priv" case-insensitively as rouser security levels.
+func snmpUserRow(u SNMPUser) map[string]string {
+	row := map[string]string{"SNMP_USER_TYPE": "AuthNoPriv", "SNMP_USER_PERMISSION": "RO", "SNMP_USER_AUTH_TYPE": u.AuthProtocol, "SNMP_USER_AUTH_PASSWORD": string(u.AuthPassword), "SNMP_USER_ENCRYPTION_TYPE": "", "SNMP_USER_ENCRYPTION_PASSWORD": ""}
+	if u.SecurityLevel == SNMPAuthPriv {
+		row["SNMP_USER_TYPE"], row["SNMP_USER_ENCRYPTION_TYPE"], row["SNMP_USER_ENCRYPTION_PASSWORD"] = "Priv", u.PrivProtocol, string(u.PrivPassword)
+	}
+	return row
+}
+
+// Only read-only users in the native field vocabulary are replaced. Read-write
+// or unknown rows belong to another writer and block adoption.
+func snmpUserRowAdoptable(fields map[string]string) bool {
+	if fields["SNMP_USER_PERMISSION"] != "RO" {
+		return false
+	}
+	for f := range fields {
+		switch f {
+		case "SNMP_USER_TYPE", "SNMP_USER_PERMISSION", "SNMP_USER_AUTH_TYPE", "SNMP_USER_AUTH_PASSWORD", "SNMP_USER_ENCRYPTION_TYPE", "SNMP_USER_ENCRYPTION_PASSWORD":
+		default:
+			return false
+		}
+	}
+	return true
 }
 func scopedEqual(a, b Database, tables ...string) bool {
 	for _, t := range tables {

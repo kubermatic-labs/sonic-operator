@@ -49,6 +49,58 @@ func TestHostSecretResolutionUsesReferencesOnly(t *testing.T) {
 	}
 }
 
+func TestHostSNMPv3UsersResolveFromSecretReferences(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = api.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "system", Name: "snmp-users", UID: "secret-uid", ResourceVersion: "7"}, Data: map[string][]byte{"auth": []byte("test-private-auth"), "priv": []byte("test-private-priv")}}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+	ref := func(key string) api.HostSecretKeyReference {
+		return api.HostSecretKeyReference{Namespace: "system", Name: "snmp-users", Key: key}
+	}
+	priv := ref("priv")
+	obj := &api.SwitchSystem{ObjectMeta: metav1.ObjectMeta{Name: "system", UID: "uid", Generation: 1}, Spec: api.SwitchSystemSpec{NetworkResourceSpec: api.NetworkResourceSpec{SwitchRef: api.NetworkSwitchReference{Name: "sw"}, ManagementPolicy: api.NetworkManagementPolicyManage}, SNMP: &api.SystemSNMP{Location: "rack", Users: []api.SystemSNMPUser{
+		{Name: "monitor", AuthPasswordSecretRef: ref("auth"), PrivPasswordSecretRef: &priv},
+		{Name: "auditor", SecurityLevel: "authNoPriv", AuthPasswordSecretRef: ref("auth")},
+	}}}}
+	r := HostReconciler{APIReader: reader}
+	request, _, err := r.hostDesired(context.Background(), obj, "switch-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	users := request.System.SNMP.Users
+	if len(users) != 2 || users[0].SecurityLevel != host.SNMPAuthPriv || users[0].AuthProtocol != "SHA" || users[0].PrivProtocol != "AES" || string(users[0].AuthPassword) != "test-private-auth" || string(users[0].PrivPassword) != "test-private-priv" {
+		t.Fatalf("authPriv user not normalized and resolved: %+v", users)
+	}
+	if users[1].SecurityLevel != host.SNMPAuthNoPriv || users[1].PrivProtocol != "" || users[1].PrivPassword != "" {
+		t.Fatal("authNoPriv user gained privacy settings")
+	}
+	if strings.Contains(request.Revision, "test-private") || !strings.HasPrefix(request.Revision, "1-") {
+		t.Fatal("revision must carry only the Secret identity")
+	}
+	// Rotating a referenced Secret must change the public revision.
+	secret.Data["auth"] = []byte("test-private-rotated")
+	if err = reader.Update(context.Background(), secret); err != nil {
+		t.Fatal(err)
+	}
+	rotated, _, err := r.hostDesired(context.Background(), obj, "switch-uid")
+	if err != nil || rotated.Revision == request.Revision {
+		t.Fatal("Secret rotation did not change the revision", err)
+	}
+	obj.Spec.SNMP.Users[0].PrivPasswordSecretRef = nil
+	if _, _, err = r.hostDesired(context.Background(), obj, "switch-uid"); err == nil {
+		t.Fatal("authPriv without a privacy passphrase accepted")
+	}
+	obj.Spec.SNMP.Users[0].PrivPasswordSecretRef = &priv
+	secret.Data["auth"] = []byte("short")
+	if err = reader.Update(context.Background(), secret); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = r.hostDesired(context.Background(), obj, "switch-uid"); err == nil || strings.Contains(err.Error(), "short") {
+		t.Fatal("invalid passphrase accepted or disclosed")
+	}
+}
+
 func TestHostSecretChangesBetweenObservationAndWriteBlockEnsure(t *testing.T) {
 	for _, operation := range []string{"rotate", "delete", "recreate", "metadata"} {
 		t.Run(operation, func(t *testing.T) {
