@@ -123,8 +123,8 @@ func routingShutdownPreflight(ctx context.Context, run routingRead, vrf string, 
 			return fmt.Errorf("BGP preflight requires actual FRR shutdown before policy changes")
 		}
 	}
-	if peer != "" && (!safeDefault || !noDefaultAF) {
-		return fmt.Errorf("peer policy preflight requires FRR default shutdown and disabled default IPv4 AF before creating a neighbor")
+	if peer != "" && (safeDefault || !noDefaultAF) {
+		return fmt.Errorf("peer policy preflight requires disabled default IPv4 AF and no FRR default shutdown (it blocks incoming sessions)")
 	}
 	return nil
 }
@@ -277,7 +277,7 @@ func observeRoutingBGP(ctx context.Context, run routingRead, vrf string, asn uin
 			afLines[af][trimmed] = true
 		}
 	}
-	matched := found && global["bgp router-id "+routerID] && global["no bgp default ipv4-unicast"] && global["bgp default shutdown"]
+	matched := found && global["bgp router-id "+routerID] && global["no bgp default ipv4-unicast"] && !global["bgp default shutdown"]
 	for _, lines := range []map[string]bool{global, afLines["ipv4 unicast"], afLines["ipv6 unicast"]} {
 		for line := range lines {
 			if strings.HasPrefix(line, "redistribute ") || strings.HasPrefix(line, "aggregate-address ") || strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "network ") {
@@ -340,6 +340,32 @@ func observeRoutingBGP(ctx context.Context, run routingRead, vrf string, asn uin
 				limit := strconv.FormatUint(uint64(*peer.MaxPrefixes), 10)
 				if !lines[nbr+"activate"] || !lines[nbr+"prefix-list "+name+" out"] || (!lines[nbr+"maximum-prefix "+limit+" 100"] && !lines[nbr+"maximum-prefix "+limit]) {
 					matched = false
+				}
+				importName := routingImportName(vrf, peer.Address, family)
+				importLines := map[string]bool{}
+				seq := 1
+				for _, p := range peer.ImportPrefixes {
+					if strings.Contains(p, ":") != (family == "ipv6_unicast") {
+						continue
+					}
+					importLines[fmt.Sprintf("%s prefix-list %s seq %d permit %s", kind, importName, seq, p)] = true
+					seq++
+				}
+				if len(importLines) > 0 {
+					importLines[fmt.Sprintf("%s prefix-list %s seq 4294967295 deny %s le %s", kind, importName, anyPrefix, bits)] = true
+				}
+				if (len(importLines) > 0) != lines[nbr+"prefix-list "+importName+" in"] {
+					matched = false
+				}
+				for line := range importLines {
+					if !all[line] {
+						matched = false
+					}
+				}
+				for line := range all {
+					if strings.HasPrefix(line, kind+" prefix-list "+importName+" ") && !importLines[line] {
+						matched = false
+					}
 				}
 				for line := range lines {
 					if strings.HasPrefix(line, nbr+"default-originate") || (strings.HasPrefix(line, nbr+"maximum-prefix ") && strings.Contains(line, "warning-only")) {

@@ -112,7 +112,7 @@ func TestNetworkRedundancyPlannerDispatch(t *testing.T) {
 	t.Parallel()
 	db := vlanChangeDB{
 		"DEVICE_METADATA|localhost":                 {"frr_mgmt_framework_config": "true"},
-		"BGP_GLOBALS|default":                       {"local_asn": "65001", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "true"},
+		"BGP_GLOBALS|default":                       {"local_asn": "65001", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "false"},
 		"LOOPBACK_INTERFACE|Loopback0|192.0.2.1/32": {"NULL": "NULL"},
 		"VXLAN_TUNNEL|vtep1":                        {"src_ip": "192.0.2.1"},
 		"VXLAN_EVPN_NVO|nvo1":                       {"source_vtep": "vtep1"},

@@ -108,6 +108,22 @@ spec:
                 - Up
                 - Down
                 type: string
+              importPrefixes:
+                description: |-
+                  ImportPrefixes is the inbound allowlist: exactly these prefixes are
+                  accepted from the peer. FRR discards every eBGP route without an inbound
+                  policy, so an empty list accepts nothing. Removal is not supported.
+                items:
+                  description: NetworkPrefix is a canonical network prefix, not an
+                    interface address.
+                  maxLength: 49
+                  type: string
+                  x-kubernetes-validations:
+                  - message: must be a canonical IPv4 or IPv6 network prefix
+                    rule: isCIDR(self) && self == string(cidr(self).masked())
+                maxItems: 256
+                type: array
+                x-kubernetes-list-type: set
               localAddress:
                 description: NetworkIP is an unscoped IPv4 or IPv6 address, never
                   an IPv4-mapped IPv6 address.
