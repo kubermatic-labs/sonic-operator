@@ -1039,6 +1039,7 @@ _Appears in:_
 | `recoveryPhase` _string_ |  |  |  |
 | `target` _string_ | Target binds UID, endpoint and credential reference across retries. |  |  |
 | `identity` _string_ |  |  |  |
+| `confirmedGeneration` _integer_ | ConfirmedGeneration is the generation whose declaration the switch last<br />confirmed. A later generation with identical content (for example only a<br />managementPolicy change) is converged without staging again. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ |  |  |  |
 
 
