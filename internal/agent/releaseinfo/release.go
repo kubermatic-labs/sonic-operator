@@ -18,8 +18,6 @@ const LegacyMarker = `SONIC-RELEASE-V1:["routing-safe-writers-v1","artifact-rese
 const Marker = `SONIC-RELEASE-V1:["routing-safe-writers-v1","artifact-reservation-v1","artifact-chunks-v1","host-observed-active-mac-v1","host-causal-runtime-v1","host-artifact-admission-v1","host-mac-ownership-v1","host-bootstrap-v1","host-imported-mac-unit-v1"]:END-SONIC-RELEASE`
 const ImportedMACUnit = "host-imported-mac-unit-v1"
 
-var compiledDeclaration = Marker
-
 type Info struct {
 	SourceCommit string   `json:"sourceCommit"`
 	Capabilities []string `json:"capabilities"`
@@ -93,17 +91,23 @@ func Equal(a, b Info) bool {
 // BinaryCapabilities preserves the declaration actually present in the binary;
 // inspecting an older release must not copy the inspecting tool's capabilities.
 // As with the original marker, this is provenance metadata, not an approval.
+//
+// The comparison markers are assembled at run time, so this function never
+// embeds a declaration of its own: an executable contains exactly the marker of
+// its compiledDeclaration.
 func BinaryCapabilities(raw []byte) ([]string, error) {
-	marker := Marker
-	if !bytes.Contains(raw, []byte(marker)) {
-		marker = LegacyMarker
-		if !bytes.Contains(raw, []byte(marker)) {
-			return nil, fmt.Errorf("compiled release declaration unavailable")
+	full := append(append([]string(nil), capabilities[:]...), ImportedMACUnit)
+	for _, caps := range [][]string{full, capabilities[:]} {
+		if bytes.Contains(raw, []byte(declarationMarker(caps))) {
+			return caps, nil
 		}
 	}
-	var caps []string
-	err := json.Unmarshal([]byte(marker[len("SONIC-RELEASE-V1:"):len(marker)-len(":END-SONIC-RELEASE")]), &caps)
-	return caps, err
+	return nil, fmt.Errorf("compiled release declaration unavailable")
+}
+
+func declarationMarker(caps []string) string {
+	raw, _ := json.Marshal(caps)
+	return "SONIC-RELEASE-" + "V1:" + string(raw) + ":END-" + "SONIC-RELEASE"
 }
 
 func SupportsImportedMACUnit(i Info) bool {
