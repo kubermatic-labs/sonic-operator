@@ -393,7 +393,7 @@ func evpnSafeConfig(db vlanChangeDB) error {
 	g := db["BGP_GLOBALS|default"]
 	asn, err := strconv.ParseUint(g["local_asn"], 10, 32)
 	v4 := true
-	if _, e := routingAddress(g["router_id"], &v4); e != nil || err != nil || asn == 0 || g["default_ipv4_unicast"] != "false" || g["default_shutdown"] != "true" {
+	if _, e := routingAddress(g["router_id"], &v4); e != nil || err != nil || asn == 0 || g["default_ipv4_unicast"] != "false" || g["default_shutdown"] != "false" {
 		return fmt.Errorf("existing SwitchBGP with routerID and safe defaults required")
 	}
 	for key, row := range db {

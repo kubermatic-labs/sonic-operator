@@ -587,6 +587,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.AdminState
       default: Down
+    - name: importPrefixes
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkPrefix
+          elementRelationship: associative
     - name: localAddress
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkIP

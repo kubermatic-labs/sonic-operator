@@ -55,7 +55,7 @@ func TestRoutingRealEnginePeerStaging(t *testing.T) {
 	if _, st := m.EnsureNetworkResource(ctx, bgp); st != nil {
 		t.Fatal(st)
 	}
-	base := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n bgp default shutdown\n"
+	base := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n"
 	filters := "!\nip prefix-list " + routingExportName("default", "ipv4_unicast") + " seq 4294967295 deny 0.0.0.0/0 le 32\nipv6 prefix-list " + routingExportName("default", "ipv6_unicast") + " seq 4294967295 deny ::/0 le 128\n"
 	config = base + filters
 	peer := routingRequest("BGPPeer", `{"address":"192.0.2.2","remoteASN":65001,"addressFamilies":["ipv4Unicast","ipv6Unicast"]}`)

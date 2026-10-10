@@ -18,13 +18,13 @@ import (
 const evpnTestMap = `{"tunnel":"vtep1","vlanID":10,"vni":100,"routeDistinguisher":"65001:100","importRouteTargets":["65001:100"],"exportRouteTargets":["65001:100","65001:101"]}`
 const evpnTestPeer = `{"address":"192.0.2.2","remoteASN":65002,"localAddress":"192.0.2.1","adminState":"Down"}`
 const evpnTestTunnel = `{"name":"vtep1","sourceAddress":"192.0.2.1","evpnNVO":"nvo1"}`
-const evpnTestFRR = "router bgp 65001\n bgp router-id 192.0.2.1\n bgp default shutdown\n no bgp default ipv4-unicast\n neighbor 192.0.2.2 remote-as 65002\n neighbor 192.0.2.2 update-source 192.0.2.1\n neighbor 192.0.2.2 shutdown\n"
+const evpnTestFRR = "router bgp 65001\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n neighbor 192.0.2.2 remote-as 65002\n neighbor 192.0.2.2 update-source 192.0.2.1\n neighbor 192.0.2.2 shutdown\n"
 const evpnTestVNI = " address-family l2vpn evpn\n  vni 100\n   rd 65001:100\n   route-target both 65001:100\n   route-target export 65001:101\n  exit-vni\n exit-address-family\n"
 
 func evpnTestDB() vlanChangeDB {
 	return vlanChangeDB{
 		"DEVICE_METADATA|localhost":                 {"frr_mgmt_framework_config": "true"},
-		"BGP_GLOBALS|default":                       {"local_asn": "65001", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "true"},
+		"BGP_GLOBALS|default":                       {"local_asn": "65001", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "false"},
 		"BGP_NEIGHBOR|default|192.0.2.2":            {"asn": "65002", "local_addr": "192.0.2.1", "admin_status": "down"},
 		"LOOPBACK_INTERFACE|Loopback0|192.0.2.1/32": {"NULL": "NULL"},
 		"PORT|Ethernet0":                            {"admin_status": "up"},

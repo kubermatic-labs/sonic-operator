@@ -40,7 +40,7 @@ func TestRoutingBGPPlan(t *testing.T) {
 	if p.Identity != "BGP|default" || p.Runtime == nil {
 		t.Fatalf("incomplete plan: %+v", p)
 	}
-	want := map[string]string{"local_asn": "65000", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "true"}
+	want := map[string]string{"local_asn": "65000", "router_id": "192.0.2.1", "default_ipv4_unicast": "false", "default_shutdown": "false"}
 	if !reflect.DeepEqual(p.Desired["BGP_GLOBALS|default"], want) {
 		t.Fatalf("global: %v", p.Desired)
 	}
@@ -59,6 +59,18 @@ func TestRoutingBGPPlan(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("planner mutated snapshot")
 	}
+	p, err = planNetworkBGP(db, routingRequest("BGP", `{"localASN":65000,"routerID":"192.0.2.1","prefixes":["192.0.2.0/24","2001:db8::/64"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// frrcfgd drops network statements processed before the instance exists:
+	// the first write creates the instance only, the next one adds networks.
+	for key := range p.Desired {
+		if strings.HasPrefix(key, "BGP_GLOBALS_AF_NETWORK|") {
+			t.Fatalf("network written together with a new instance: %s", key)
+		}
+	}
+	db["BGP_GLOBALS|default"] = p.Desired["BGP_GLOBALS|default"]
 	p, err = planNetworkBGP(db, routingRequest("BGP", `{"localASN":65000,"routerID":"192.0.2.1","prefixes":["192.0.2.0/24","2001:db8::/64"]}`))
 	if err != nil {
 		t.Fatal(err)
@@ -311,7 +323,7 @@ func TestRoutingObservationBound(t *testing.T) {
 
 func TestRoutingBGPRuntimeEvidence(t *testing.T) {
 	t.Parallel()
-	config := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n bgp default shutdown\n!\n"
+	config := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n!\n"
 	for _, af := range []string{"ipv4_unicast", "ipv6_unicast"} {
 		kind, prefix, bits := "ip", "0.0.0.0/0", "32"
 		if af == "ipv6_unicast" {
@@ -326,7 +338,7 @@ func TestRoutingBGPRuntimeEvidence(t *testing.T) {
 		{"consumed without peers", config, "frrcfgd RUNNING pid 1\nbgpd RUNNING pid 2", `{}`, true},
 		{"wrong router ID", strings.ReplaceAll(config, "192.0.2.1", "192.0.2.9"), "frrcfgd RUNNING\nbgpd RUNNING", `{}`, false},
 		{"traditional daemon", config, "bgpcfgd RUNNING\nbgpd RUNNING", `{}`, false},
-		{"implicit redistribution", strings.Replace(config, " bgp default shutdown", " redistribute connected\n bgp default shutdown", 1), "frrcfgd RUNNING\nbgpd RUNNING", `{}`, false},
+		{"implicit redistribution", strings.Replace(config, " no bgp default ipv4-unicast\n", " no bgp default ipv4-unicast\n redistribute connected\n", 1), "frrcfgd RUNNING\nbgpd RUNNING", `{}`, false},
 		{"wrong VRF", strings.Replace(config, "router bgp 65000", "router bgp 65000 vrf VrfBlue", 1), "frrcfgd RUNNING\nbgpd RUNNING", `{}`, false},
 		{"missing export guard", strings.ReplaceAll(config, "deny", "permit"), "frrcfgd RUNNING\nbgpd RUNNING", `{}`, false},
 	} {
@@ -385,7 +397,7 @@ func TestRoutingPeerRuntimeFamilies(t *testing.T) {
 	t.Parallel()
 	max := uint32(1000)
 	peer := &routingPeerSpec{Address: "2001:db8::2", RemoteASN: 65001, AdminState: "Down", MaxPrefixes: &max, AddressFamilies: []string{"ipv4Unicast", "ipv6Unicast"}}
-	config := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n bgp default shutdown\n neighbor 2001:db8::2 remote-as 65001\n neighbor 2001:db8::2 shutdown\n"
+	config := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n neighbor 2001:db8::2 remote-as 65001\n neighbor 2001:db8::2 shutdown\n"
 	policies := ""
 	for _, family := range []string{"ipv4_unicast", "ipv6_unicast"} {
 		name := routingExportName("default", family)
@@ -444,5 +456,134 @@ func TestRoutingPeerRuntimeFamilies(t *testing.T) {
 	}
 	if verified, _, err := observeRoutingBGP(t.Context(), runUp, "default", 65000, "192.0.2.1", nil, &up); err != nil || !verified {
 		t.Fatalf("FRR enabled peer: %v %v", verified, err)
+	}
+}
+
+func TestRoutingPeerImportFilter(t *testing.T) {
+	t.Parallel()
+	db := routingDB()
+	bgp, err := planNetworkBGP(db, routingRequest("BGP", `{"localASN":65000,"routerID":"192.0.2.1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range bgp.Desired {
+		db[k] = v
+	}
+	spec := `{"address":"192.0.2.2","remoteASN":65001,"addressFamilies":["ipv4Unicast"],"importPrefixes":["198.51.100.0/24","203.0.113.7/32"]}`
+	p, err := planNetworkBGPPeer(db, routingRequest("BGPPeer", spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := routingImportName("default", "192.0.2.2", "ipv4_unicast")
+	if p.Desired["BGP_NEIGHBOR_AF|default|192.0.2.2|ipv4_unicast"]["prefix_list_in"] != name {
+		t.Fatalf("no inbound filter: %v", p.Desired["BGP_NEIGHBOR_AF|default|192.0.2.2|ipv4_unicast"])
+	}
+	for _, key := range []string{"PREFIX_SET|" + name, "PREFIX|" + name + "|1|198.51.100.0/24|exact", "PREFIX|" + name + "|2|203.0.113.7/32|exact"} {
+		if len(p.Desired[key]) == 0 {
+			t.Fatalf("missing %s", key)
+		}
+	}
+	if p.Desired["PREFIX|"+name+"|4294967295|0.0.0.0/0|0..32"]["action"] != "deny" {
+		t.Fatal("inbound filter does not end with deny")
+	}
+	if _, ok := p.Desired["PREFIX_SET|"+routingImportName("default", "192.0.2.2", "ipv6_unicast")]; ok {
+		t.Fatal("empty IPv6 import filter created")
+	}
+	if routingImportName("default", "192.0.2.2", "ipv4_unicast") == routingImportName("default", "192.0.2.3", "ipv4_unicast") {
+		t.Fatal("import filters are not per peer")
+	}
+	if err := validateNetworkFields("BGPPeer", p.Desired); err != nil {
+		t.Fatalf("peer fields not allowed: %v", err)
+	}
+	for k, v := range p.Desired {
+		db[k] = v
+	}
+	if _, err := planNetworkBGPPeer(db, routingRequest("BGPPeer", `{"address":"192.0.2.2","remoteASN":65001,"addressFamilies":["ipv4Unicast"]}`)); err == nil || !strings.Contains(err.Error(), "importPrefixes") {
+		t.Fatalf("import filter removal accepted: %v", err)
+	}
+	if _, err := planNetworkBGPPeer(db, routingRequest("BGPPeer", `{"address":"192.0.2.2","remoteASN":65001,"addressFamilies":["ipv4Unicast"],"importPrefixes":["198.51.100.1/24"]}`)); err == nil {
+		t.Fatal("non-canonical import prefix accepted")
+	}
+}
+
+func TestRoutingPeerRequiresNoDefaultShutdown(t *testing.T) {
+	t.Parallel()
+	db := routingDB()
+	bgp, err := planNetworkBGP(db, routingRequest("BGP", `{"localASN":65000,"routerID":"192.0.2.1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range bgp.Desired {
+		db[k] = v
+	}
+	db["BGP_GLOBALS|default"]["default_shutdown"] = "true"
+	if _, err := planNetworkBGPPeer(db, routingRequest("BGPPeer", `{"address":"192.0.2.2","remoteASN":65001,"addressFamilies":["ipv4Unicast"]}`)); err == nil {
+		t.Fatal("peer planned while FRR default shutdown blocks incoming sessions")
+	}
+	again, err := planNetworkBGP(db, routingRequest("BGP", `{"localASN":65000,"routerID":"192.0.2.1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Desired["BGP_GLOBALS|default"]["default_shutdown"] != "false" {
+		t.Fatal("SwitchBGP does not migrate off default shutdown")
+	}
+}
+
+func TestRoutingRuntimeImportFilterAndDefaultShutdown(t *testing.T) {
+	t.Parallel()
+	max := uint32(1000)
+	peer := &routingPeerSpec{VRF: "default", Address: "192.0.2.2", RemoteASN: 65001, AdminState: "Down", MaxPrefixes: &max, AddressFamilies: []string{"ipv4Unicast"}, ImportPrefixes: []string{"198.51.100.0/24"}}
+	out, in := routingExportName("default", "ipv4_unicast"), routingImportName("default", "192.0.2.2", "ipv4_unicast")
+	config := "router bgp 65000\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n neighbor 192.0.2.2 remote-as 65001\n neighbor 192.0.2.2 shutdown\n !\n address-family ipv4 unicast\n  neighbor 192.0.2.2 activate\n  neighbor 192.0.2.2 maximum-prefix 1000 100\n  neighbor 192.0.2.2 prefix-list " + in + " in\n  neighbor 192.0.2.2 prefix-list " + out + " out\n exit-address-family\n!\n" +
+		"ip prefix-list " + out + " seq 4294967295 deny 0.0.0.0/0 le 32\n" +
+		"ipv6 prefix-list " + routingExportName("default", "ipv6_unicast") + " seq 4294967295 deny ::/0 le 128\n" +
+		"ip prefix-list " + in + " seq 1 permit 198.51.100.0/24\n" +
+		"ip prefix-list " + in + " seq 4294967295 deny 0.0.0.0/0 le 32\n"
+	for _, tc := range []struct {
+		name, config string
+		want         bool
+	}{
+		{"complete", config, true},
+		{"inbound filter not applied", strings.Replace(config, "  neighbor 192.0.2.2 prefix-list "+in+" in\n", "", 1), false},
+		{"inbound entry missing", strings.Replace(config, "ip prefix-list "+in+" seq 1 permit 198.51.100.0/24\n", "", 1), false},
+		{"extra inbound entry", config + "ip prefix-list " + in + " seq 2 permit 10.0.0.0/8\n", false},
+		{"FRR default shutdown", strings.Replace(config, " no bgp default ipv4-unicast\n", " no bgp default ipv4-unicast\n bgp default shutdown\n", 1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func(_ context.Context, c routingReadCommand) ([]byte, error) {
+				switch c {
+				case routingBGPConfig:
+					return []byte(tc.config), nil
+				case routingBGPDaemons:
+					return []byte("frrcfgd RUNNING\nbgpd RUNNING"), nil
+				case routingBGPSummary:
+					return []byte(`{}`), nil
+				}
+				return nil, fmt.Errorf("unexpected command")
+			}
+			got, _, err := observeRoutingBGP(context.Background(), run, "default", 65000, "192.0.2.1", nil, peer)
+			if err != nil || got != tc.want {
+				t.Fatalf("got %v, want %v (%v)", got, tc.want, err)
+			}
+		})
+	}
+}
+
+func TestBGPDefaultShutdownMigrationIsOneWayAndNarrow(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		kind, key, field, old, value string
+		want                         bool
+	}{
+		{"BGP", "BGP_GLOBALS|default", "default_shutdown", "true", "false", true},
+		{"BGP", "BGP_GLOBALS|Vrf1", "default_shutdown", "true", "false", true},
+		{"BGP", "BGP_GLOBALS|default", "default_shutdown", "false", "true", false},
+		{"BGP", "BGP_GLOBALS|default", "default_ipv4_unicast", "true", "false", false},
+		{"BGP", "BGP_NEIGHBOR|default|192.0.2.2", "default_shutdown", "true", "false", false},
+		{"BGPPeer", "BGP_GLOBALS|default", "default_shutdown", "true", "false", false},
+	} {
+		if got := bgpDefaultShutdownMigration(tc.kind, tc.key, tc.field, tc.old, tc.value); got != tc.want {
+			t.Fatalf("%+v: got %v", tc, got)
+		}
 	}
 }

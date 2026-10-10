@@ -20,6 +20,10 @@ type SwitchBGPPeerSpecApplyConfiguration struct {
 	AddressFamilies                       []string                    `json:"addressFamilies,omitempty"`
 	AdminState                            *apiv1alpha1.AdminState     `json:"adminState,omitempty"`
 	MaxPrefixes                           *uint32                     `json:"maxPrefixes,omitempty"`
+	// ImportPrefixes is the inbound allowlist: exactly these prefixes are
+	// accepted from the peer. FRR discards every eBGP route without an inbound
+	// policy, so an empty list accepts nothing. Removal is not supported.
+	ImportPrefixes []apiv1alpha1.NetworkPrefix `json:"importPrefixes,omitempty"`
 }
 
 // SwitchBGPPeerSpecApplyConfiguration constructs a declarative configuration of the SwitchBGPPeerSpec type for use with
@@ -99,5 +103,15 @@ func (b *SwitchBGPPeerSpecApplyConfiguration) WithAdminState(value apiv1alpha1.A
 // If called multiple times, the MaxPrefixes field is set to the value of the last call.
 func (b *SwitchBGPPeerSpecApplyConfiguration) WithMaxPrefixes(value uint32) *SwitchBGPPeerSpecApplyConfiguration {
 	b.MaxPrefixes = &value
+	return b
+}
+
+// WithImportPrefixes adds the given value to the ImportPrefixes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ImportPrefixes field.
+func (b *SwitchBGPPeerSpecApplyConfiguration) WithImportPrefixes(values ...apiv1alpha1.NetworkPrefix) *SwitchBGPPeerSpecApplyConfiguration {
+	for i := range values {
+		b.ImportPrefixes = append(b.ImportPrefixes, values[i])
+	}
 	return b
 }

@@ -424,6 +424,20 @@ func networkDesired(kind string, obj client.Object) (*agent.NetworkRequest, stri
 		if s.MaxPrefixes == 0 {
 			s.MaxPrefixes = 1000
 		}
+		if len(s.ImportPrefixes) > 256 {
+			return nil, "", fmt.Errorf("too many import prefixes")
+		}
+		seenImport := map[netip.Prefix]bool{}
+		for _, value := range s.ImportPrefixes {
+			p, err := prefix(string(value), true)
+			if err != nil {
+				return nil, "", err
+			}
+			if seenImport[p] {
+				return nil, "", fmt.Errorf("duplicate import prefix")
+			}
+			seenImport[p] = true
+		}
 		target = string(s.VRF) + "/" + a.String()
 	case *api.SwitchDHCPRelaySpec:
 		if err := vrf(&s.VRF); err != nil {
