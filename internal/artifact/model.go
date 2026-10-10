@@ -67,6 +67,10 @@ type Result struct {
 func Digest(b []byte) string { sum := sha256.Sum256(b); return hex.EncodeToString(sum[:]) }
 func (b Bundle) Identity() string {
 	b = b.WithoutContent()
+	if b.Bootstrap != nil {
+		// WithoutContent already copied Bootstrap.
+		b.Bootstrap.MigrationFrom = ""
+	}
 	data, _ := json.Marshal(b)
 	return Digest(data)
 }

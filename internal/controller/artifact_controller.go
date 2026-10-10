@@ -159,6 +159,13 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 			return result, err
 		}
 		bootstrap, err := freshConnection.ArtifactFresh(ctx, artifact.Request{Operation: "bootstrap", Bundle: bundle}, freshInputs)
+		if err != nil && obj.Spec.BootstrapMigrationFrom != "" && strings.Contains(err.Error(), "immutable bootstrap owner or identity conflict") {
+			// The switch still records the predecessor. Retry once with the
+			// approved predecessor so a capable agent replaces it in place.
+			// Only on this conflict: agents without the field decode bundles
+			// strictly and would reject it in every other operation.
+			bootstrap, err = freshConnection.ArtifactFresh(ctx, artifact.Request{Operation: "bootstrap", Bundle: withBootstrapMigration(bundle, obj.Spec.BootstrapMigrationFrom)}, freshInputs)
+		}
 		if err != nil {
 			return result, err
 		}
@@ -303,6 +310,18 @@ func confirmedEarlierGeneration(obj *api.SwitchArtifact, bundle artifact.Bundle,
 	previous := bundle
 	previous.Generation = g
 	return previous, current.Identity == previous.Identity()
+}
+
+// withBootstrapMigration returns a copy of bundle that approves replacing the
+// bootstrap whose policy SHA-256 is from.
+func withBootstrapMigration(bundle artifact.Bundle, from string) artifact.Bundle {
+	if bundle.Bootstrap == nil {
+		return bundle
+	}
+	b := *bundle.Bootstrap
+	b.MigrationFrom = from
+	bundle.Bootstrap = &b
+	return bundle
 }
 
 func artifactStatus(obj *api.SwitchArtifact, r *artifact.Result) {
