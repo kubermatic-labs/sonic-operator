@@ -511,6 +511,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: configurationVerified
       type:
         scalar: boolean
+    - name: confirmedGeneration
+      type:
+        scalar: numeric
     - name: identity
       type:
         scalar: string
