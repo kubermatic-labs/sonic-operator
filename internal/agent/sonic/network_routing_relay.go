@@ -44,6 +44,7 @@ type routingPeerSpec struct {
 	AddressFamilies []string `json:"addressFamilies"`
 	AdminState      string   `json:"adminState"`
 	MaxPrefixes     *uint32  `json:"maxPrefixes"`
+	ImportPrefixes  []string `json:"importPrefixes"`
 }
 
 type routingRelaySpec struct {
@@ -193,6 +194,44 @@ func routingExportPolicy(vrf string, prefixes []string) vlanChangeDB {
 	return desired
 }
 
+// routingImportName is per peer: import allowlists differ between neighbors.
+func routingImportName(vrf, address, family string) string {
+	h := sha256.Sum256([]byte(vrf + "|" + address))
+	return fmt.Sprintf("SONIC_OPERATOR_IN_%x_%s", h[:8], family)
+}
+
+// routingImportPolicy accepts exactly the listed prefixes and denies the rest.
+// FRR (bgp ebgp-requires-policy) discards every eBGP route without an inbound
+// policy, so an empty list keeps the previous "accept nothing" behavior.
+func routingImportPolicy(vrf, address string, prefixes []string) vlanChangeDB {
+	desired := vlanChangeDB{}
+	for _, af := range []string{"ipv4_unicast", "ipv6_unicast"} {
+		name := routingImportName(vrf, address, af)
+		mode, anyPrefix, maxLen := "IPv4", "0.0.0.0/0", "32"
+		if af == "ipv6_unicast" {
+			mode, anyPrefix, maxLen = "IPv6", "::/0", "128"
+		}
+		seq := 1
+		entries := vlanChangeDB{}
+		for _, p := range prefixes {
+			if strings.Contains(p, ":") != (af == "ipv6_unicast") {
+				continue
+			}
+			entries[fmt.Sprintf("PREFIX|%s|%d|%s|exact", name, seq, p)] = map[string]string{"action": "permit"}
+			seq++
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		desired["PREFIX_SET|"+name] = map[string]string{"mode": mode}
+		for k, v := range entries {
+			desired[k] = v
+		}
+		desired["PREFIX|"+name+"|4294967295|"+anyPrefix+"|0.."+maxLen] = map[string]string{"action": "deny"}
+	}
+	return desired
+}
+
 func routingUnified(db vlanChangeDB) error {
 	if db["DEVICE_METADATA|localhost"]["frr_mgmt_framework_config"] != "true" {
 		return fmt.Errorf("traditional bgpcfgd is unsupported: explicit prefixes/export filters and maxPrefixes cannot be enforced; provision unified frrcfgd out of band (frr_mgmt_framework_config=true), do not simply change metadata on a running switch")
@@ -286,8 +325,20 @@ func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 			}
 		}
 	}
-	desired["BGP_GLOBALS|"+s.VRF] = map[string]string{"local_asn": asn, "router_id": s.RouterID, "default_ipv4_unicast": "false", "default_shutdown": "true"}
+	// FRR applies "bgp default shutdown" to the temporary peer it creates for an
+	// incoming connection, so with it set no session can ever be accepted.
+	// Peers are still created explicitly Down and enabled only after their
+	// policy is verified, and "no bgp default ipv4-unicast" keeps unconfigured
+	// neighbors from exchanging routes.
+	desired["BGP_GLOBALS|"+s.VRF] = map[string]string{"local_asn": asn, "router_id": s.RouterID, "default_ipv4_unicast": "false", "default_shutdown": "false"}
+	// frrcfgd silently drops network statements processed before the BGP
+	// instance exists and never retries them. Create the instance first; the
+	// next reconcile adds the networks.
+	_, instanceExists := db["BGP_GLOBALS|"+s.VRF]
 	for _, p := range s.Prefixes {
+		if !instanceExists {
+			break
+		}
 		af := "ipv4_unicast"
 		if strings.Contains(p, ":") {
 			af = "ipv6_unicast"
@@ -315,9 +366,14 @@ func planNetworkBGP(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, err
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan, error) {
 	var s routingPeerSpec
-	if err := routingDecode(r, "BGPPeer", &s, "vrf address remoteASN localAddress addressFamilies adminState maxPrefixes"); err != nil {
+	if err := routingDecode(r, "BGPPeer", &s, "vrf address remoteASN localAddress addressFamilies adminState maxPrefixes importPrefixes"); err != nil {
 		return nil, err
 	}
+	importPrefixes, err := routingPrefixes(s.ImportPrefixes)
+	if err != nil {
+		return nil, fmt.Errorf("importPrefixes: %w", err)
+	}
+	s.ImportPrefixes = importPrefixes
 	if err := routingVRF(db, &s.VRF); err != nil {
 		return nil, err
 	}
@@ -383,17 +439,38 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 	}
 	global := db["BGP_GLOBALS|"+s.VRF]
 	localASN, err := strconv.ParseUint(global["local_asn"], 10, 32)
-	if err != nil || localASN == 0 || global["default_ipv4_unicast"] != "false" || global["default_shutdown"] != "true" {
+	if err != nil || localASN == 0 || global["default_ipv4_unicast"] != "false" || global["default_shutdown"] != "false" {
 		return nil, fmt.Errorf("configure SwitchBGP with safe defaults before peers")
 	}
+	// The peer is bound to the SwitchBGP export filter. Networks follow the
+	// instance in a later write (frrcfgd ordering), so derive the prefixes from
+	// the filter; the runtime check still requires the rendered networks.
 	var prefixes []string
+	for key := range db {
+		for _, af := range []string{"ipv4_unicast", "ipv6_unicast"} {
+			if !strings.HasPrefix(key, "PREFIX|"+routingExportName(s.VRF, af)+"|") || !strings.HasSuffix(key, "|exact") {
+				continue
+			}
+			parts := strings.Split(key, "|")
+			if len(parts) != 5 {
+				return nil, fmt.Errorf("invalid existing export filter key")
+			}
+			prefixes = append(prefixes, parts[3])
+		}
+	}
 	for key := range db {
 		if strings.HasPrefix(key, "BGP_GLOBALS_AF_NETWORK|"+s.VRF+"|") {
 			parts := strings.Split(key, "|")
 			if len(parts) != 4 {
 				return nil, fmt.Errorf("invalid existing BGP network key")
 			}
-			prefixes = append(prefixes, parts[3])
+			found := false
+			for _, p := range prefixes {
+				found = found || p == parts[3]
+			}
+			if !found {
+				return nil, fmt.Errorf("BGP network outside the export filter")
+			}
 		}
 	}
 	prefixes, err = routingPrefixes(prefixes)
@@ -450,6 +527,7 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 			return nil, fmt.Errorf("existing peer has unsupported address families")
 		}
 	}
+	imports := routingImportPolicy(s.VRF, s.Address, s.ImportPrefixes)
 	for _, af := range []string{"ipv4_unicast", "ipv6_unicast"} {
 		family := "ipv4Unicast"
 		if af == "ipv6_unicast" {
@@ -466,6 +544,23 @@ func planNetworkBGPPeer(db vlanChangeDB, r *agent.NetworkRequest) (*networkPlan,
 			return nil, fmt.Errorf("existing max-prefix/default-originate policy conflicts with safety contract")
 		}
 		desired[afKey] = map[string]string{"admin_status": "up", "max_prefix_limit": strconv.FormatUint(uint64(*s.MaxPrefixes), 10), "max_prefix_warning_threshold": "100", "prefix_list_out": routingExportName(s.VRF, af), "send_default_route": "false"}
+		if _, filtered := imports["PREFIX_SET|"+routingImportName(s.VRF, s.Address, af)]; filtered {
+			desired[afKey]["prefix_list_in"] = routingImportName(s.VRF, s.Address, af)
+		} else if db[afKey]["prefix_list_in"] != "" {
+			return nil, fmt.Errorf("removal of importPrefixes is unsupported")
+		}
+	}
+	for k, v := range imports {
+		desired[k] = v
+	}
+	for _, af := range []string{"ipv4_unicast", "ipv6_unicast"} {
+		for existing := range db {
+			if strings.HasPrefix(existing, "PREFIX|"+routingImportName(s.VRF, s.Address, af)+"|") {
+				if _, ok := imports[existing]; !ok {
+					return nil, fmt.Errorf("existing import filter contains extra entries; removal/reordering is not supported")
+				}
+			}
+		}
 	}
 	// CONFIG_DB events are not a transaction in FRR. Never enable a new peer in
 	// the same operation that creates its limits and outbound filter.

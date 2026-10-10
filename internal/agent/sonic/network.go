@@ -257,6 +257,14 @@ var networkQoSIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`
 // Defense in depth for planner outputs and durable records. RPC callers never
 // supply these tables or fields; kind-specific planners validate their values.
 //
+// bgpDefaultShutdownMigration qualifies the one-way change of an owned
+// BGP_GLOBALS default_shutdown from true to false. FRR applies "bgp default
+// shutdown" to the temporary peer of every incoming connection, so no session
+// can be accepted while it is set. The BGP planner requires all peers Down.
+func bgpDefaultShutdownMigration(kind, key, field, old, value string) bool {
+	return kind == "BGP" && strings.HasPrefix(key, "BGP_GLOBALS|") && field == "default_shutdown" && old == "true" && value == "false"
+}
+
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
 func validateNetworkFields(kind string, desired vlanChangeDB) error {
 	allowed := map[string]map[string]string{
@@ -267,7 +275,7 @@ func validateNetworkFields(kind string, desired vlanChangeDB) error {
 		"L3Interface":  {"INTERFACE": "NULL vrf_name", "PORTCHANNEL_INTERFACE": "NULL vrf_name", "VLAN_INTERFACE": "NULL vrf_name", "LOOPBACK_INTERFACE": "NULL vrf_name"},
 		"StaticRoute":  {"STATIC_ROUTE": "nexthop ifname distance advertise"},
 		"BGP":          {"DEVICE_METADATA": "bgp_asn type", "BGP_GLOBALS": "local_asn router_id default_ipv4_unicast default_shutdown", "BGP_GLOBALS_AF_NETWORK": "backdoor", "PREFIX_SET": "mode", "PREFIX": "action"},
-		"BGPPeer":      {"BGP_NEIGHBOR": "asn local_addr admin_status", "BGP_NEIGHBOR_AF": "admin_status max_prefix_limit max_prefix_warning_threshold prefix_list_out send_default_route"},
+		"BGPPeer":      {"BGP_NEIGHBOR": "asn local_addr admin_status", "BGP_NEIGHBOR_AF": "admin_status max_prefix_limit max_prefix_warning_threshold prefix_list_out prefix_list_in send_default_route", "PREFIX_SET": "mode", "PREFIX": "action"},
 		"DHCPRelay":    {"VLAN": "dhcp_servers@", "DHCP_RELAY": "dhcpv6_servers@", "DHCPV4_RELAY": "dhcpv4_servers@"},
 		"MLAG":         {"MCLAG_DOMAIN": "source_ip peer_ip peer_link keepalive_interval session_timeout", "MCLAG_INTERFACE": "if_type"},
 		"EVPN":         {"BGP_GLOBALS_AF": "advertise-all-vni advertise-svi-ip advertise-default-gw advertise-ipv4-unicast advertise-ipv6-unicast"},
@@ -739,11 +747,12 @@ func (m *SonicAgent) networkResource(ctx context.Context, r *agent.NetworkReques
 				// native-qualified buffer restoration may overwrite fields.
 				previous, ours := owned[key][field]
 				peerAdmin := r.Kind == "BGPPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR|") && field == "admin_status" && (value == "up" || value == "down")
+				bgpDefaultShutdown := bgpDefaultShutdownMigration(r.Kind, key, field, old, value)
 				evpnAdmin := r.Kind == "EVPNPeer" && strings.HasPrefix(key, "BGP_NEIGHBOR_AF|default|") && strings.HasSuffix(key, "|l2vpn_evpn") && field == "admin_status" && (old == "up" || old == "down") && (value == "up" || value == "down")
 				globalEVPNAdmin := r.Kind == "EVPN" && key == evpnGlobalKey && field == "advertise-all-vni" && (old == "true" || old == "false") && (value == "true" || value == "false")
 				relayServers := r.Kind == "DHCPRelay" && routingRelayMutableField(key, field)
 				modeUpdate := migrationUpdate && frrMigrationModeUpdate(key, field, old, value) && (record == nil || (ours && previous == old))
-				if !portRepair && !traditionalRepair && !modeUpdate && !(bufferRepair && ours && previous == value) && (!ours || previous != old || (!peerAdmin && !evpnAdmin && !globalEVPNAdmin && !relayServers)) {
+				if !portRepair && !traditionalRepair && !modeUpdate && !(bufferRepair && ours && previous == value) && (!ours || previous != old || (!peerAdmin && !evpnAdmin && !globalEVPNAdmin && !relayServers && !bgpDefaultShutdown)) {
 					return fail("conflicting network field; only qualified owned-field updates, approved mode changes, recorded Port/Traditional BGP repairs or qualified buffer restoration are allowed")
 				}
 			}

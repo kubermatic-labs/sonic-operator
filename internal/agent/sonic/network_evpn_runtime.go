@@ -310,7 +310,7 @@ func evpnFRRParse(config []byte, db vlanChangeDB) (*evpnFRR, error) {
 			r.af[l] = true
 		}
 	}
-	if !found || !r.global["bgp default shutdown"] || !r.global["no bgp default ipv4-unicast"] || !r.global["bgp router-id "+db["BGP_GLOBALS|default"]["router_id"]] {
+	if !found || r.global["bgp default shutdown"] || !r.global["no bgp default ipv4-unicast"] || !r.global["bgp router-id "+db["BGP_GLOBALS|default"]["router_id"]] {
 		return nil, fmt.Errorf("actual FRR ASN/routerID/safe defaults not verified")
 	}
 	for line := range r.global {

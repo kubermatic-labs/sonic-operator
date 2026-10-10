@@ -540,6 +540,7 @@ _Validation:_
 
 _Appears in:_
 - [ACLRule](#aclrule)
+- [SwitchBGPPeerSpec](#switchbgppeerspec)
 - [SwitchBGPSpec](#switchbgpspec)
 - [SwitchStaticRouteSpec](#switchstaticroutespec)
 
@@ -1103,6 +1104,7 @@ _Appears in:_
 | `addressFamilies` _string array_ |  |  | MaxItems: 2 <br />MinItems: 1 <br />items:Enum: [ipv4Unicast ipv6Unicast] <br /> |
 | `adminState` _[AdminState](#adminstate)_ |  | Down | Enum: [Up Down] <br /> |
 | `maxPrefixes` _integer_ |  | 1000 | Format: int64 <br />Maximum: 4.294967295e+09 <br />Minimum: 1 <br /> |
+| `importPrefixes` _[NetworkPrefix](#networkprefix) array_ | ImportPrefixes is the inbound allowlist: exactly these prefixes are<br />accepted from the peer. FRR discards every eBGP route without an inbound<br />policy, so an empty list accepts nothing. Removal is not supported. |  | MaxItems: 256 <br />MaxLength: 49 <br /> |
 
 
 #### SwitchBGPSpec

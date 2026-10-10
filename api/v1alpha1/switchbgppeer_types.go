@@ -38,6 +38,13 @@ type SwitchBGPPeerSpec struct {
 	// +kubebuilder:validation:Maximum=4294967295
 	// +kubebuilder:validation:Format=int64
 	MaxPrefixes uint32 `json:"maxPrefixes,omitempty"`
+	// ImportPrefixes is the inbound allowlist: exactly these prefixes are
+	// accepted from the peer. FRR discards every eBGP route without an inbound
+	// policy, so an empty list accepts nothing. Removal is not supported.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=256
+	ImportPrefixes []NetworkPrefix `json:"importPrefixes,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -55,7 +55,7 @@ func TestEVPNRealRedisProductionSequence(t *testing.T) {
 	}
 	ensure(bgp)
 	filters := "!\nip prefix-list " + routingExportName("default", "ipv4_unicast") + " seq 4294967295 deny 0.0.0.0/0 le 32\nipv6 prefix-list " + routingExportName("default", "ipv6_unicast") + " seq 4294967295 deny ::/0 le 128\n"
-	base := "router bgp 65001\n bgp router-id 192.0.2.1\n bgp default shutdown\n no bgp default ipv4-unicast\n"
+	base := "router bgp 65001\n bgp router-id 192.0.2.1\n no bgp default ipv4-unicast\n"
 	config = base + filters
 	ensure(peer) // Must create and own the neighbor through the actual BGP planner.
 	unicast := " address-family ipv4 unicast\n  neighbor 192.0.2.2 activate\n  neighbor 192.0.2.2 maximum-prefix 1000 100\n  neighbor 192.0.2.2 prefix-list " + routingExportName("default", "ipv4_unicast") + " out\n exit-address-family\n"
