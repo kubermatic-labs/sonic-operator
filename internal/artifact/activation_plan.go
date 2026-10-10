@@ -24,6 +24,17 @@ func (n *Native) ColdPlatformBoot() error {
 func fileChanged(f savedFile) bool {
 	return !f.ObservedExisted || f.ObservedHash != f.Hash || f.ObservedMode != f.Mode
 }
+
+// rollbackFileChanged reports whether rollback writes something other than
+// the pre-stage observation. Rollback restores the last confirmed bytes, which
+// can differ from the observation even when the candidate matched it (for
+// example a hand-installed agent), so it cannot reuse fileChanged.
+func rollbackFileChanged(f savedFile) bool {
+	if !f.Existed {
+		return f.ObservedExisted
+	}
+	return !f.ObservedExisted || f.ObservedHash != f.PreviousHash || f.ObservedMode != f.PreviousMode
+}
 func platformMutation(j *journal) bool {
 	if j.RuntimePlatformDrift {
 		return true
@@ -55,7 +66,18 @@ func agentMutation(j *journal) bool {
 		return true
 	}
 	for _, f := range j.Files {
-		if agentRecoverySlot(f.Slot) && fileChanged(f) {
+		if agentRecoverySlot(f.Slot) && (fileChanged(f) || (j.Phase == "RollingBack" && rollbackFileChanged(f))) {
+			return true
+		}
+	}
+	return false
+}
+
+// rollbackChanged reports whether rollback writes any file differing from the
+// pre-stage observation, which then requires activation like a change.
+func rollbackChanged(j *journal) bool {
+	for _, f := range j.Files {
+		if !packageGeneratedSlot(j, f.Slot) && rollbackFileChanged(f) {
 			return true
 		}
 	}

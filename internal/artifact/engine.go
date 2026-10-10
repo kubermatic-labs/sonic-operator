@@ -972,7 +972,7 @@ func (e *Engine) rollback(j *journal) error {
 			return err
 		}
 	}
-	if j.Changed {
+	if j.Changed || rollbackChanged(j) {
 		if e.PauseRuntime {
 			return ErrActivationPending
 		}
