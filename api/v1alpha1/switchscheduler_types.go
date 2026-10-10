@@ -55,8 +55,17 @@ type SwitchSchedulerSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Scheduler",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Algorithm",type=string,JSONPath=`.spec.algorithm`
+// +kubebuilder:printcolumn:name="Weight",type=integer,JSONPath=`.spec.weight`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Meter",type=string,JSONPath=`.spec.meterType`,priority=1
+// +kubebuilder:printcolumn:name="CIR",type=integer,JSONPath=`.spec.committedRate`,priority=1
+// +kubebuilder:printcolumn:name="PIR",type=integer,JSONPath=`.spec.peakRate`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchScheduler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

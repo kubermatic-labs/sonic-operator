@@ -44,8 +44,16 @@ type SwitchQoSBindingSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Interface",type=string,JSONPath=`.spec.interfaceName`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="DSCPToTC",type=string,JSONPath=`.spec.dscpToTC`,priority=1
+// +kubebuilder:printcolumn:name="Dot1pToTC",type=string,JSONPath=`.spec.dot1pToTC`,priority=1
+// +kubebuilder:printcolumn:name="TCToQueue",type=string,JSONPath=`.spec.tcToQueue`,priority=1
+// +kubebuilder:printcolumn:name="TCToPG",type=string,JSONPath=`.spec.tcToPriorityGroup`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchQoSBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

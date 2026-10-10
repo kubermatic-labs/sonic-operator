@@ -238,8 +238,14 @@ type SwitchStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Host",type=string,JSONPath=`.spec.management.host`
 // +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.status.macAddress`
+// +kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`
+// +kubebuilder:printcolumn:name="Firmware",type=string,JSONPath=`.status.firmwareVersion`
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Hostname",type=string,JSONPath=`.spec.hostname`,priority=1
+// +kubebuilder:printcolumn:name="ZTPSource",type=string,JSONPath=`.spec.ztp.sourceAddress`,priority=1
+// +kubebuilder:printcolumn:name="NextBoot",type=string,JSONPath=`.spec.nextBootMode`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // +kubebuilder:ac:generate=false
 // Switch is the Schema for the switch API

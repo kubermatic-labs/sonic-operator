@@ -18,12 +18,33 @@ spec:
     - jsonPath: .spec.switchRef.name
       name: Switch
       type: string
+    - jsonPath: .spec.name
+      name: Interface
+      type: string
+    - jsonPath: .spec.vrf
+      name: VRF
+      type: string
     - jsonPath: .spec.managementPolicy
       name: Policy
       type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      priority: 1
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.addresses
+      name: Addresses
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:

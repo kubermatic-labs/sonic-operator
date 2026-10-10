@@ -15,11 +15,32 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.management.host
+      name: Host
+      type: string
     - jsonPath: .status.macAddress
       name: MACAddress
       type: string
+    - jsonPath: .status.sku
+      name: SKU
+      type: string
+    - jsonPath: .status.firmwareVersion
+      name: Firmware
+      type: string
     - jsonPath: .status.state
       name: Status
+      type: string
+    - jsonPath: .spec.hostname
+      name: Hostname
+      priority: 1
+      type: string
+    - jsonPath: .spec.ztp.sourceAddress
+      name: ZTPSource
+      priority: 1
+      type: string
+    - jsonPath: .spec.nextBootMode
+      name: NextBoot
+      priority: 1
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age

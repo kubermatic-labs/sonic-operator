@@ -14,7 +14,36 @@ spec:
     singular: switchsystem
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.switchRef.name
+      name: Switch
+      type: string
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.ntp.servers
+      name: NTPServers
+      priority: 1
+      type: string
+    - jsonPath: .spec.snmp.location
+      name: SNMPLocation
+      priority: 1
+      type: string
+    - jsonPath: .status.recovery
+      name: Recovery
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         properties:

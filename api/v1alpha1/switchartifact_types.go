@@ -172,6 +172,16 @@ type SwitchArtifactStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchName`
+// +kubebuilder:printcolumn:name="Baseline",type=string,JSONPath=`.spec.baseline`
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.recoveryPhase`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Activation",type=string,JSONPath=`.spec.activation`,priority=1
+// +kubebuilder:printcolumn:name="Generation",type=integer,JSONPath=`.metadata.generation`,priority=1
+// +kubebuilder:printcolumn:name="Confirmed",type=integer,JSONPath=`.status.confirmedGeneration`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchArtifact struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

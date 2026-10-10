@@ -44,8 +44,18 @@ type SwitchBGPPeerSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Peer",type=string,JSONPath=`.spec.address`
+// +kubebuilder:printcolumn:name="RemoteASN",type=integer,JSONPath=`.spec.remoteASN`
+// +kubebuilder:printcolumn:name="VRF",type=string,JSONPath=`.spec.vrf`
+// +kubebuilder:printcolumn:name="Admin",type=string,JSONPath=`.spec.adminState`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="LocalAddress",type=string,JSONPath=`.spec.localAddress`,priority=1
+// +kubebuilder:printcolumn:name="Families",type=string,JSONPath=`.spec.addressFamilies`,priority=1
+// +kubebuilder:printcolumn:name="MaxPrefixes",type=integer,JSONPath=`.spec.maxPrefixes`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchBGPPeer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

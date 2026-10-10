@@ -104,6 +104,15 @@ type HostResourceStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.spec.addresses[0].prefix`
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Addresses",type=string,JSONPath=`.spec.addresses`,priority=1
+// +kubebuilder:printcolumn:name="MAC",type=string,JSONPath=`.spec.mac`,priority=1
+// +kubebuilder:printcolumn:name="Recovery",type=string,JSONPath=`.status.recovery`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchManagement struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -121,6 +130,14 @@ type SwitchManagementList struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="NTPServers",type=string,JSONPath=`.spec.ntp.servers`,priority=1
+// +kubebuilder:printcolumn:name="SNMPLocation",type=string,JSONPath=`.spec.snmp.location`,priority=1
+// +kubebuilder:printcolumn:name="Recovery",type=string,JSONPath=`.status.recovery`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchSystem struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

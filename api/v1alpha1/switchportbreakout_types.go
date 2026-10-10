@@ -114,6 +114,9 @@ type SwitchPortBreakoutStatus struct {
 // +kubebuilder:printcolumn:name="Mode",type=string,JSONPath=`.status.mode`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Desired",type=string,JSONPath=`.spec.mode`,priority=1
+// +kubebuilder:printcolumn:name="Pending",type=boolean,JSONPath=`.status.pending`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // SwitchPortBreakout manages a parent port layout. Deletion leaves hardware

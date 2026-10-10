@@ -15,6 +15,12 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.switchRef.name
+      name: Switch
+      type: string
+    - jsonPath: .spec.nativeName
+      name: Interface
+      type: string
     - jsonPath: .status.adminState
       name: AdminState
       type: string
@@ -23,6 +29,38 @@ spec:
       type: string
     - jsonPath: .status.state
       name: State
+      type: string
+    - jsonPath: .status.aliasName
+      name: Alias
+      priority: 1
+      type: string
+    - jsonPath: .spec.speed
+      name: Speed
+      priority: 1
+      type: integer
+    - jsonPath: .spec.mtu
+      name: MTU
+      priority: 1
+      type: integer
+    - jsonPath: .spec.fec
+      name: FEC
+      priority: 1
+      type: string
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      priority: 1
+      type: string
+    - jsonPath: .status.neighbor.systemName
+      name: Neighbor
+      priority: 1
+      type: string
+    - jsonPath: .status.neighbor.interfaceHandle
+      name: NeighborPort
+      priority: 1
+      type: string
+    - jsonPath: .status.macAddress
+      name: MACAddress
+      priority: 1
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
