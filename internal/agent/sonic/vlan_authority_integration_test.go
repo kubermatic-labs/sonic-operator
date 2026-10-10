@@ -310,7 +310,7 @@ func TestVLANAuthorityRejectUnsafe(t *testing.T) {
 		{"LAG member", "VLAN_MEMBER|Vlan100|PortChannel1", "tagging_mode", "tagged"},
 		{"LAG port", "PORTCHANNEL_MEMBER|PortChannel1|Ethernet4", "NULL", "NULL"},
 		{"routed port", "INTERFACE|Ethernet0|192.0.2.1/24", "NULL", "NULL"},
-		{"SVI", "VLAN_INTERFACE|Vlan100|192.0.2.1/24", "NULL", "NULL"},
+		{"malformed SVI", "VLAN_INTERFACE|Vlan100|192.0.2.1", "NULL", "NULL"},
 		{"unknown key reference", "MYSTERY|Vlan100", "NULL", "NULL"},
 		{"unknown value reference", "MYSTERY|thing", "interfaces@", "Vlan100,Vlan200"},
 		{"numeric reference", "MYSTERY|thing", "vlan_id", "100"},
