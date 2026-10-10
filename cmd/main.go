@@ -68,6 +68,7 @@ func main() {
 	var allowTrafficPolicy bool
 	var allowRedundancy bool
 	var allowArtifacts bool
+	var artifactConcurrency int
 	var disableProvisionsingServer bool
 	var httpServerAddr, onieImagesDir, onieConfigFile, ztpConfigFile, ztpMode, bootstrapControlKubeconfigFile string
 	var tlsOpts []func(*tls.Config)
@@ -97,6 +98,7 @@ func main() {
 	flag.BoolVar(&allowNetworkConfig, "allow-network-config", false,
 		"Allow additive network configuration. Requires observe-only=false, individual managementPolicy=Manage and agent network/write gates. Resource deletion leaves device configuration intact.")
 	flag.BoolVar(&allowHostConfig, "allow-host-config", false, "Allow typed management and system configuration with switch-local management rollback; requires observe-only=false and per-resource Manage policy.")
+	flag.IntVar(&artifactConcurrency, "artifact-concurrency", 4, "Number of SwitchArtifacts (switches) reconciled in parallel.")
 	flag.BoolVar(&allowArtifacts, "allow-artifacts", false, "Allow immutable declared artifact lifecycle with an independently installed switch-local recovery supervisor.")
 	flag.BoolVar(&allowFRRMigration, "allow-frr-migration", false,
 		"Allow approved empty-routing FRR migration. Requires allow-network-config=true, observe-only=false, managementPolicy=Manage, a matching approvedDigest and agent migration/write gates.")
@@ -273,7 +275,7 @@ func main() {
 		}
 	}
 	// +kubebuilder:scaffold:builder
-	if err := (&controller.ArtifactReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), ObserveOnly: observeOnly, AllowArtifacts: allowArtifacts}).SetupWithManager(mgr); err != nil {
+	if err := (&controller.ArtifactReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), ObserveOnly: observeOnly, AllowArtifacts: allowArtifacts, MaxConcurrentReconciles: artifactConcurrency}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create artifact controller")
 		os.Exit(1)
 	}

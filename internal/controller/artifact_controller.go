@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 type artifactRPC interface {
@@ -32,6 +33,11 @@ type ArtifactReconciler struct {
 	ObserveOnly    bool
 	AllowArtifacts bool
 	NewClient      func(context.Context, client.Reader, *api.Switch) (artifactRPC, io.Closer, error)
+	// MaxConcurrentReconciles bounds parallel switches. A single worker serializes
+	// every switch, so with several switches staging at once a confirmation can
+	// miss the switch-local five-minute deadline. controller-runtime never
+	// reconciles the same object concurrently.
+	MaxConcurrentReconciles int
 }
 
 // +kubebuilder:rbac:groups=sonic.networking.metal.ironcore.dev,resources=switchartifacts,verbs=get;list;watch
@@ -39,7 +45,9 @@ type ArtifactReconciler struct {
 // +kubebuilder:rbac:groups="",resources=configmaps;secrets,verbs=get
 
 func (r *ArtifactReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&api.SwitchArtifact{}).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).For(&api.SwitchArtifact{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: max(r.MaxConcurrentReconciles, 1)}).
+		Complete(r)
 }
 
 //nolint:gocyclo // Existing safety-check sequence; split only with dedicated tests.
