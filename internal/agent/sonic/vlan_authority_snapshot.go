@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/netip"
 	"regexp"
 	"sort"
 	"strconv"
@@ -252,6 +253,32 @@ func vlanAuthoritySafe(db vlanChangeDB, id uint32, target vlanChangeDB) error {
 					}
 				default:
 					return fmt.Errorf("unknown LOGGER field")
+				}
+			}
+			continue
+		case "VLAN_INTERFACE":
+			// SVIs are owned by SwitchL3Interface. Validate the exact grammar so
+			// no other selector hides behind this table; membership authority
+			// coexists with them, but must not delete a VLAN that still has one.
+			parts := strings.Split(k, "|")
+			otherID, err := strconv.ParseUint(strings.TrimPrefix(parts[1], "Vlan"), 10, 32)
+			if len(parts) > 3 || err != nil || otherID < 1 || otherID > 4094 || parts[1] != fmt.Sprintf("Vlan%d", otherID) {
+				return fmt.Errorf("malformed VLAN interface identity")
+			}
+			if len(parts) == 3 {
+				if p, err := netip.ParsePrefix(parts[2]); err != nil || p.String() != parts[2] || len(fields) != 1 || fields["NULL"] != "NULL" {
+					return fmt.Errorf("malformed VLAN interface address")
+				}
+			} else {
+				for field := range fields {
+					if field != "NULL" && field != "vrf_name" {
+						return fmt.Errorf("unknown VLAN interface field")
+					}
+				}
+			}
+			if parts[1] == vlan {
+				if _, kept := target[key]; !kept {
+					return fmt.Errorf("VLAN has an L3 interface; remove it before deleting the VLAN")
 				}
 			}
 			continue
