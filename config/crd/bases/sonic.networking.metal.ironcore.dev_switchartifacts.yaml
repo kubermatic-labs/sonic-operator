@@ -534,6 +534,13 @@ spec:
                 x-kubernetes-list-type: map
               configurationVerified:
                 type: boolean
+              confirmedGeneration:
+                description: |-
+                  ConfirmedGeneration is the generation whose declaration the switch last
+                  confirmed. A later generation with identical content (for example only a
+                  managementPolicy change) is converged without staging again.
+                format: int64
+                type: integer
               identity:
                 type: string
               observedGeneration:
