@@ -19,9 +19,13 @@ type SwitchArtifactStatusApplyConfiguration struct {
 	PersistenceVerified   *bool   `json:"persistenceVerified,omitempty"`
 	RecoveryPhase         *string `json:"recoveryPhase,omitempty"`
 	// Target binds UID, endpoint and credential reference across retries.
-	Target     *string                          `json:"target,omitempty"`
-	Identity   *string                          `json:"identity,omitempty"`
-	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Target   *string `json:"target,omitempty"`
+	Identity *string `json:"identity,omitempty"`
+	// ConfirmedGeneration is the generation whose declaration the switch last
+	// confirmed. A later generation with identical content (for example only a
+	// managementPolicy change) is converged without staging again.
+	ConfirmedGeneration *int64                           `json:"confirmedGeneration,omitempty"`
+	Conditions          []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // SwitchArtifactStatusApplyConfiguration constructs a declarative configuration of the SwitchArtifactStatus type for use with
@@ -91,6 +95,14 @@ func (b *SwitchArtifactStatusApplyConfiguration) WithTarget(value string) *Switc
 // If called multiple times, the Identity field is set to the value of the last call.
 func (b *SwitchArtifactStatusApplyConfiguration) WithIdentity(value string) *SwitchArtifactStatusApplyConfiguration {
 	b.Identity = &value
+	return b
+}
+
+// WithConfirmedGeneration sets the ConfirmedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ConfirmedGeneration field is set to the value of the last call.
+func (b *SwitchArtifactStatusApplyConfiguration) WithConfirmedGeneration(value int64) *SwitchArtifactStatusApplyConfiguration {
+	b.ConfirmedGeneration = &value
 	return b
 }
 

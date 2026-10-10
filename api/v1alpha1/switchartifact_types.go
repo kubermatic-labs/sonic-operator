@@ -160,6 +160,10 @@ type SwitchArtifactStatus struct {
 	// Target binds UID, endpoint and credential reference across retries.
 	Target   string `json:"target,omitempty"`
 	Identity string `json:"identity,omitempty"`
+	// ConfirmedGeneration is the generation whose declaration the switch last
+	// confirmed. A later generation with identical content (for example only a
+	// managementPolicy change) is converged without staging again.
+	ConfirmedGeneration int64 `json:"confirmedGeneration,omitempty"`
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

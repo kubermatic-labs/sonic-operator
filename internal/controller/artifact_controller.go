@@ -174,6 +174,16 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		return result, fmt.Errorf("missing artifact observation")
 	}
 	artifactStatus(obj, current)
+	if previous, ok := confirmedEarlierGeneration(obj, bundle, current); ok {
+		// The switch already confirmed exactly this declaration under an earlier
+		// generation (e.g. only managementPolicy changed). Staging it again would
+		// restart the agent and risk a rollback for no content change.
+		obj.Status.Identity = previous.Identity()
+		return result, nil
+	}
+	if current.Phase == "Confirmed" && current.Identity == bundle.Identity() {
+		obj.Status.ConfirmedGeneration = obj.Generation
+	}
 	if r.ObserveOnly || !r.AllowArtifacts || obj.Spec.ManagementPolicy != "Manage" {
 		return result, nil
 	}
@@ -213,6 +223,9 @@ func (r *ArtifactReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 			return result, fmt.Errorf("missing artifact confirmation")
 		}
 		artifactStatus(obj, confirmed)
+		if confirmed.Phase == "Confirmed" {
+			obj.Status.ConfirmedGeneration = obj.Generation
+		}
 		return result, nil
 	}
 	if current.Phase == "Staged" || current.Phase == "Installing" || current.Phase == "Activating" || current.Phase == "Retiring" || current.Phase == "AwaitingConfirmation" || current.Phase == "RollingBack" || current.Phase == "RestoringAgent" || current.Phase == "WaitingForeign" || current.Phase == "RestoringBoot" || current.Phase == "ActivatingBoot" || current.Phase == "RecoveringBoot" {
@@ -278,6 +291,20 @@ func (r *ArtifactReconciler) checkArtifactClaims(ctx context.Context, obj *api.S
 	}
 	return nil
 }
+
+// confirmedEarlierGeneration returns the declaration under the last confirmed
+// generation when the switch reports it as confirmed and healthy and it is
+// identical to the current declaration apart from the generation.
+func confirmedEarlierGeneration(obj *api.SwitchArtifact, bundle artifact.Bundle, current *artifact.Result) (artifact.Bundle, bool) {
+	g := obj.Status.ConfirmedGeneration
+	if g <= 0 || g >= obj.Generation || current.Phase != "Confirmed" || !current.Configuration || !current.Runtime || !current.Persistence {
+		return artifact.Bundle{}, false
+	}
+	previous := bundle
+	previous.Generation = g
+	return previous, current.Identity == previous.Identity()
+}
+
 func artifactStatus(obj *api.SwitchArtifact, r *artifact.Result) {
 	obj.Status.RecoveryReason = r.Reason
 	obj.Status.ConfigurationVerified = r.Configuration
