@@ -14,7 +14,34 @@ spec:
     singular: switchevpn
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.switchRef.name
+      name: Switch
+      type: string
+    - jsonPath: .spec.tunnel
+      name: Tunnel
+      type: string
+    - jsonPath: .spec.adminState
+      name: Admin
+      type: string
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      priority: 1
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         properties:

@@ -70,8 +70,17 @@ type SwitchMLAGSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Peer",type=string,JSONPath=`.spec.peerSwitchRef.name`
+// +kubebuilder:printcolumn:name="Domain",type=integer,JSONPath=`.spec.domainID`
+// +kubebuilder:printcolumn:name="PeerLink",type=string,JSONPath=`.spec.peerLink`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="LocalAddress",type=string,JSONPath=`.spec.localAddress`,priority=1
+// +kubebuilder:printcolumn:name="PeerAddress",type=string,JSONPath=`.spec.peerAddress`,priority=1
+// +kubebuilder:printcolumn:name="Members",type=string,JSONPath=`.spec.members`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchMLAG struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -103,8 +112,14 @@ type SwitchVXLANTunnelSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Tunnel",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Source",type=string,JSONPath=`.spec.sourceAddress`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="NVO",type=string,JSONPath=`.spec.evpnNVO`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchVXLANTunnel struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -154,8 +169,17 @@ type SwitchVLANVNISpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="VLAN",type=integer,JSONPath=`.spec.vlanID`
+// +kubebuilder:printcolumn:name="VNI",type=integer,JSONPath=`.spec.vni`
+// +kubebuilder:printcolumn:name="Tunnel",type=string,JSONPath=`.spec.tunnel`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="RD",type=string,JSONPath=`.spec.routeDistinguisher`,priority=1
+// +kubebuilder:printcolumn:name="ImportRT",type=string,JSONPath=`.spec.importRouteTargets`,priority=1
+// +kubebuilder:printcolumn:name="ExportRT",type=string,JSONPath=`.spec.exportRouteTargets`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchVLANVNI struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -226,8 +250,17 @@ type SwitchEVPNPeerSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Peer",type=string,JSONPath=`.spec.address`
+// +kubebuilder:printcolumn:name="RemoteASN",type=integer,JSONPath=`.spec.remoteASN`
+// +kubebuilder:printcolumn:name="Role",type=string,JSONPath=`.spec.role`
+// +kubebuilder:printcolumn:name="Admin",type=string,JSONPath=`.spec.adminState`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="LocalAddress",type=string,JSONPath=`.spec.localAddress`,priority=1
+// +kubebuilder:printcolumn:name="VRF",type=string,JSONPath=`.spec.vrf`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchEVPNPeer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

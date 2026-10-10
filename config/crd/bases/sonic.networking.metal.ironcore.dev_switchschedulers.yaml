@@ -18,12 +18,44 @@ spec:
     - jsonPath: .spec.switchRef.name
       name: Switch
       type: string
+    - jsonPath: .spec.name
+      name: Scheduler
+      type: string
+    - jsonPath: .spec.algorithm
+      name: Algorithm
+      type: string
+    - jsonPath: .spec.weight
+      name: Weight
+      type: integer
     - jsonPath: .spec.managementPolicy
       name: Policy
       type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      priority: 1
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.meterType
+      name: Meter
+      priority: 1
+      type: string
+    - jsonPath: .spec.committedRate
+      name: CIR
+      priority: 1
+      type: integer
+    - jsonPath: .spec.peakRate
+      name: PIR
+      priority: 1
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:

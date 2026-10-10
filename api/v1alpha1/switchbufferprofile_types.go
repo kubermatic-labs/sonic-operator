@@ -44,7 +44,16 @@ type SwitchBufferProfileSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Profile",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Pool",type=string,JSONPath=`.spec.pool`
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Size",type=integer,JSONPath=`.spec.size`,priority=1
+// +kubebuilder:printcolumn:name="DynamicTh",type=integer,JSONPath=`.spec.dynamicThreshold`,priority=1
+// +kubebuilder:printcolumn:name="StaticTh",type=integer,JSONPath=`.spec.staticThreshold`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type SwitchBufferProfile struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -14,7 +14,42 @@ spec:
     singular: switchartifact
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.switchName
+      name: Switch
+      type: string
+    - jsonPath: .spec.baseline
+      name: Baseline
+      type: string
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.recoveryPhase
+      name: Phase
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.activation
+      name: Activation
+      priority: 1
+      type: string
+    - jsonPath: .metadata.generation
+      name: Generation
+      priority: 1
+      type: integer
+    - jsonPath: .status.confirmedGeneration
+      name: Confirmed
+      priority: 1
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         properties:

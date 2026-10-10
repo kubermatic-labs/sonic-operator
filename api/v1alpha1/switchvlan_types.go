@@ -145,6 +145,9 @@ type SwitchVLANStatus struct {
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Reconcile",type=string,JSONPath=`.spec.reconcilePolicy`,priority=1
+// +kubebuilder:printcolumn:name="Deletion",type=string,JSONPath=`.spec.deletionPolicy`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // SwitchVLAN manages Layer-2 VLAN configuration. Additive is the safe default;

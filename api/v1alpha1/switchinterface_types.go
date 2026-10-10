@@ -140,9 +140,19 @@ type SwitchInterfaceStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="Interface",type=string,JSONPath=`.spec.nativeName`
 // +kubebuilder:printcolumn:name="AdminState",type=string,JSONPath=`.status.adminState`
 // +kubebuilder:printcolumn:name="OperationalState",type=string,JSONPath=`.status.operationalState`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Alias",type=string,JSONPath=`.status.aliasName`,priority=1
+// +kubebuilder:printcolumn:name="Speed",type=integer,JSONPath=`.spec.speed`,priority=1
+// +kubebuilder:printcolumn:name="MTU",type=integer,JSONPath=`.spec.mtu`,priority=1
+// +kubebuilder:printcolumn:name="FEC",type=string,JSONPath=`.spec.fec`,priority=1
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`,priority=1
+// +kubebuilder:printcolumn:name="Neighbor",type=string,JSONPath=`.status.neighbor.systemName`,priority=1
+// +kubebuilder:printcolumn:name="NeighborPort",type=string,JSONPath=`.status.neighbor.interfaceHandle`,priority=1
+// +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.status.macAddress`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // SwitchInterface is the Schema for the switchinterfaces API

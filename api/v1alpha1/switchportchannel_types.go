@@ -48,8 +48,17 @@ type SwitchPortChannelSpec struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Switch",type=string,JSONPath=`.spec.switchRef.name`
+// +kubebuilder:printcolumn:name="PortChannel",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Admin",type=string,JSONPath=`.spec.adminState`
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=`.spec.managementPolicy`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=="Synced")].status`,priority=1
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,priority=1
+// +kubebuilder:printcolumn:name="Members",type=string,JSONPath=`.spec.members`,priority=1
+// +kubebuilder:printcolumn:name="MinLinks",type=integer,JSONPath=`.spec.minLinks`,priority=1
+// +kubebuilder:printcolumn:name="MTU",type=integer,JSONPath=`.spec.mtu`,priority=1
+// +kubebuilder:printcolumn:name="FastRate",type=boolean,JSONPath=`.spec.fastRate`,priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // SwitchPortChannel leaves device configuration intact on deletion.
 type SwitchPortChannel struct {
 	metav1.TypeMeta   `json:",inline"`

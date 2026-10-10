@@ -18,12 +18,37 @@ spec:
     - jsonPath: .spec.switchRef.name
       name: Switch
       type: string
+    - jsonPath: .spec.vlanID
+      name: VLAN
+      type: integer
+    - jsonPath: .spec.vrf
+      name: VRF
+      type: string
     - jsonPath: .spec.managementPolicy
       name: Policy
       type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      priority: 1
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.ipv4Servers
+      name: IPv4Servers
+      priority: 1
+      type: string
+    - jsonPath: .spec.ipv6Servers
+      name: IPv6Servers
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:

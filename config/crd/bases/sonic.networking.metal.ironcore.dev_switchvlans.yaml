@@ -30,6 +30,18 @@ spec:
     - jsonPath: .status.conditions[?(@.type=="Synced")].status
       name: Synced
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Reason
+      priority: 1
+      type: string
+    - jsonPath: .spec.reconcilePolicy
+      name: Reconcile
+      priority: 1
+      type: string
+    - jsonPath: .spec.deletionPolicy
+      name: Deletion
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
