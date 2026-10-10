@@ -505,3 +505,55 @@ func TestConfirmedBootRecoveryOutlivesStartupWindowWithoutAgentReplay(t *testing
 		t.Fatal(err)
 	}
 }
+
+// A candidate already present on disk (for example a hand-installed agent)
+// stages without a file change. If it is not confirmed, rollback restores the
+// last confirmed bytes, which differ from the running agent, so the agent must
+// be restarted; otherwise recovery health can never pass.
+func TestUnchangedCandidateRollbackRestartsAgentForRestoredBytes(t *testing.T) {
+	h := newGenerationFixture(t)
+	defer func() { h.e.Close() }()
+	h.confirmInitial()
+	var confirmed []byte
+	for i := range h.bundle.Files {
+		if h.bundle.Files[i].Slot == "AgentBinary" {
+			confirmed = h.bundle.Files[i].Data
+			h.bundle.Files[i].Data = append(append([]byte(nil), confirmed...), []byte("next-agent")...)
+			h.bundle.Files[i].SHA256 = Digest(h.bundle.Files[i].Data)
+			if err := os.WriteFile(filepath.Join(h.root, "usr/local/sbin/sonic-operator-agent"), h.bundle.Files[i].Data, 0755); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	h.bundle.Generation++
+	h.bundle.Activation = "AgentRestart"
+	now := time.Now()
+	if _, err := h.e.Ensure(h.bundle, now); err != nil {
+		t.Fatal(err)
+	}
+	j, err := h.e.load()
+	if err != nil || j.Changed {
+		t.Fatalf("hand-installed candidate should stage without a change: %+v %v", j, err)
+	}
+	restarts := h.agentRestarts
+	_ = h.e.Tick(now)
+	if err := h.e.Tick(now); err != nil {
+		t.Fatal(err)
+	}
+	if h.agentRestarts != restarts {
+		t.Fatal("unchanged candidate restarted the agent")
+	}
+	if err := h.e.Tick(now.Add(6 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(h.root, "usr/local/sbin/sonic-operator-agent"))
+	if !bytes.Equal(got, confirmed) {
+		t.Fatal("rollback did not restore the last confirmed agent")
+	}
+	if h.agentRestarts != restarts+1 {
+		t.Fatalf("restored agent bytes were not activated: restarts %d -> %d", restarts, h.agentRestarts)
+	}
+	if j, err := h.e.load(); err != nil || j.Phase != "RolledBack" {
+		t.Fatalf("rollback did not complete: %+v %v", j, err)
+	}
+}
