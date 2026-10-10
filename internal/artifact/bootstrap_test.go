@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -102,5 +103,81 @@ func TestBootstrapRuntimeCannotSpoofConsumerReadback(t *testing.T) {
 	policy := Policy{ImageSHA256: coreImageSHA, Runtime: map[string]RuntimeFile{"PlatformJSON": {Container: "pmon", Path: "/usr/share/sonic/device/unrelated/platform.json"}}}
 	if err := validateBootstrapPolicy(policy); err == nil {
 		t.Fatal("bootstrap policy could redirect health checks to an unrelated file")
+	}
+}
+
+// A successor bootstrap replaces the declared predecessor's owner record in
+// place, without the record ever being missing; any other conflict still fails.
+func TestBootstrapReplacesOnlyTheApprovedPredecessor(t *testing.T) {
+	b, root := bootstrapFixture(t)
+	calls := 0
+	activate := func(context.Context) error { calls++; return nil }
+	if err := EnsureBootstrap(context.Background(), root, b, activate); err != nil {
+		t.Fatal(err)
+	}
+	oldPolicy := b.Bootstrap.PolicySHA256
+	// Same policy content, different bytes: a distinct, still valid identity.
+	var policy Policy
+	if err := json.Unmarshal(b.Bootstrap.Policy, &policy); err != nil {
+		t.Fatal(err)
+	}
+	successor := *b.Bootstrap
+	successor.Policy, _ = json.MarshalIndent(policy, "", " ")
+	successor.PolicySHA256 = Digest(successor.Policy)
+	next := b
+	next.Bootstrap = &successor
+	if err := EnsureBootstrap(context.Background(), root, next, activate); err == nil || !strings.Contains(err.Error(), "identity conflict") {
+		t.Fatalf("successor replaced the owner without approval: %v", err)
+	}
+	wrong := successor
+	wrong.MigrationFrom = strings.Repeat("b", 64)
+	next.Bootstrap = &wrong
+	if err := EnsureBootstrap(context.Background(), root, next, activate); err == nil {
+		t.Fatal("successor replaced an owner that is not the declared predecessor")
+	}
+	stolen := successor
+	stolen.MigrationFrom = oldPolicy
+	other := next
+	other.Owner = "other-owner"
+	other.Bootstrap = &stolen
+	if err := EnsureBootstrap(context.Background(), root, other, activate); err == nil {
+		t.Fatal("predecessor approval transferred ownership")
+	}
+	approved := successor
+	approved.MigrationFrom = oldPolicy
+	next.Bootstrap = &approved
+	if err := EnsureBootstrap(context.Background(), root, next, activate); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, bootstrapState, "owner.json"))
+	if err != nil || !strings.Contains(string(raw), successor.PolicySHA256) || strings.Contains(string(raw), `"pending":true`) {
+		t.Fatalf("owner record not replaced: %s %v", raw, err)
+	}
+	// Re-applying the approved successor is idempotent; the old declaration
+	// can no longer reclaim the switch.
+	if err := EnsureBootstrap(context.Background(), root, next, activate); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBootstrap(context.Background(), root, b, activate); err == nil {
+		t.Fatal("stale predecessor declaration reclaimed the bootstrap")
+	}
+}
+
+func TestBootstrapMigrationIsNotPartOfTheIdentity(t *testing.T) {
+	b, _ := bootstrapFixture(t)
+	with := *b.Bootstrap
+	with.MigrationFrom = strings.Repeat("c", 64)
+	approved := b
+	approved.Bootstrap = &with
+	if b.Identity() != approved.Identity() {
+		t.Fatal("migration approval changed the bundle identity")
+	}
+	if b.Bootstrap.MigrationFrom != "" {
+		t.Fatal("Identity mutated the bundle")
+	}
+	same := with
+	same.MigrationFrom = same.PolicySHA256
+	if err := same.Validate(false); err == nil {
+		t.Fatal("bootstrap accepted itself as predecessor")
 	}
 }

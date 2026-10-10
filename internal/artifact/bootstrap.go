@@ -55,6 +55,11 @@ type Bootstrap struct {
 	PolicySHA256     string                 `json:"policySHA256"`
 	Policy           []byte                 `json:"policy,omitempty"`
 	UnitSHA256       string                 `json:"unitSHA256"`
+	// MigrationFrom is the policy SHA-256 of the approved predecessor
+	// (SwitchArtifactSpec.BootstrapMigrationFrom). It lets EnsureBootstrap
+	// replace exactly that owner record. It is an approval, not content, and
+	// does not enter the bundle identity.
+	MigrationFrom string `json:"migrationFrom,omitempty"`
 }
 
 func (b Bootstrap) Validate(content bool) error {
@@ -63,6 +68,9 @@ func (b Bootstrap) Validate(content bool) error {
 	}
 	if !shaPattern.MatchString(b.SupervisorSHA256) || !shaPattern.MatchString(b.PolicySHA256) || b.UnitSHA256 != Digest([]byte(SupervisorUnit)) {
 		return fmt.Errorf("invalid immutable bootstrap identity")
+	}
+	if b.MigrationFrom != "" && (!shaPattern.MatchString(b.MigrationFrom) || b.MigrationFrom == b.PolicySHA256) {
+		return fmt.Errorf("invalid bootstrap migration predecessor")
 	}
 	if content && (Digest(b.Supervisor) != b.SupervisorSHA256 || Digest(b.Policy) != b.PolicySHA256) {
 		return fmt.Errorf("bootstrap content identity mismatch")
@@ -104,6 +112,16 @@ func (b Bootstrap) Validate(content bool) error {
 		}
 	}
 	return nil
+}
+
+// approvedBootstrapPredecessor reports whether old may be replaced by desired:
+// only the declared predecessor policy, for the same owner, target, baseline,
+// unit and host recovery, and never while an installation is pending.
+func approvedBootstrapPredecessor(old, desired bootstrapRecord, pending bool, migrationFrom string) bool {
+	if migrationFrom == "" || pending || old.PolicySHA256 != migrationFrom {
+		return false
+	}
+	return old.Owner == desired.Owner && old.Target == desired.Target && old.Baseline == desired.Baseline && old.UnitSHA256 == desired.UnitSHA256 && old.HostSHA256 == desired.HostSHA256
 }
 
 type bootstrapRecord struct {
@@ -169,7 +187,13 @@ func EnsureBootstrap(ctx context.Context, root string, b Bundle, activate func(c
 		pending = old.Pending
 		old.Pending = false
 		if old != desired {
-			return fmt.Errorf("immutable bootstrap owner or identity conflict")
+			if !approvedBootstrapPredecessor(old, desired, pending, b.Bootstrap.MigrationFrom) {
+				return fmt.Errorf("immutable bootstrap owner or identity conflict")
+			}
+			// Replace the approved, settled predecessor in place: no window in
+			// which the record is missing and could be recreated by a stale
+			// declaration.
+			pending = false
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
