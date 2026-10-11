@@ -32,6 +32,18 @@ def persisted_users(path):
         users.append(name)
     return sorted(users)
 
+# chrony reads every conf.d/*.conf. Only the operator-owned makestep drop-in may
+# carry directives; the probe reports its digest and identity, never its content.
+# Returns (None, '') when absent.
+def chrony_step_file(root):
+    path=root/'etc/chrony/conf.d/sonic-operator-makestep.conf'
+    if not path.exists() and not path.is_symlink(): return None,''
+    if path.is_symlink() or not path.is_file(): raise ValueError()
+    with path.open('rb') as f:
+        data=f.read(4097); info=os.fstat(f.fileno())
+    if len(data)>4096: raise ValueError()
+    return dict(device=info.st_dev,inode=info.st_ino,modifiedNS=info.st_mtime_ns,changedNS=info.st_ctime_ns),hashlib.sha256(data).hexdigest()
+
 def mapped_library_matches(proc,root):
     mappings=[line.split() for line in (proc/'maps').read_text().splitlines() if 'libnetsnmp.so.' in line]
     if not mappings or any(len(m)!=6 for m in mappings): return False
@@ -68,6 +80,7 @@ def collect(mode):
     auxiliary=True
     clean=True
     users=[]
+    step,stepDigest=None,''
     if mode=='snmp':
         clean=not any(k.startswith('SNMP') for k in env) and env.get('HOME','/root')=='/root'
         auxiliary=mapped_library_matches(proc,root)
@@ -78,11 +91,13 @@ def collect(mode):
         if auxiliary: users=persisted_users(root/'var/lib/snmp/snmpd.conf')
     elif mode=='chrony':
         for directory,pattern in [('etc/chrony/conf.d','*.conf'),('etc/chrony/sources.d','*.sources'),('run/chrony-dhcp','*.sources')]:
-            for path in (root/directory).glob(pattern): auxiliary=auxiliary and directives(path,set())
+            for path in (root/directory).glob(pattern):
+                if path.name!='sonic-operator-makestep.conf' or directory!='etc/chrony/conf.d': auxiliary=auxiliary and directives(path,set())
+        step,stepDigest=chrony_step_file(root)
     final=(proc/'stat').read_text().rsplit(')',1)[1].split()[19]
     if initial!=final or file.stat().st_mtime_ns!=info.st_mtime_ns or file.stat().st_ctime_ns!=info.st_ctime_ns: raise ValueError()
     uptime=time.clock_gettime(time.CLOCK_BOOTTIME); wall=time.time()
-    return dict(pid=int(pid),bootID=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),file=dict(device=info.st_dev,inode=info.st_ino,modifiedNS=info.st_mtime_ns,changedNS=info.st_ctime_ns),arguments=args,startUptime=int(initial)/os.sysconf('SC_CLK_TCK'),observedWall=wall,observedUptime=uptime,configModified=info.st_mtime,configChanged=info.st_ctime,configDigest=hashlib.sha256(data).hexdigest(),environmentClean=clean,auxiliaryClean=auxiliary,persistedUsers=users)
+    return dict(pid=int(pid),bootID=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),file=dict(device=info.st_dev,inode=info.st_ino,modifiedNS=info.st_mtime_ns,changedNS=info.st_ctime_ns),arguments=args,startUptime=int(initial)/os.sysconf('SC_CLK_TCK'),observedWall=wall,observedUptime=uptime,configModified=info.st_mtime,configChanged=info.st_ctime,configDigest=hashlib.sha256(data).hexdigest(),environmentClean=clean,auxiliaryClean=auxiliary,persistedUsers=users,stepFile=step,stepDigest=stepDigest)
 
 try:
     print(json.dumps(collect(sys.argv[1])))

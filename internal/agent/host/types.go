@@ -23,11 +23,16 @@ func (Credential) String() string   { return "[redacted]" }
 func (Credential) GoString() string { return "[redacted]" }
 
 type NTP struct {
-	Servers         []string `json:"servers"`
-	AdminState      string   `json:"adminState,omitempty"`
-	DHCP            string   `json:"dhcp,omitempty"`
-	ServerRole      string   `json:"serverRole,omitempty"`
-	SourceInterface string   `json:"sourceInterface,omitempty"`
+	Servers         []string     `json:"servers"`
+	AdminState      string       `json:"adminState,omitempty"`
+	DHCP            string       `json:"dhcp,omitempty"`
+	ServerRole      string       `json:"serverRole,omitempty"`
+	SourceInterface string       `json:"sourceInterface,omitempty"`
+	MakeStep        *NTPMakeStep `json:"makeStep,omitempty"`
+}
+type NTPMakeStep struct {
+	ThresholdSeconds int `json:"thresholdSeconds"`
+	Limit            int `json:"limit"`
 }
 type SNMP struct {
 	Location  string     `json:"location"`

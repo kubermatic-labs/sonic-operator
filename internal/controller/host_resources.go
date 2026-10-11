@@ -75,6 +75,9 @@ func (r *HostReconciler) hostDesired(ctx context.Context, obj client.Object, tar
 		q.System = &host.System{}
 		if o.Spec.NTP != nil {
 			q.System.NTP = &host.NTP{Servers: append([]string{}, o.Spec.NTP.Servers...), AdminState: o.Spec.NTP.AdminState, DHCP: o.Spec.NTP.DHCP, ServerRole: o.Spec.NTP.ServerRole, SourceInterface: o.Spec.NTP.SourceInterface}
+			if m := o.Spec.NTP.MakeStep; m != nil {
+				q.System.NTP.MakeStep = &host.NTPMakeStep{ThresholdSeconds: m.ThresholdSeconds, Limit: m.Limit}
+			}
 		}
 		if o.Spec.SNMP != nil {
 			snmp, identities, err := r.hostSNMP(ctx, fresh, *o.Spec.SNMP)

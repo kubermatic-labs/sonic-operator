@@ -232,6 +232,9 @@ func ValidateSystem(s System) error {
 		if len(s.NTP.Servers) > 16 {
 			return ErrInvalid
 		}
+		if m := s.NTP.MakeStep; m != nil && (m.ThresholdSeconds < 1 || m.ThresholdSeconds > 86400 || m.Limit < 1 || m.Limit > 10) {
+			return ErrInvalid
+		}
 		seen := map[string]bool{}
 		for _, v := range s.NTP.Servers {
 			a, e := netip.ParseAddr(v)

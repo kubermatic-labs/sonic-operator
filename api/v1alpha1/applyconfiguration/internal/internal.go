@@ -262,6 +262,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: prefix
       type:
         namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NetworkInterfaceAddress
+- name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NTPMakeStep
+  map:
+    fields:
+    - name: limit
+      type:
+        scalar: numeric
+    - name: thresholdSeconds
+      type:
+        scalar: numeric
 - name: com.github.ironcore-dev.sonic-operator.api.v1alpha1.Neighbor
   map:
     fields:
@@ -1913,6 +1922,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: enabled
+    - name: makeStep
+      type:
+        namedType: com.github.ironcore-dev.sonic-operator.api.v1alpha1.NTPMakeStep
     - name: serverRole
       type:
         scalar: string

@@ -92,6 +92,25 @@ spec:
                     - enabled
                     - disabled
                     type: string
+                  makeStep:
+                    description: |-
+                      MakeStep lets chronyd step the clock instead of slewing it when the offset
+                      exceeds ThresholdSeconds during its first Limit clock updates after start.
+                      Use it on platforms whose RTC cannot be read at boot. Omission removes the
+                      operator-owned drop-in. Supported only by the chrony backend.
+                    properties:
+                      limit:
+                        maximum: 10
+                        minimum: 1
+                        type: integer
+                      thresholdSeconds:
+                        maximum: 86400
+                        minimum: 1
+                        type: integer
+                    required:
+                    - limit
+                    - thresholdSeconds
+                    type: object
                   serverRole:
                     default: disabled
                     enum:

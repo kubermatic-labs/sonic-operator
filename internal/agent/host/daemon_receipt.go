@@ -29,6 +29,8 @@ type daemonReceipt struct {
 	PID         int        `json:"pid"`
 	StartUptime float64    `json:"startUptime"`
 	File        daemonFile `json:"file"`
+	// StepFile is the identity of chrony's makestep drop-in at activation.
+	StepFile *daemonFile `json:"stepFile,omitempty"`
 }
 type daemonIntent struct {
 	Claim       claim   `json:"claim"`
@@ -170,7 +172,7 @@ func (n *Native) activateDaemon(ctx context.Context, q Request, p NativeProfile,
 	var observed daemonEvidence
 	for {
 		observed, err = n.daemonEvidence(ready, mode)
-		if err == nil && daemonProcessMatches(mode, observed, expected) && persistedUsersMatch(mode, q, observed) && observed.BootID == before.ID && observed.StartUptime >= before.Seconds && (observed.PID != prior.PID || observed.StartUptime != prior.StartUptime) {
+		if err == nil && daemonProcessMatches(mode, observed, expected) && persistedUsersMatch(mode, q, observed) && chronyStepLoaded(mode, q, observed) && observed.BootID == before.ID && observed.StartUptime >= before.Seconds && (observed.PID != prior.PID || observed.StartUptime != prior.StartUptime) {
 			break
 		}
 		select {
@@ -179,7 +181,7 @@ func (n *Native) activateDaemon(ctx context.Context, q Request, p NativeProfile,
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	r := daemonReceipt{Claim: intent.Claim, Profile: profileIdentity(p), BootID: observed.BootID, PID: observed.PID, StartUptime: observed.StartUptime, File: observed.File}
+	r := daemonReceipt{Claim: intent.Claim, Profile: profileIdentity(p), BootID: observed.BootID, PID: observed.PID, StartUptime: observed.StartUptime, File: observed.File, StepFile: observed.StepFile}
 	return n.writeRuntime(mode+".receipt.json", r)
 }
 

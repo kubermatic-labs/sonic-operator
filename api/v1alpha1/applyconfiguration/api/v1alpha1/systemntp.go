@@ -15,6 +15,11 @@ type SystemNTPApplyConfiguration struct {
 	// Servers owns the configured NTP_SERVER membership. Empty removes all
 	// configured servers; DHCP/vendor-generated sources remain separately checked.
 	Servers []string `json:"servers,omitempty"`
+	// MakeStep lets chronyd step the clock instead of slewing it when the offset
+	// exceeds ThresholdSeconds during its first Limit clock updates after start.
+	// Use it on platforms whose RTC cannot be read at boot. Omission removes the
+	// operator-owned drop-in. Supported only by the chrony backend.
+	MakeStep *NTPMakeStepApplyConfiguration `json:"makeStep,omitempty"`
 }
 
 // SystemNTPApplyConfiguration constructs a declarative configuration of the SystemNTP type for use with
@@ -62,5 +67,13 @@ func (b *SystemNTPApplyConfiguration) WithServers(values ...string) *SystemNTPAp
 	for i := range values {
 		b.Servers = append(b.Servers, values[i])
 	}
+	return b
+}
+
+// WithMakeStep sets the MakeStep field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MakeStep field is set to the value of the last call.
+func (b *SystemNTPApplyConfiguration) WithMakeStep(value *NTPMakeStepApplyConfiguration) *SystemNTPApplyConfiguration {
+	b.MakeStep = value
 	return b
 }

@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestSwitchSystemSNMPUserSchema(t *testing.T) {
+func TestSwitchSystemSchema(t *testing.T) {
 	env := &envtest.Environment{ErrorIfCRDPathMissing: true, CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases", "sonic.networking.metal.ironcore.dev_switchsystems.yaml")}}
 	cfg, err := env.Start()
 	if err != nil {
@@ -45,6 +45,30 @@ func TestSwitchSystemSNMPUserSchema(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			obj := &unstructured.Unstructured{}
 			doc := `{apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1, kind: SwitchSystem, metadata: {name: ` + tc.name + `}, spec: {switchRef: {name: sw}, snmp: {location: rack, users: ` + tc.users + `}}}`
+			if err := yaml.Unmarshal([]byte(doc), &obj.Object); err != nil {
+				t.Fatal(err)
+			}
+			err := c.Create(t.Context(), obj, client.DryRunAll)
+			if tc.valid && err != nil {
+				t.Fatal(err)
+			}
+			if !tc.valid && !apierrors.IsInvalid(err) {
+				t.Fatalf("expected invalid, got %v", err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name, makeStep string
+		valid          bool
+	}{
+		{"makestep-valid", `{thresholdSeconds: 1, limit: 3}`, true},
+		{"makestep-zero-threshold", `{thresholdSeconds: 0, limit: 3}`, false},
+		{"makestep-unbounded-limit", `{thresholdSeconds: 1, limit: -1}`, false},
+		{"makestep-missing-limit", `{thresholdSeconds: 1}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			doc := `{apiVersion: sonic.networking.metal.ironcore.dev/v1alpha1, kind: SwitchSystem, metadata: {name: ` + tc.name + `}, spec: {switchRef: {name: sw}, ntp: {servers: [10.0.0.1], makeStep: ` + tc.makeStep + `}}}`
 			if err := yaml.Unmarshal([]byte(doc), &obj.Object); err != nil {
 				t.Fatal(err)
 			}

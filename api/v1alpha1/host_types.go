@@ -68,6 +68,23 @@ type SystemNTP struct {
 	// +kubebuilder:validation:MaxItems=16
 	// +listType=set
 	Servers []string `json:"servers"`
+	// MakeStep lets chronyd step the clock instead of slewing it when the offset
+	// exceeds ThresholdSeconds during its first Limit clock updates after start.
+	// Use it on platforms whose RTC cannot be read at boot. Omission removes the
+	// operator-owned drop-in. Supported only by the chrony backend.
+	// +optional
+	MakeStep *NTPMakeStep `json:"makeStep,omitempty"`
+}
+
+type NTPMakeStep struct {
+	// +required
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=86400
+	ThresholdSeconds int `json:"thresholdSeconds"`
+	// +required
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10
+	Limit int `json:"limit"`
 }
 type SystemSNMP struct {
 	// +kubebuilder:validation:MaxLength=256
