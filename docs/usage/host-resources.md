@@ -96,7 +96,7 @@ the clock starts far off after a reboot. The qualified `chrony.conf.j2` ships
 ```yaml
 spec:
   ntp:
-    servers: ["192.53.103.108"]
+    servers: ["192.0.2.10"]
     makeStep:
       thresholdSeconds: 1   # step when the offset exceeds 1 s ...
       limit: 3              # ... during the first 3 clock updates after start
