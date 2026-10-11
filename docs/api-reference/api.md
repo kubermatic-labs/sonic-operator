@@ -437,6 +437,23 @@ _Appears in:_
 | `gateway` _[NetworkIP](#networkip)_ | Gateway is on-link and of the same address family as Prefix. |  | MaxLength: 45 <br /> |
 
 
+#### NTPMakeStep
+
+
+
+
+
+
+
+_Appears in:_
+- [SystemNTP](#systemntp)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `thresholdSeconds` _integer_ |  |  | Maximum: 86400 <br />Minimum: 1 <br /> |
+| `limit` _integer_ |  |  | Maximum: 10 <br />Minimum: 1 <br /> |
+
+
 #### Neighbor
 
 
@@ -2352,6 +2369,7 @@ _Appears in:_
 | `serverRole` _string_ |  | disabled | Enum: [enabled disabled] <br /> |
 | `sourceInterface` _string_ |  | eth0 | Enum: [eth0] <br /> |
 | `servers` _string array_ | Servers owns the configured NTP_SERVER membership. Empty removes all<br />configured servers; DHCP/vendor-generated sources remain separately checked. |  | MaxItems: 16 <br /> |
+| `makeStep` _[NTPMakeStep](#ntpmakestep)_ | MakeStep lets chronyd step the clock instead of slewing it when the offset<br />exceeds ThresholdSeconds during its first Limit clock updates after start.<br />Use it on platforms whose RTC cannot be read at boot. Omission removes the<br />operator-owned drop-in. Supported only by the chrony backend. |  |  |
 
 
 #### SystemSNMP

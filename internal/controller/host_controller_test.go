@@ -101,6 +101,18 @@ func TestHostSNMPv3UsersResolveFromSecretReferences(t *testing.T) {
 	}
 }
 
+func TestHostNTPMakeStepMapsToAgentRequest(t *testing.T) {
+	obj := &api.SwitchSystem{ObjectMeta: metav1.ObjectMeta{Name: "system", UID: "uid", Generation: 2}, Spec: api.SwitchSystemSpec{NetworkResourceSpec: api.NetworkResourceSpec{SwitchRef: api.NetworkSwitchReference{Name: "sw"}, ManagementPolicy: api.NetworkManagementPolicyManage}, NTP: &api.SystemNTP{Servers: []string{"10.0.0.1"}, MakeStep: &api.NTPMakeStep{ThresholdSeconds: 1, Limit: 3}}}}
+	request, _, err := (&HostReconciler{}).hostDesired(context.Background(), obj, "switch-uid")
+	if err != nil || request.System.NTP.MakeStep == nil || *request.System.NTP.MakeStep != (host.NTPMakeStep{ThresholdSeconds: 1, Limit: 3}) {
+		t.Fatal("makeStep not carried to the agent request", err)
+	}
+	obj.Spec.NTP.MakeStep = nil
+	if request, _, err = (&HostReconciler{}).hostDesired(context.Background(), obj, "switch-uid"); err != nil || request.System.NTP.MakeStep != nil {
+		t.Fatal("omitted makeStep must stay omitted", err)
+	}
+}
+
 func TestHostSecretChangesBetweenObservationAndWriteBlockEnsure(t *testing.T) {
 	for _, operation := range []string{"rotate", "delete", "recreate", "metadata"} {
 		t.Run(operation, func(t *testing.T) {

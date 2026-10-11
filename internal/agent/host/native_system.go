@@ -99,6 +99,9 @@ func (n *Native) observeSystem(ctx context.Context, q Request, db, saved Databas
 		}
 		installed, e := n.read(profile.output)
 		equal := e == nil && bytes.Equal(generated, installed)
+		if p.NTPBackend == "chrony" {
+			equal = equal && n.chronyStepPersisted(s.NTP.MakeStep)
+		}
 		out.PersistenceVerified = out.PersistenceVerified && equal
 		args := []string{"chronyc", "-c", "-N", "sources"}
 		matches := ntpSourcesMatch
@@ -237,6 +240,11 @@ func (n *Native) ApplySystem(ctx context.Context, q Request) error {
 		if s.NTP != nil {
 			if e = n.write(ntpProfile.output, chrony, 0644); e != nil {
 				return e
+			}
+			if p.NTPBackend == "chrony" {
+				if e = n.writeChronyStep(s.NTP.MakeStep); e != nil {
+					return e
+				}
 			}
 			if e = n.activateDaemon(ctx, q, p, p.NTPBackend, ntpProfile.service, chrony); e != nil {
 				return e

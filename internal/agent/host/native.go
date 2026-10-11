@@ -54,6 +54,7 @@ type Native struct {
 	ReadFile          func(string) ([]byte, error)
 	ReadUnitFile      func(string) ([]byte, os.FileInfo, error)
 	WriteFile         func(string, []byte, os.FileMode) error
+	RemoveFile        func(string) error
 	SNMPExchange      func(context.Context, []byte) ([]byte, error)
 	BeforeRecovery    func(context.Context) error
 	stateDir          string

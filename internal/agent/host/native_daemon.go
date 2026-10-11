@@ -23,6 +23,10 @@ type daemonEvidence struct {
 	EnvironmentClean bool       `json:"environmentClean"`
 	AuxiliaryClean   bool       `json:"auxiliaryClean"`
 	PersistedUsers   []string   `json:"persistedUsers"`
+	// StepFile/StepDigest describe chrony's operator-owned makestep drop-in;
+	// both are empty when the file is absent or for other daemons.
+	StepFile   *daemonFile `json:"stepFile"`
+	StepDigest string      `json:"stepDigest"`
 }
 
 // Net-SNMP rewrites its persistent USM users right after startup, so a running
@@ -45,6 +49,10 @@ func daemonConfigLoaded(mode string, v daemonEvidence, expected []byte, receipts
 	}
 	r := receipts[0]
 	if r.BootID != v.BootID || r.PID != v.PID || r.StartUptime != v.StartUptime || r.File != v.File {
+		return false
+	}
+	// A drop-in rewritten or removed after activation is not what chronyd loaded.
+	if (r.StepFile == nil) != (v.StepFile == nil) || (r.StepFile != nil && *r.StepFile != *v.StepFile) {
 		return false
 	}
 	return daemonProcessMatches(mode, v, expected)
@@ -93,5 +101,5 @@ func (n *Native) daemonLoaded(ctx context.Context, mode string, expected []byte,
 	if err != nil || r.Claim != *requestClaim(q) || r.Profile != profileIdentity(p) {
 		return false
 	}
-	return daemonConfigLoaded(mode, evidence, expected, r) && persistedUsersMatch(mode, q, evidence)
+	return daemonConfigLoaded(mode, evidence, expected, r) && persistedUsersMatch(mode, q, evidence) && chronyStepLoaded(mode, q, evidence)
 }

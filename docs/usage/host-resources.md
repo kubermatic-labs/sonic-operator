@@ -87,6 +87,34 @@ write or activation. chrony supports the original server names.
 Configured-source convergence is separate from synchronization with a peer, so an
 empty server set is valid.
 
+### Clock step at start (chrony)
+
+Some platforms, such as the Dell Z9100, have no readable RTC (`hwclock` fails), so
+the clock starts far off after a reboot. The qualified `chrony.conf.j2` ships
+`makestep` commented out, so chronyd would slew for days. Declare a step instead:
+
+```yaml
+spec:
+  ntp:
+    servers: ["192.0.2.10"]
+    makeStep:
+      thresholdSeconds: 1   # step when the offset exceeds 1 s ...
+      limit: 3              # ... during the first 3 clock updates after start
+```
+
+- The agent owns `/etc/chrony/conf.d/sonic-operator-makestep.conf`. It writes the
+  file with fixed content (`makestep <thresholdSeconds> <limit>` plus a header) and
+  restarts chronyd through the normal activation. Omitting `makeStep` removes the
+  file.
+- Any other directive in `conf.d`, `sources.d` or `/run/chrony-dhcp` still fails
+  closed. A hand-written file at the owned path is replaced in `Manage`, and it
+  never counts as declared configuration in `Observe`.
+- The daemon probe reports the drop-in's digest and file identity, and the
+  activation receipt records that identity. A drop-in rewritten or removed without
+  a chronyd restart does not prove runtime.
+- NTPsec has no equivalent setting, so `makeStep` is rejected for the NTPsec
+  backend.
+
 ## SNMP
 
 - Communities come from namespaced Kubernetes Secret key references. Omitting the

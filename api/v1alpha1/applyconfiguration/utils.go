@@ -47,6 +47,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.NetworkResourceStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkSwitchReference"):
 		return &apiv1alpha1.NetworkSwitchReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NTPMakeStep"):
+		return &apiv1alpha1.NTPMakeStepApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("QoSMapEntry"):
 		return &apiv1alpha1.QoSMapEntryApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("QoSQueueBinding"):
